@@ -10,6 +10,57 @@ export default {
     login: '登录',
     getStarted: '开始使用',
     goToDashboard: '进入控制台',
+    nav: {
+      features: '功能特性',
+      pricing: '定价方案',
+      docs: '使用文档',
+      menu: '菜单'
+    },
+    hero: {
+      headline: '稳定高速 · 专业服务',
+      description: '统一入口，兼容多模型接口；支持账号池、粘性会话与实时计费，让你的团队可观测、可控、可扩展。',
+      secondaryCta: '查看用量',
+      stats: {
+        performance: '高速稳定转发',
+        control: '计费与配额可控',
+        security: '数据安全与隔离'
+      }
+    },
+    sections: {
+      featuresTitle: '功能特性',
+      featuresSubtitle: '统一入口、账号池与实时计费，构建稳定可控的 API 中转层。',
+      pricingTitle: '定价方案',
+      pricingSubtitle: '按量计费 + 配额管理，账单清晰可追踪。',
+      docsTitle: '使用文档',
+      docsSubtitle: '快速开始、API 说明与最佳实践。'
+    },
+    pricing: {
+      usageTitle: '按量计费',
+      usageDesc: '基于 Token 的精确计费与用量追踪，实时可见。',
+      quotaTitle: '配额管理',
+      quotaDesc: '支持用户/分组配额与限额策略，避免超支。',
+      redeemTitle: '充值与兑换码',
+      redeemDesc: '支持充值、兑换码与余额管理，结算更灵活。'
+    },
+    quickstart: {
+      title: '快速上手',
+      subtitle: '三步接入：创建 Key → 选择接口 → 直接调用。',
+      cta: '打开控制台',
+      steps: {
+        createKey: {
+          title: '创建 API Key',
+          desc: '在控制台生成 Key，并绑定分组/权限与配额策略。'
+        },
+        chooseApi: {
+          title: '选择兼容接口',
+          desc: 'Claude：/v1/messages；OpenAI：/v1/responses；Gemini：/v1beta/。'
+        },
+        call: {
+          title: '开始调用',
+          desc: '把 Base URL 指向你的 Sub2API，SDK/CLI 即可直连运行。'
+        }
+      }
+    },
     tags: {
       subscriptionToApi: '订阅转 API',
       stickySession: '粘性会话',
@@ -24,8 +75,8 @@ export default {
       balanceQuotaDesc: '基于 Token 的精确计费和用量追踪，支持配额管理和兑换码充值。'
     },
     providers: {
-      title: '支持的服务商',
-      description: 'AI 服务的统一 API 接口',
+      title: '受信赖的伙伴与技术栈',
+      description: '与 OpenAI、Anthropic、Claude 等生态深度兼容，持续扩展。',
       supported: '已支持',
       soon: '即将推出',
       claude: 'Claude',

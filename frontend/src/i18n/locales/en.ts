@@ -10,6 +10,58 @@ export default {
     login: 'Login',
     getStarted: 'Get Started',
     goToDashboard: 'Go to Dashboard',
+    nav: {
+      features: 'Features',
+      pricing: 'Pricing',
+      docs: 'Docs',
+      menu: 'Menu'
+    },
+    hero: {
+      headline: 'Fast & Stable · Built for Teams',
+      description:
+        'One entry for multi-model APIs. Account pooling, sticky sessions, and real-time billing — observable, controllable, and scalable.',
+      secondaryCta: 'View Usage',
+      stats: {
+        performance: 'Fast & stable routing',
+        control: 'Billing & quotas',
+        security: 'Security & isolation'
+      }
+    },
+    sections: {
+      featuresTitle: 'Features',
+      featuresSubtitle: 'One entry, account pooling, and real-time billing to build a stable, controllable API hub.',
+      pricingTitle: 'Pricing',
+      pricingSubtitle: 'Usage-based billing + quota control, with clear and traceable bills.',
+      docsTitle: 'Documentation',
+      docsSubtitle: 'Quick start, API reference, and best practices.'
+    },
+    pricing: {
+      usageTitle: 'Usage-based Billing',
+      usageDesc: 'Token-based billing with precise usage tracking, visible in real time.',
+      quotaTitle: 'Quota Control',
+      quotaDesc: 'User/group quotas and limit policies to prevent overspending.',
+      redeemTitle: 'Recharge & Redeem',
+      redeemDesc: 'Recharge, redeem codes, and balance management for flexible settlement.'
+    },
+    quickstart: {
+      title: 'Quick Start',
+      subtitle: '3 steps: create a key → choose an API → make requests.',
+      cta: 'Open Dashboard',
+      steps: {
+        createKey: {
+          title: 'Create an API Key',
+          desc: 'Generate a key in the dashboard and bind it to a group/permissions & quota policy.'
+        },
+        chooseApi: {
+          title: 'Pick a Compatible API',
+          desc: 'Claude: /v1/messages; OpenAI: /v1/responses; Gemini: /v1beta/.'
+        },
+        call: {
+          title: 'Start Calling',
+          desc: 'Point the Base URL to your Sub2API and run with your SDK/CLI.'
+        }
+      }
+    },
     tags: {
       subscriptionToApi: 'Subscription to API',
       stickySession: 'Sticky Session',
@@ -27,8 +79,8 @@ export default {
         'Token-based billing with precise usage tracking. Manage quotas and recharge with redeem codes.'
     },
     providers: {
-      title: 'Supported Providers',
-      description: 'Unified API interface for AI services',
+      title: 'Trusted Partners & Stack',
+      description: 'Deep compatibility with ecosystems like OpenAI, Anthropic, and Claude — and continuously expanding.',
       supported: 'Supported',
       soon: 'Soon',
       claude: 'Claude',
