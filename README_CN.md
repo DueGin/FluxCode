@@ -228,16 +228,21 @@ npm run build
 cd ../backend
 go build -tags embed -o sub2api ./cmd/server
 
-# 4. 创建配置文件
-cp ../deploy/config.example.yaml ./config.yaml
+# 4. 首次初始化（生成 config.yaml + .installed + 管理员账号）
+# 注意：只有当当前目录下同时不存在 config.yaml 和 .installed 时，才会进入安装流程
+./sub2api -setup
 
-# 5. 编辑配置
-nano config.yaml
+# 也可以使用 Web 安装向导：
+#   ./sub2api
+#   然后在浏览器打开 http://localhost:8080
 ```
 
 > **注意：** `-tags embed` 参数会将前端嵌入到二进制文件中。不使用此参数编译的程序将不包含前端界面。
 
 **`config.yaml` 关键配置：**
+
+> **管理员账号说明：** 首次管理员账号是在安装流程中创建并写入数据库的。
+> 配置模板里的 `default.admin_email` / `default.admin_password` **不会**用于自动创建管理员账号。
 
 ```yaml
 server:
@@ -269,7 +274,7 @@ default:
 ```
 
 ```bash
-# 6. 运行应用
+# 5. 运行应用
 ./sub2api
 ```
 
@@ -278,6 +283,10 @@ default:
 ```bash
 # 后端（支持热重载）
 cd backend
+# 首次初始化（生成 config.yaml + .installed + 管理员账号）
+go run ./cmd/server -setup
+
+# 正常启动
 go run ./cmd/server
 
 # 前端（支持热重载）

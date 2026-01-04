@@ -228,16 +228,21 @@ npm run build
 cd ../backend
 go build -tags embed -o sub2api ./cmd/server
 
-# 4. Create configuration file
-cp ../deploy/config.example.yaml ./config.yaml
+# 4. First-time setup (creates config.yaml + .installed + admin user)
+# IMPORTANT: Initial installation works only when BOTH config.yaml and .installed do NOT exist in the working directory.
+./sub2api -setup
 
-# 5. Edit configuration
-nano config.yaml
+# Alternatively, use the Web setup wizard:
+#   ./sub2api
+#   then open http://localhost:8080 in your browser
 ```
 
 > **Note:** The `-tags embed` flag embeds the frontend into the binary. Without this flag, the binary will not serve the frontend UI.
 
 **Key configuration in `config.yaml`:**
+
+> **Admin account note:** The initial admin user is created during the setup flow and stored in the database.
+> `default.admin_email` / `default.admin_password` in config templates are **not** used to auto-create an admin user.
 
 ```yaml
 server:
@@ -269,7 +274,7 @@ default:
 ```
 
 ```bash
-# 6. Run the application
+# 5. Run the application
 ./sub2api
 ```
 
@@ -278,6 +283,10 @@ default:
 ```bash
 # Backend (with hot reload)
 cd backend
+# First run (creates config.yaml + .installed + admin user)
+go run ./cmd/server -setup
+
+# Normal run
 go run ./cmd/server
 
 # Frontend (with hot reload)
