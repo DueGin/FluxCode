@@ -34,30 +34,6 @@
           <!-- Center Nav -->
           <div class="hidden flex-1 items-center justify-center gap-10 md:flex">
             <router-link
-              :to="{ path: '/home', hash: '#features' }"
-              class="text-sm font-medium transition-colors"
-              :class="
-                route.path === '/home'
-                  ? 'text-gray-900 dark:text-white'
-                  : 'text-gray-700 hover:text-gray-900 dark:text-dark-200 dark:hover:text-white'
-              "
-              @click="closeMobileMenu"
-            >
-              {{ t('home.nav.features') }}
-            </router-link>
-            <router-link
-              to="/pricing"
-              class="text-sm font-medium transition-colors"
-              :class="
-                route.path === '/pricing'
-                  ? 'text-gray-900 dark:text-white'
-                  : 'text-gray-700 hover:text-gray-900 dark:text-dark-200 dark:hover:text-white'
-              "
-              @click="closeMobileMenu"
-            >
-              {{ t('home.nav.pricing') }}
-            </router-link>
-            <router-link
               to="/docs"
               class="text-sm font-medium transition-colors"
               :class="
@@ -177,20 +153,6 @@
           <div v-if="isMobileMenuOpen" class="md:hidden">
             <div class="border-t border-black/5 px-4 py-4 dark:border-white/10">
               <div class="grid gap-2">
-                <router-link
-                  :to="{ path: '/home', hash: '#features' }"
-                  class="rounded-xl px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-dark-200 dark:hover:bg-white/10 dark:hover:text-white"
-                  @click="closeMobileMenu"
-                >
-                  {{ t('home.nav.features') }}
-                </router-link>
-                <router-link
-                  to="/pricing"
-                  class="rounded-xl px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-dark-200 dark:hover:bg-white/10 dark:hover:text-white"
-                  @click="closeMobileMenu"
-                >
-                  {{ t('home.nav.pricing') }}
-                </router-link>
                 <router-link
                   to="/docs"
                   class="rounded-xl px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-dark-200 dark:hover:bg-white/10 dark:hover:text-white"

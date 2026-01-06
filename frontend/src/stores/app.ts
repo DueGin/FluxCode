@@ -24,7 +24,7 @@ export const useAppStore = defineStore('app', () => {
   // Public settings cache state
   const publicSettingsLoaded = ref<boolean>(false)
   const publicSettingsLoading = ref<boolean>(false)
-  const siteName = ref<string>('Sub2API')
+  const siteName = ref<string>('FluxCode')
   const siteLogo = ref<string>('')
   const siteVersion = ref<string>('')
   const contactInfo = ref<string>('')
@@ -308,7 +308,7 @@ export const useAppStore = defineStore('app', () => {
     publicSettingsLoading.value = true
     try {
       const data = await fetchPublicSettingsAPI()
-      siteName.value = data.site_name || 'Sub2API'
+      siteName.value = data.site_name || 'FluxCode'
       siteLogo.value = data.site_logo || ''
       siteVersion.value = data.version || ''
       contactInfo.value = data.contact_info || ''

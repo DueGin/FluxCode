@@ -1,4 +1,4 @@
-# Sub2API Configuration File
+# FluxCode Configuration File
 # Copy this file to /etc/sub2api/config.yaml and modify as needed
 # Documentation: https://github.com/Wei-Shaw/sub2api
 
@@ -140,7 +140,7 @@ gateway:
 # =============================================================================
 # Gemini OAuth (Required for Gemini accounts)
 # =============================================================================
-# Sub2API supports TWO Gemini OAuth modes:
+# FluxCode supports TWO Gemini OAuth modes:
 #
 # 1. Code Assist OAuth (需要 GCP project_id)
 #    - Uses: cloudcode-pa.googleapis.com (Code Assist API)

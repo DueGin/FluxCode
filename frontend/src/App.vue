@@ -41,7 +41,7 @@ watch(
 const routeTitle = computed(() => (route.meta.title as string | undefined) || '')
 
 const updateDocumentTitle = () => {
-  const baseTitle = appStore.siteName || 'Sub2API'
+  const baseTitle = appStore.siteName || 'FluxCode'
   document.title = routeTitle.value ? `${routeTitle.value} - ${baseTitle}` : baseTitle
 }
 

@@ -39,7 +39,7 @@ func (s *SettingService) webTitleDefault() string {
 	if title := strings.TrimSpace(os.Getenv("WEB_TITLE")); title != "" {
 		return title
 	}
-	return "Sub2API"
+	return "FluxCode"
 }
 
 // NewSettingService 创建系统设置服务实例

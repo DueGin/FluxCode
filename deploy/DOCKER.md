@@ -1,6 +1,6 @@
-# Sub2API Docker Image
+# FluxCode Docker Image
 
-Sub2API is an AI API Gateway Platform for distributing and managing AI product subscription API quotas.
+FluxCode is an AI API Gateway Platform for distributing and managing AI product subscription API quotas.
 
 ## Quick Start
 

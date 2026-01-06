@@ -1,4 +1,4 @@
-# Sub2API
+# FluxCode
 
 <div align="center">
 
@@ -18,7 +18,7 @@ English | [中文](README_CN.md)
 
 ## Demo
 
-Try Sub2API online: **https://v2.pincc.ai/**
+Try FluxCode online: **https://v2.pincc.ai/**
 
 Demo credentials (shared demo environment; **not** created automatically for self-hosted installs):
 
@@ -28,7 +28,7 @@ Demo credentials (shared demo environment; **not** created automatically for sel
 
 ## Overview
 
-Sub2API is an AI API gateway platform designed to distribute and manage API quotas from AI product subscriptions (like Claude Code $200/month). Users can access upstream AI services through platform-generated API Keys, while the platform handles authentication, billing, load balancing, and request forwarding.
+FluxCode is an AI API gateway platform designed to distribute and manage API quotas from AI product subscriptions (like Claude Code $200/month). Users can access upstream AI services through platform-generated API Keys, while the platform handles authentication, billing, load balancing, and request forwarding.
 
 ## Features
 
@@ -318,7 +318,7 @@ Simple Mode is designed for individual developers or internal teams who want qui
 
 ## Antigravity Support
 
-Sub2API supports [Antigravity](https://antigravity.so/) accounts. After authorization, dedicated endpoints are available for Claude and Gemini models.
+FluxCode supports [Antigravity](https://antigravity.so/) accounts. After authorization, dedicated endpoints are available for Claude and Gemini models.
 
 ### Dedicated Endpoints
 

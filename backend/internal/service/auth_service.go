@@ -165,7 +165,7 @@ func (s *AuthService) SendVerifyCode(ctx context.Context, email string) error {
 	}
 
 	// 获取网站名称
-	siteName := "Sub2API"
+	siteName := "FluxCode"
 	if s.settingService != nil {
 		siteName = s.settingService.GetSiteName(ctx)
 	}
@@ -201,7 +201,7 @@ func (s *AuthService) SendVerifyCodeAsync(ctx context.Context, email string) (*S
 	}
 
 	// 获取网站名称
-	siteName := "Sub2API"
+	siteName := "FluxCode"
 	if s.settingService != nil {
 		siteName = s.settingService.GetSiteName(ctx)
 	}

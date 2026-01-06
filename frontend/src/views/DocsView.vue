@@ -146,7 +146,7 @@ const { t } = useI18n()
 const appStore = useAppStore()
 
 // Site settings
-const siteName = computed(() => appStore.siteName || 'Sub2API')
+const siteName = computed(() => appStore.siteName || 'FluxCode')
 const siteLogo = computed(() => appStore.siteLogo || '')
 const docUrl = computed(() => appStore.docUrl || '')
 

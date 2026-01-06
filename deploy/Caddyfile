@@ -1,5 +1,5 @@
 # =============================================================================
-# Sub2API Caddy Reverse Proxy Configuration (宿主机部署)
+# FluxCode Caddy Reverse Proxy Configuration (宿主机部署)
 # =============================================================================
 # 使用方法:
 #   1. 安装 Caddy: https://caddyserver.com/docs/install
