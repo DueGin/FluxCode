@@ -140,7 +140,7 @@
                 v-model="formData.database.dbname"
                 type="text"
                 class="input"
-                placeholder="sub2api"
+                placeholder="fluxcode"
               />
             </div>
             <div>
@@ -579,7 +579,7 @@ const formData = reactive<InstallRequest>({
     port: 5432,
     user: 'postgres',
     password: '',
-    dbname: 'sub2api',
+    dbname: 'fluxcode',
     sslmode: 'disable'
   },
   redis: {

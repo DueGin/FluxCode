@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/ent"
-	"github.com/Wei-Shaw/sub2api/ent/setting"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/ent"
+	"github.com/DueGin/FluxCode/ent/setting"
+	"github.com/DueGin/FluxCode/internal/service"
 )
 
 type settingRepository struct {

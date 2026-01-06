@@ -59,8 +59,8 @@ temp/
 
 # Deploy files (not needed in image)
 deploy/install.sh
-deploy/sub2api.service
-deploy/sub2api-sudoers
+deploy/fluxcode.service
+deploy/fluxcode-sudoers
 
 # GoReleaser
 .goreleaser.yaml

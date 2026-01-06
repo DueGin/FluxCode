@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
+	"github.com/DueGin/FluxCode/internal/pkg/antigravity"
 )
 
 // AntigravityQuotaFetcher 从 Antigravity API 获取额度

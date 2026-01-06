@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"github.com/Wei-Shaw/sub2api/internal/handler"
-	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/DueGin/FluxCode/internal/handler"
+	"github.com/DueGin/FluxCode/internal/server/middleware"
 
 	"github.com/gin-gonic/gin"
 )

@@ -9,12 +9,12 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/Wei-Shaw/sub2api/ent/account"
-	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/usagelog"
-	"github.com/Wei-Shaw/sub2api/ent/user"
-	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/DueGin/FluxCode/ent/account"
+	"github.com/DueGin/FluxCode/ent/apikey"
+	"github.com/DueGin/FluxCode/ent/group"
+	"github.com/DueGin/FluxCode/ent/usagelog"
+	"github.com/DueGin/FluxCode/ent/user"
+	"github.com/DueGin/FluxCode/ent/usersubscription"
 )
 
 // UsageLog is the model entity for the UsageLog schema.

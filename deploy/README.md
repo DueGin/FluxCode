@@ -17,7 +17,7 @@ This directory contains files for deploying FluxCode on Linux servers.
 | `.env.example` | Docker environment variables template |
 | `DOCKER.md` | Docker Hub documentation |
 | `install.sh` | One-click binary installation script |
-| `sub2api.service` | Systemd service unit file |
+| `fluxcode.service` | Systemd service unit file |
 | `config.example.yaml` | Example configuration file |
 
 ---
@@ -28,8 +28,8 @@ This directory contains files for deploying FluxCode on Linux servers.
 
 ```bash
 # Clone repository
-git clone https://github.com/Wei-Shaw/sub2api.git
-cd sub2api/deploy
+git clone https://github.com/DueGin/FluxCode.git
+cd FluxCode/deploy
 
 # Configure environment
 cp .env.example .env
@@ -39,7 +39,7 @@ nano .env  # Set POSTGRES_PASSWORD (required)
 docker-compose up -d
 
 # View logs (check for auto-generated admin password)
-docker-compose logs -f sub2api
+docker-compose logs -f fluxcode
 
 # Access Web UI
 # http://localhost:8080
@@ -60,7 +60,7 @@ When using Docker Compose with `AUTO_SETUP=true`:
 
 3. If `ADMIN_PASSWORD` is not set, check logs for the generated password:
    ```bash
-   docker-compose logs sub2api | grep "admin password"
+   docker-compose logs fluxcode | grep "admin password"
    ```
 
 ### Database Migration Notes (PostgreSQL)
@@ -97,10 +97,10 @@ docker-compose up -d
 docker-compose down
 
 # View logs
-docker-compose logs -f sub2api
+docker-compose logs -f fluxcode
 
 # Restart FluxCode only
-docker-compose restart sub2api
+docker-compose restart fluxcode
 
 # Update to latest version
 docker-compose pull
@@ -116,7 +116,7 @@ docker-compose down -v
 |----------|----------|---------|-------------|
 | `POSTGRES_PASSWORD` | **Yes** | - | PostgreSQL password |
 | `SERVER_PORT` | No | `8080` | Server port |
-| `ADMIN_EMAIL` | No | `admin@sub2api.local` | Admin email |
+| `ADMIN_EMAIL` | No | `admin@fluxcode.local` | Admin email |
 | `ADMIN_PASSWORD` | No | *(auto-generated)* | Admin password |
 | `JWT_SECRET` | No | *(auto-generated)* | JWT secret |
 | `TZ` | No | `Asia/Shanghai` | Timezone |
@@ -229,19 +229,19 @@ For production servers using systemd.
 ### One-Line Installation
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/DueGin/FluxCode/main/deploy/install.sh | sudo bash
 ```
 
 ### Manual Installation
 
-1. Download the latest release from [GitHub Releases](https://github.com/Wei-Shaw/sub2api/releases)
-2. Extract and copy the binary to `/opt/sub2api/`
-3. Copy `sub2api.service` to `/etc/systemd/system/`
+1. Download the latest release from [GitHub Releases](https://github.com/DueGin/FluxCode/releases)
+2. Extract and copy the binary to `/opt/fluxcode/`
+3. Copy `fluxcode.service` to `/etc/systemd/system/`
 4. Run:
    ```bash
    sudo systemctl daemon-reload
-   sudo systemctl enable sub2api
-   sudo systemctl start sub2api
+   sudo systemctl enable fluxcode
+   sudo systemctl start fluxcode
    ```
 5. Open the Setup Wizard in your browser to complete configuration
 
@@ -262,22 +262,22 @@ sudo ./install.sh uninstall
 
 ```bash
 # Start the service
-sudo systemctl start sub2api
+sudo systemctl start fluxcode
 
 # Stop the service
-sudo systemctl stop sub2api
+sudo systemctl stop fluxcode
 
 # Restart the service
-sudo systemctl restart sub2api
+sudo systemctl restart fluxcode
 
 # Check status
-sudo systemctl status sub2api
+sudo systemctl status fluxcode
 
 # View logs
-sudo journalctl -u sub2api -f
+sudo journalctl -u fluxcode -f
 
 # Enable auto-start on boot
-sudo systemctl enable sub2api
+sudo systemctl enable fluxcode
 ```
 
 ### Configuration
@@ -290,7 +290,7 @@ To change after installation:
 
 1. Edit the systemd service:
    ```bash
-   sudo systemctl edit sub2api
+   sudo systemctl edit fluxcode
    ```
 
 2. Add or modify:
@@ -303,7 +303,7 @@ To change after installation:
 3. Reload and restart:
    ```bash
    sudo systemctl daemon-reload
-   sudo systemctl restart sub2api
+   sudo systemctl restart fluxcode
    ```
 
 #### Gemini OAuth Configuration
@@ -312,7 +312,7 @@ If you need to use AI Studio OAuth for Gemini accounts, add the OAuth client cre
 
 1. Edit the service file:
    ```bash
-   sudo nano /etc/systemd/system/sub2api.service
+   sudo nano /etc/systemd/system/fluxcode.service
    ```
 
 2. Add your OAuth credentials in the `[Service]` section (after the existing `Environment=` lines):
@@ -324,7 +324,7 @@ If you need to use AI Studio OAuth for Gemini accounts, add the OAuth client cre
 3. Reload and restart:
    ```bash
    sudo systemctl daemon-reload
-   sudo systemctl restart sub2api
+   sudo systemctl restart fluxcode
    ```
 
 > **Note:** Code Assist OAuth does not require any configuration - it uses the built-in Gemini CLI client.
@@ -332,7 +332,7 @@ If you need to use AI Studio OAuth for Gemini accounts, add the OAuth client cre
 
 #### Application Configuration
 
-The main config file is at `/etc/sub2api/config.yaml` (created by Setup Wizard).
+The main config file is at `/etc/fluxcode/config.yaml` (created by Setup Wizard).
 
 ### Prerequisites
 
@@ -344,12 +344,12 @@ The main config file is at `/etc/sub2api/config.yaml` (created by Setup Wizard).
 ### Directory Structure
 
 ```
-/opt/sub2api/
-├── sub2api              # Main binary
-├── sub2api.backup       # Backup (after upgrade)
+/opt/fluxcode/
+├── fluxcode              # Main binary
+├── fluxcode.backup       # Backup (after upgrade)
 └── data/                # Runtime data
 
-/etc/sub2api/
+/etc/fluxcode/
 └── config.yaml          # Configuration file
 ```
 
@@ -364,7 +364,7 @@ The main config file is at `/etc/sub2api/config.yaml` (created by Setup Wizard).
 docker-compose ps
 
 # View detailed logs
-docker-compose logs --tail=100 sub2api
+docker-compose logs --tail=100 fluxcode
 
 # Check database connection
 docker-compose exec postgres pg_isready
@@ -380,13 +380,13 @@ docker-compose restart
 
 ```bash
 # Check service status
-sudo systemctl status sub2api
+sudo systemctl status fluxcode
 
 # View recent logs
-sudo journalctl -u sub2api -n 50
+sudo journalctl -u fluxcode -n 50
 
 # Check config file
-sudo cat /etc/sub2api/config.yaml
+sudo cat /etc/fluxcode/config.yaml
 
 # Check PostgreSQL
 sudo systemctl status postgresql

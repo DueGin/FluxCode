@@ -11,14 +11,14 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/Wei-Shaw/sub2api/ent/account"
-	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/predicate"
-	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
-	"github.com/Wei-Shaw/sub2api/ent/usagelog"
-	"github.com/Wei-Shaw/sub2api/ent/user"
-	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	"github.com/DueGin/FluxCode/ent/account"
+	"github.com/DueGin/FluxCode/ent/apikey"
+	"github.com/DueGin/FluxCode/ent/group"
+	"github.com/DueGin/FluxCode/ent/predicate"
+	"github.com/DueGin/FluxCode/ent/redeemcode"
+	"github.com/DueGin/FluxCode/ent/usagelog"
+	"github.com/DueGin/FluxCode/ent/user"
+	"github.com/DueGin/FluxCode/ent/usersubscription"
 )
 
 // GroupUpdate is the builder for updating Group entities.

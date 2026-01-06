@@ -184,7 +184,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ secrets.DOCKERHUB_USERNAME }}/sub2api
+          repository: ${{ secrets.DOCKERHUB_USERNAME }}/fluxcode
           short-description: "FluxCode - AI API Gateway Platform"
           readme-filepath: ./deploy/DOCKER.md
 
@@ -233,7 +233,7 @@ jobs:
           MESSAGE+="\`\`\`bash"$'\n'
           # 根据是否配置 DockerHub 动态生成
           if [ -n "$DOCKERHUB_USERNAME" ]; then
-            DOCKER_IMAGE="${DOCKERHUB_USERNAME}/sub2api"
+            DOCKER_IMAGE="${DOCKERHUB_USERNAME}/fluxcode"
             MESSAGE+="# Docker Hub"$'\n'
             MESSAGE+="docker pull ${DOCKER_IMAGE}:${TAG_NAME}"$'\n'
             MESSAGE+="# GitHub Container Registry"$'\n'
@@ -245,7 +245,7 @@ jobs:
           if [ -n "$DOCKERHUB_USERNAME" ]; then
             MESSAGE+="• [Docker Hub](https://hub.docker.com/r/${DOCKER_IMAGE})"$'\n'
           fi
-          MESSAGE+="• [GitHub Packages](https://github.com/${REPO}/pkgs/container/sub2api)"$'\n'$'\n'
+          MESSAGE+="• [GitHub Packages](https://github.com/${REPO}/pkgs/container/fluxcode)"$'\n'$'\n'
           MESSAGE+="#FluxCode #Release #${TAG_NAME//./_}"
 
           # 发送消息

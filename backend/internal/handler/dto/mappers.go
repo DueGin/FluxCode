@@ -1,7 +1,7 @@
 // Package dto provides data transfer objects for HTTP handlers.
 package dto
 
-import "github.com/Wei-Shaw/sub2api/internal/service"
+import "github.com/DueGin/FluxCode/internal/service"
 
 func UserFromServiceShallow(u *service.User) *User {
 	if u == nil {

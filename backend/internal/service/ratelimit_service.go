@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/DueGin/FluxCode/internal/config"
 )
 
 // RateLimitService 处理限流和过载状态管理

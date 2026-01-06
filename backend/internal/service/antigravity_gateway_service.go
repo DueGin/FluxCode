@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
+	"github.com/DueGin/FluxCode/internal/pkg/antigravity"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -304,7 +304,7 @@ func (s *AntigravityGatewayService) wrapV1InternalRequest(projectID, model strin
 	wrapped := map[string]any{
 		"project":     projectID,
 		"requestId":   "agent-" + uuid.New().String(),
-		"userAgent":   "sub2api",
+		"userAgent":   "fluxcode",
 		"requestType": "agent",
 		"model":       model,
 		"request":     request,

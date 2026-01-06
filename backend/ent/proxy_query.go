@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/Wei-Shaw/sub2api/ent/account"
-	"github.com/Wei-Shaw/sub2api/ent/predicate"
-	"github.com/Wei-Shaw/sub2api/ent/proxy"
+	"github.com/DueGin/FluxCode/ent/account"
+	"github.com/DueGin/FluxCode/ent/predicate"
+	"github.com/DueGin/FluxCode/ent/proxy"
 )
 
 // ProxyQuery is the builder for querying Proxy entities.

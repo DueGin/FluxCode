@@ -24,7 +24,7 @@ Demo credentials (shared demo environment; **not** created automatically for sel
 
 | Email | Password |
 |-------|----------|
-| admin@sub2api.com | admin123 |
+| admin@fluxcode.com | admin123 |
 
 ## Overview
 
@@ -67,13 +67,13 @@ One-click installation script that downloads pre-built binaries from GitHub Rele
 #### Installation Steps
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/DueGin/FluxCode/main/deploy/install.sh | sudo bash
 ```
 
 The script will:
 1. Detect your system architecture
 2. Download the latest release
-3. Install binary to `/opt/sub2api`
+3. Install binary to `/opt/fluxcode`
 4. Create systemd service
 5. Configure system user and permissions
 
@@ -81,10 +81,10 @@ The script will:
 
 ```bash
 # 1. Start the service
-sudo systemctl start sub2api
+sudo systemctl start fluxcode
 
 # 2. Enable auto-start on boot
-sudo systemctl enable sub2api
+sudo systemctl enable fluxcode
 
 # 3. Open Setup Wizard in browser
 # http://YOUR_SERVER_IP:8080
@@ -108,16 +108,16 @@ The web interface will:
 
 ```bash
 # Check status
-sudo systemctl status sub2api
+sudo systemctl status fluxcode
 
 # View logs
-sudo journalctl -u sub2api -f
+sudo journalctl -u fluxcode -f
 
 # Restart service
-sudo systemctl restart sub2api
+sudo systemctl restart fluxcode
 
 # Uninstall
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | sudo bash -s -- uninstall -y
+curl -sSL https://raw.githubusercontent.com/DueGin/FluxCode/main/deploy/install.sh | sudo bash -s -- uninstall -y
 ```
 
 ---
@@ -135,8 +135,8 @@ Deploy with Docker Compose, including PostgreSQL and Redis containers.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Wei-Shaw/sub2api.git
-cd sub2api
+git clone https://github.com/DueGin/FluxCode.git
+cd FluxCode
 
 # 2. Enter the deploy directory
 cd deploy
@@ -170,7 +170,7 @@ docker-compose up -d
 docker-compose ps
 
 # 7. View logs
-docker-compose logs -f sub2api
+docker-compose logs -f fluxcode
 ```
 
 #### Access
@@ -215,8 +215,8 @@ Build and run from source code for development or customization.
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Wei-Shaw/sub2api.git
-cd sub2api
+git clone https://github.com/DueGin/FluxCode.git
+cd FluxCode
 
 # 2. Build frontend
 cd frontend
@@ -226,14 +226,14 @@ npm run build
 
 # 3. Build backend with embedded frontend
 cd ../backend
-go build -tags embed -o sub2api ./cmd/server
+go build -tags embed -o fluxcode ./cmd/server
 
 # 4. First-time setup (creates config.yaml + .installed + admin user)
 # IMPORTANT: Initial installation works only when BOTH config.yaml and .installed do NOT exist in the working directory.
-./sub2api -setup
+./fluxcode -setup
 
 # Alternatively, use the Web setup wizard:
-#   ./sub2api
+#   ./fluxcode
 #   then open http://localhost:8080 in your browser
 ```
 
@@ -255,7 +255,7 @@ database:
   port: 5432
   user: "postgres"
   password: "your_password"
-  dbname: "sub2api"
+  dbname: "fluxcode"
 
 redis:
   host: "localhost"
@@ -275,7 +275,7 @@ default:
 
 ```bash
 # 5. Run the application
-./sub2api
+./fluxcode
 ```
 
 #### Development Mode
@@ -351,7 +351,7 @@ In Claude Code, Plan Mode cannot exit automatically. (Normally when using the na
 ## Project Structure
 
 ```
-sub2api/
+FluxCode/
 ├── backend/                  # Go backend service
 │   ├── cmd/server/           # Application entry
 │   ├── internal/             # Internal modules

@@ -121,14 +121,14 @@
           &copy; {{ currentYear }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}
         </p>
         <div class="flex items-center gap-4">
-          <a
+          <!-- <a
             :href="githubUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
           >
             GitHub
-          </a>
+          </a> -->
         </div>
       </div>
     </footer>
@@ -151,7 +151,7 @@ const siteLogo = computed(() => appStore.siteLogo || '')
 const docUrl = computed(() => appStore.docUrl || '')
 
 // GitHub URL
-const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
+const githubUrl = 'https://github.com/DueGin/FluxCode'
 
 // Current year for footer
 const currentYear = computed(() => new Date().getFullYear())

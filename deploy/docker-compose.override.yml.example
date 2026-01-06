@@ -30,7 +30,7 @@
 # =============================================================================
 
 services:
-  sub2api:
+  fluxcode:
     # Remove dependencies on containerized postgres/redis
     depends_on: []
 
@@ -45,7 +45,7 @@ services:
       DATABASE_PORT: "5678"  # Change to your PostgreSQL port
       # DATABASE_USER: postgres  # Uncomment to override
       # DATABASE_PASSWORD: your_password  # Uncomment to override
-      # DATABASE_DBNAME: sub2api  # Uncomment to override
+      # DATABASE_DBNAME: fluxcode  # Uncomment to override
 
       # Redis Configuration
       REDIS_HOST: host.docker.internal
@@ -75,7 +75,7 @@ services:
 # =============================================================================
 
 # services:
-#   sub2api:
+#   fluxcode:
 #     # Keep default dependencies
 #     pass
 #
@@ -101,11 +101,11 @@ services:
 # =============================================================================
 # Scenario 4: Resource Limits (Production)
 # =============================================================================
-# Uncomment to set resource limits for the sub2api container
+# Uncomment to set resource limits for the fluxcode container
 # =============================================================================
 
 # services:
-#   sub2api:
+#   fluxcode:
 #     deploy:
 #       resources:
 #         limits:
@@ -122,7 +122,7 @@ services:
 # =============================================================================
 
 # services:
-#   sub2api:
+#   fluxcode:
 #     volumes:
 #       - ./logs:/app/logs
 #       - ./backups:/app/backups

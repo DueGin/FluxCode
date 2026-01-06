@@ -1,4 +1,4 @@
-module github.com/Wei-Shaw/sub2api
+module github.com/DueGin/FluxCode
 
 go 1.24.0
 

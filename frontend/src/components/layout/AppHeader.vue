@@ -156,7 +156,7 @@
                 </router-link>
 
                 <a
-                  href="https://github.com/Wei-Shaw/sub2api"
+                  href="https://github.com/DueGin/FluxCode"
                   target="_blank"
                   rel="noopener noreferrer"
                   @click="closeDropdown"

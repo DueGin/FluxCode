@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/internal/service"
 	"github.com/redis/go-redis/v9"
 )
 

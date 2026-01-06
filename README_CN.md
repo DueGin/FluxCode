@@ -24,7 +24,7 @@
 
 | 邮箱 | 密码 |
 |------|------|
-| admin@sub2api.com | admin123 |
+| admin@fluxcode.com | admin123 |
 
 ## 项目概述
 
@@ -67,13 +67,13 @@ FluxCode 是一个 AI API 网关平台，用于分发和管理 AI 产品订阅�
 #### 安装步骤
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/DueGin/FluxCode/main/deploy/install.sh | sudo bash
 ```
 
 脚本会自动：
 1. 检测系统架构
 2. 下载最新版本
-3. 安装二进制文件到 `/opt/sub2api`
+3. 安装二进制文件到 `/opt/fluxcode`
 4. 创建 systemd 服务
 5. 配置系统用户和权限
 
@@ -81,10 +81,10 @@ curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install
 
 ```bash
 # 1. 启动服务
-sudo systemctl start sub2api
+sudo systemctl start fluxcode
 
 # 2. 设置开机自启
-sudo systemctl enable sub2api
+sudo systemctl enable fluxcode
 
 # 3. 在浏览器中打开设置向导
 # http://你的服务器IP:8080
@@ -108,16 +108,16 @@ sudo systemctl enable sub2api
 
 ```bash
 # 查看状态
-sudo systemctl status sub2api
+sudo systemctl status fluxcode
 
 # 查看日志
-sudo journalctl -u sub2api -f
+sudo journalctl -u fluxcode -f
 
 # 重启服务
-sudo systemctl restart sub2api
+sudo systemctl restart fluxcode
 
 # 卸载
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | sudo bash -s -- uninstall -y
+curl -sSL https://raw.githubusercontent.com/DueGin/FluxCode/main/deploy/install.sh | sudo bash -s -- uninstall -y
 ```
 
 ---
@@ -135,8 +135,8 @@ curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/Wei-Shaw/sub2api.git
-cd sub2api
+git clone https://github.com/DueGin/FluxCode.git
+cd FluxCode
 
 # 2. 进入 deploy 目录
 cd deploy
@@ -170,7 +170,7 @@ docker-compose up -d
 docker-compose ps
 
 # 7. 查看日志
-docker-compose logs -f sub2api
+docker-compose logs -f fluxcode
 ```
 
 #### 访问
@@ -215,8 +215,8 @@ docker-compose logs -f
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/Wei-Shaw/sub2api.git
-cd sub2api
+git clone https://github.com/DueGin/FluxCode.git
+cd FluxCode
 
 # 2. 编译前端
 cd frontend
@@ -226,14 +226,14 @@ npm run build
 
 # 3. 编译后端（嵌入前端）
 cd ../backend
-go build -tags embed -o sub2api ./cmd/server
+go build -tags embed -o fluxcode ./cmd/server
 
 # 4. 首次初始化（生成 config.yaml + .installed + 管理员账号）
 # 注意：只有当当前目录下同时不存在 config.yaml 和 .installed 时，才会进入安装流程
-./sub2api -setup
+./fluxcode -setup
 
 # 也可以使用 Web 安装向导：
-#   ./sub2api
+#   ./fluxcode
 #   然后在浏览器打开 http://localhost:8080
 ```
 
@@ -255,7 +255,7 @@ database:
   port: 5432
   user: "postgres"
   password: "your_password"
-  dbname: "sub2api"
+  dbname: "fluxcode"
 
 redis:
   host: "localhost"
@@ -275,7 +275,7 @@ default:
 
 ```bash
 # 5. 运行应用
-./sub2api
+./fluxcode
 ```
 
 #### 开发模式
@@ -349,7 +349,7 @@ Antigravity 账户支持可选的**混合调度**功能。开启后，通用端�
 ## 项目结构
 
 ```
-sub2api/
+FluxCode/
 ├── backend/                  # Go 后端服务
 │   ├── cmd/server/           # 应用入口
 │   ├── internal/             # 内部模块

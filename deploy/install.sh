@@ -2,7 +2,7 @@
 #
 # FluxCode Installation Script
 # FluxCode 安装脚本
-# Usage: curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | bash
+# Usage: curl -sSL https://raw.githubusercontent.com/DueGin/FluxCode/main/deploy/install.sh | bash
 #
 
 set -e
@@ -16,11 +16,11 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-GITHUB_REPO="Wei-Shaw/sub2api"
-INSTALL_DIR="/opt/sub2api"
-SERVICE_NAME="sub2api"
-SERVICE_USER="sub2api"
-CONFIG_DIR="/etc/sub2api"
+GITHUB_REPO="DueGin/FluxCode"
+INSTALL_DIR="/opt/fluxcode"
+SERVICE_NAME="fluxcode"
+SERVICE_USER="fluxcode"
+CONFIG_DIR="/etc/fluxcode"
 
 # Server configuration (will be set by user)
 SERVER_HOST="0.0.0.0"
@@ -542,9 +542,9 @@ validate_version() {
 
 # Get current installed version
 get_current_version() {
-    if [ -f "$INSTALL_DIR/sub2api" ]; then
+    if [ -f "$INSTALL_DIR/fluxcode" ]; then
         # Use grep -E for better compatibility (works on macOS and Linux)
-        "$INSTALL_DIR/sub2api" --version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"
+        "$INSTALL_DIR/fluxcode" --version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "unknown"
     else
         echo "not_installed"
     fi
@@ -553,7 +553,7 @@ get_current_version() {
 # Download and extract
 download_and_extract() {
     local version_num=${LATEST_VERSION#v}
-    local archive_name="sub2api_${version_num}_${OS}_${ARCH}.tar.gz"
+    local archive_name="fluxcode_${version_num}_${OS}_${ARCH}.tar.gz"
     local download_url="https://github.com/${GITHUB_REPO}/releases/download/${LATEST_VERSION}/${archive_name}"
     local checksum_url="https://github.com/${GITHUB_REPO}/releases/download/${LATEST_VERSION}/checksums.txt"
 
@@ -594,15 +594,15 @@ download_and_extract() {
     mkdir -p "$INSTALL_DIR"
 
     # Copy binary
-    cp "$TEMP_DIR/sub2api" "$INSTALL_DIR/sub2api"
-    chmod +x "$INSTALL_DIR/sub2api"
+    cp "$TEMP_DIR/fluxcode" "$INSTALL_DIR/fluxcode"
+    chmod +x "$INSTALL_DIR/fluxcode"
 
     # Copy deploy files if they exist in the archive
     if [ -d "$TEMP_DIR/deploy" ]; then
         cp -r "$TEMP_DIR/deploy/"* "$INSTALL_DIR/" 2>/dev/null || true
     fi
 
-    print_success "$(msg 'binary_installed') $INSTALL_DIR/sub2api"
+    print_success "$(msg 'binary_installed') $INSTALL_DIR/fluxcode"
 }
 
 # Create system user
@@ -652,31 +652,31 @@ install_service() {
     print_info "$(msg 'installing_service')"
 
     # Create service file with configured host and port
-    cat > /etc/systemd/system/sub2api.service << EOF
+    cat > /etc/systemd/system/fluxcode.service << EOF
 [Unit]
 Description=FluxCode - AI API Gateway Platform
-Documentation=https://github.com/Wei-Shaw/sub2api
+Documentation=https://github.com/DueGin/FluxCode
 After=network.target postgresql.service redis.service
 Wants=postgresql.service redis.service
 
 [Service]
 Type=simple
-User=sub2api
-Group=sub2api
-WorkingDirectory=/opt/sub2api
-ExecStart=/opt/sub2api/sub2api
+User=fluxcode
+Group=fluxcode
+WorkingDirectory=/opt/fluxcode
+ExecStart=/opt/fluxcode/fluxcode
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=sub2api
+SyslogIdentifier=fluxcode
 
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/opt/sub2api
+ReadWritePaths=/opt/fluxcode
 
 # Environment - Server configuration
 Environment=GIN_MODE=release
@@ -725,12 +725,12 @@ get_public_ip() {
 start_service() {
     print_info "$(msg 'starting_service')"
 
-    if systemctl start sub2api; then
+    if systemctl start fluxcode; then
         print_success "$(msg 'service_started')"
         return 0
     else
         print_error "$(msg 'service_start_failed')"
-        print_info "sudo journalctl -u sub2api -n 50"
+        print_info "sudo journalctl -u fluxcode -n 50"
         return 1
     fi
 }
@@ -739,7 +739,7 @@ start_service() {
 enable_autostart() {
     print_info "$(msg 'enabling_autostart')"
 
-    if systemctl enable sub2api 2>/dev/null; then
+    if systemctl enable fluxcode 2>/dev/null; then
         print_success "$(msg 'autostart_enabled')"
         return 0
     else
@@ -780,10 +780,10 @@ print_completion() {
     echo "  $(msg 'useful_commands')"
     echo "=============================================="
     echo ""
-    echo "  $(msg 'cmd_status'):   sudo systemctl status sub2api"
-    echo "  $(msg 'cmd_logs'):     sudo journalctl -u sub2api -f"
-    echo "  $(msg 'cmd_restart'):  sudo systemctl restart sub2api"
-    echo "  $(msg 'cmd_stop'):     sudo systemctl stop sub2api"
+    echo "  $(msg 'cmd_status'):   sudo systemctl status fluxcode"
+    echo "  $(msg 'cmd_logs'):     sudo journalctl -u fluxcode -f"
+    echo "  $(msg 'cmd_restart'):  sudo systemctl restart fluxcode"
+    echo "  $(msg 'cmd_stop'):     sudo systemctl stop fluxcode"
     echo ""
     echo "=============================================="
 }
@@ -791,7 +791,7 @@ print_completion() {
 # Upgrade function
 upgrade() {
     # Check if FluxCode is installed
-    if [ ! -f "$INSTALL_DIR/sub2api" ]; then
+    if [ ! -f "$INSTALL_DIR/fluxcode" ]; then
         print_error "$(msg 'not_installed')"
         print_info "$(msg 'fresh_install_hint'): $0 install"
         exit 1
@@ -800,29 +800,29 @@ upgrade() {
     print_info "$(msg 'upgrading')"
 
     # Get current version
-    CURRENT_VERSION=$("$INSTALL_DIR/sub2api" --version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+    CURRENT_VERSION=$("$INSTALL_DIR/fluxcode" --version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
     print_info "$(msg 'current_version'): $CURRENT_VERSION"
 
     # Stop service
-    if systemctl is-active --quiet sub2api; then
+    if systemctl is-active --quiet fluxcode; then
         print_info "$(msg 'stopping_service')"
-        systemctl stop sub2api
+        systemctl stop fluxcode
     fi
 
     # Backup current binary
-    cp "$INSTALL_DIR/sub2api" "$INSTALL_DIR/sub2api.backup"
-    print_info "$(msg 'backup_created'): $INSTALL_DIR/sub2api.backup"
+    cp "$INSTALL_DIR/fluxcode" "$INSTALL_DIR/fluxcode.backup"
+    print_info "$(msg 'backup_created'): $INSTALL_DIR/fluxcode.backup"
 
     # Download and install new version
     get_latest_version
     download_and_extract
 
     # Set permissions
-    chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/sub2api"
+    chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/fluxcode"
 
     # Start service
     print_info "$(msg 'starting_service')"
-    systemctl start sub2api
+    systemctl start fluxcode
 
     print_success "$(msg 'upgrade_complete')"
 }
@@ -833,7 +833,7 @@ install_version() {
     local target_version="$1"
 
     # Check if FluxCode is installed
-    if [ ! -f "$INSTALL_DIR/sub2api" ]; then
+    if [ ! -f "$INSTALL_DIR/fluxcode" ]; then
         print_error "$(msg 'not_installed')"
         print_info "$(msg 'fresh_install_hint'): $0 install -v $target_version"
         exit 1
@@ -856,20 +856,20 @@ install_version() {
     fi
 
     # Stop service if running
-    if systemctl is-active --quiet sub2api; then
+    if systemctl is-active --quiet fluxcode; then
         print_info "$(msg 'stopping_service')"
-        systemctl stop sub2api
+        systemctl stop fluxcode
     fi
 
     # Backup current binary (for potential recovery)
-    if [ -f "$INSTALL_DIR/sub2api" ]; then
+    if [ -f "$INSTALL_DIR/fluxcode" ]; then
         local backup_name
         if [ "$current_version" != "unknown" ] && [ "$current_version" != "not_installed" ]; then
-            backup_name="sub2api.backup.${current_version}"
+            backup_name="fluxcode.backup.${current_version}"
         else
-            backup_name="sub2api.backup.$(date +%Y%m%d%H%M%S)"
+            backup_name="fluxcode.backup.$(date +%Y%m%d%H%M%S)"
         fi
-        cp "$INSTALL_DIR/sub2api" "$INSTALL_DIR/$backup_name"
+        cp "$INSTALL_DIR/fluxcode" "$INSTALL_DIR/$backup_name"
         print_info "$(msg 'backup_created'): $INSTALL_DIR/$backup_name"
     fi
 
@@ -880,15 +880,15 @@ install_version() {
     download_and_extract
 
     # Set permissions
-    chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/sub2api"
+    chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR/fluxcode"
 
     # Start service
     print_info "$(msg 'starting_service')"
-    if systemctl start sub2api; then
+    if systemctl start fluxcode; then
         print_success "$(msg 'service_started')"
     else
         print_error "$(msg 'service_start_failed')"
-        print_info "sudo journalctl -u sub2api -n 50"
+        print_info "sudo journalctl -u fluxcode -n 50"
     fi
 
     # Print completion message
@@ -923,11 +923,11 @@ uninstall() {
     fi
 
     print_info "$(msg 'stopping_service')"
-    systemctl stop sub2api 2>/dev/null || true
-    systemctl disable sub2api 2>/dev/null || true
+    systemctl stop fluxcode 2>/dev/null || true
+    systemctl disable fluxcode 2>/dev/null || true
 
     print_info "$(msg 'removing_files')"
-    rm -f /etc/systemd/system/sub2api.service
+    rm -f /etc/systemd/system/fluxcode.service
     systemctl daemon-reload
 
     print_info "$(msg 'removing_install_dir')"
@@ -1039,7 +1039,7 @@ main() {
             check_dependencies
             if [ -n "$target_version" ]; then
                 # Install specific version (fresh install or rollback)
-                if [ -f "$INSTALL_DIR/sub2api" ]; then
+                if [ -f "$INSTALL_DIR/fluxcode" ]; then
                     # Already installed, treat as version change
                     install_version "$target_version"
                 else
@@ -1135,7 +1135,7 @@ main() {
 
     if [ -n "$target_version" ]; then
         # Install specific version
-        if [ -f "$INSTALL_DIR/sub2api" ]; then
+        if [ -f "$INSTALL_DIR/fluxcode" ]; then
             install_version "$target_version"
         else
             configure_server

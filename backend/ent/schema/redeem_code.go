@@ -3,7 +3,7 @@ package schema
 import (
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/internal/service"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"

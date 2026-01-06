@@ -1,6 +1,6 @@
 # FluxCode Configuration File
-# Copy this file to /etc/sub2api/config.yaml and modify as needed
-# Documentation: https://github.com/Wei-Shaw/sub2api
+# Copy this file to /etc/fluxcode/config.yaml and modify as needed
+# Documentation: https://github.com/DueGin/FluxCode
 
 # =============================================================================
 # Server Configuration
@@ -55,7 +55,7 @@ database:
   port: 5432
   user: "postgres"
   password: "your_secure_password_here"
-  dbname: "sub2api"
+  dbname: "fluxcode"
   # SSL mode: disable, require, verify-ca, verify-full
   sslmode: "disable"
 

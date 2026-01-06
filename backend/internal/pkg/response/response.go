@@ -5,7 +5,7 @@ import (
 	"math"
 	"net/http"
 
-	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
 	"github.com/gin-gonic/gin"
 )
 

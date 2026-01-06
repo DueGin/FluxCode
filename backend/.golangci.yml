@@ -19,7 +19,7 @@ linters:
           files:
             - "**/internal/service/**"
           deny:
-            - pkg: github.com/Wei-Shaw/sub2api/internal/repository
+            - pkg: github.com/DueGin/FluxCode/internal/repository
               desc: "service must not import repository"
             - pkg: gorm.io/gorm
               desc: "service must not import gorm"
@@ -30,7 +30,7 @@ linters:
           files:
             - "**/internal/handler/**"
           deny:
-            - pkg: github.com/Wei-Shaw/sub2api/internal/repository
+            - pkg: github.com/DueGin/FluxCode/internal/repository
               desc: "handler must not import repository"
             - pkg: gorm.io/gorm
               desc: "handler must not import gorm"
