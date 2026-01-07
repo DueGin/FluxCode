@@ -1,51 +1,69 @@
 # =============================================================================
-# FluxCode Docker Compose Configuration
+# FluxCode Docker Compose (Scale-ready)
 # =============================================================================
-# Quick Start:
-#   1. Copy .env.example to .env and configure
-#   2. docker-compose up -d
-#   3. Check logs: docker-compose logs -f fluxcode
-#   4. Access: http://localhost:8080
+# 这个 compose 文件用于“水平扩容后端”场景：
+# - 引入 Caddy 作为唯一入口（对外只暴露一个端口）
+# - fluxcode 不再直接映射宿主机端口，从而可以 docker compose --scale
 #
-# All configuration is done via environment variables.
-# No Setup Wizard needed - the system auto-initializes on first run.
+# 使用方法：
+#   cd deploy
+#   cp .env.example .env
+#   # 至少设置：
+#   #   POSTGRES_PASSWORD=...
+#   #   JWT_SECRET=...           # 所有实例必须一致（建议 openssl rand -hex 32）
+#   #   ADMIN_PASSWORD=...       # 建议固定，避免并发首启时生成多个“无效日志密码”
+#   docker compose -f docker-compose.scale.yml up -d --scale fluxcode=3
+#
+# 访问：
+#   http://localhost:${SERVER_PORT:-8080}
+#
+# 注意：
+# - docker-compose（非 swarm）只能在“单机”水平扩容；多机需要额外的上游 LB 或改用 Swarm/K8s
 # =============================================================================
 
 services:
   # ===========================================================================
-  # FluxCode Application
+  # Ingress / Load Balancer
+  # ===========================================================================
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8080}:8080"
+    volumes:
+      - ./Caddyfile.compose:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - fluxcode-network
+    depends_on:
+      fluxcode:
+        condition: service_healthy
+
+  # ===========================================================================
+  # FluxCode Application (scale this service)
   # ===========================================================================
   fluxcode:
-    image: duegin/fluxcode:latest
-    container_name: fluxcode
+    image: ghcr.io/duegin/fluxcode:latest
     restart: unless-stopped
     ulimits:
       nofile:
         soft: 100000
         hard: 100000
-    ports:
-      - "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8080}:8080"
     volumes:
-      # Data persistence (config.yaml will be auto-generated here)
       - fluxcode_data:/app/data
     environment:
-      # =======================================================================
-      # Auto Setup (REQUIRED for Docker deployment)
-      # =======================================================================
+      # Auto Setup
       - AUTO_SETUP=true
 
-      # =======================================================================
       # Server Configuration
-      # =======================================================================
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8080
       - SERVER_MODE=${SERVER_MODE:-release}
       - RUN_MODE=${RUN_MODE:-standard}
       - WEB_TITLE=${WEB_TITLE:-FluxCode}
 
-      # =======================================================================
       # Database Configuration (PostgreSQL)
-      # =======================================================================
       - DATABASE_HOST=postgres
       - DATABASE_PORT=5432
       - DATABASE_USER=${POSTGRES_USER:-fluxcode}
@@ -53,45 +71,34 @@ services:
       - DATABASE_DBNAME=${POSTGRES_DB:-fluxcode}
       - DATABASE_SSLMODE=disable
 
-      # =======================================================================
       # Redis Configuration
-      # =======================================================================
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - REDIS_DB=${REDIS_DB:-0}
 
-      # =======================================================================
-      # Admin Account (auto-created on first run)
-      # =======================================================================
+      # Admin Account (建议固定，避免并发首启时生成多个“无效日志密码”)
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@fluxcode.local}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
 
-      # =======================================================================
-      # JWT Configuration
-      # =======================================================================
-      # Leave empty to auto-generate (recommended)
-      - JWT_SECRET=${JWT_SECRET:-}
+      # JWT Configuration（多实例必须一致）
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - JWT_EXPIRE_HOUR=${JWT_EXPIRE_HOUR:-24}
 
-      # =======================================================================
-      # Timezone Configuration
-      # This affects ALL time operations in the application:
-      # - Database timestamps
-      # - Usage statistics "today" boundary
-      # - Subscription expiry times
-      # - Log timestamps
-      # Common values: Asia/Shanghai, America/New_York, Europe/London, UTC
-      # =======================================================================
+      # Timezone
       - TZ=${TZ:-Asia/Shanghai}
 
-      # =======================================================================
-      # Gemini OAuth Configuration (for Gemini accounts)
-      # =======================================================================
+      # Gemini OAuth Configuration
       - GEMINI_OAUTH_CLIENT_ID=${GEMINI_OAUTH_CLIENT_ID:-}
       - GEMINI_OAUTH_CLIENT_SECRET=${GEMINI_OAUTH_CLIENT_SECRET:-}
       - GEMINI_OAUTH_SCOPES=${GEMINI_OAUTH_SCOPES:-}
       - GEMINI_QUOTA_POLICY=${GEMINI_QUOTA_POLICY:-}
+
+      # 可选：多实例时建议下调单实例的连接池，避免总连接数 = 实例数 x pool
+      - DATABASE_MAX_OPEN_CONNS=${DATABASE_MAX_OPEN_CONNS:-20}
+      - DATABASE_MAX_IDLE_CONNS=${DATABASE_MAX_IDLE_CONNS:-10}
+      - REDIS_POOL_SIZE=${REDIS_POOL_SIZE:-128}
+      - REDIS_MIN_IDLE_CONNS=${REDIS_MIN_IDLE_CONNS:-10}
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,7 +118,6 @@ services:
   # ===========================================================================
   postgres:
     image: postgres:18-alpine
-    container_name: fluxcode-postgres
     restart: unless-stopped
     ulimits:
       nofile:
@@ -132,15 +138,12 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    # 注意：不暴露端口到宿主机，应用通过内部网络连接
-    # 如需调试，可临时添加：ports: ["127.0.0.1:5433:5432"]
 
   # ===========================================================================
   # Redis Cache
   # ===========================================================================
   redis:
     image: redis:7-alpine
-    container_name: fluxcode-redis
     restart: unless-stopped
     ulimits:
       nofile:
@@ -156,7 +159,6 @@ services:
       ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
     environment:
       - TZ=${TZ:-Asia/Shanghai}
-      # REDISCLI_AUTH is used by redis-cli for authentication (safer than -a flag)
       - REDISCLI_AUTH=${REDIS_PASSWORD:-}
     networks:
       - fluxcode-network
@@ -167,9 +169,6 @@ services:
       retries: 5
       start_period: 5s
 
-# =============================================================================
-# Volumes
-# =============================================================================
 volumes:
   fluxcode_data:
     driver: local
@@ -177,10 +176,12 @@ volumes:
     driver: local
   redis_data:
     driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
 
-# =============================================================================
-# Networks
-# =============================================================================
 networks:
   fluxcode-network:
     driver: bridge
+
