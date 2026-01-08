@@ -43,6 +43,8 @@ export async function getRealtimeMetrics(): Promise<{
 export interface TrendParams {
   start_date?: string
   end_date?: string
+  // Rolling window for hourly granularity (when start/end are omitted)
+  hours?: number
   granularity?: 'day' | 'hour'
   user_id?: number
   api_key_id?: number

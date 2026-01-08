@@ -32,7 +32,7 @@ export interface UserDashboardStats {
   today_cache_creation_tokens: number
   today_cache_read_tokens: number
   today_tokens: number
-  today_cost: number // 今日标准计费
+  today_cost: number // 当前用户订阅下所有日额度之和
   today_actual_cost: number // 今日实际扣除
   average_duration_ms: number
   rpm: number // 近5分钟平均每分钟请求数
@@ -42,6 +42,8 @@ export interface UserDashboardStats {
 export interface TrendParams {
   start_date?: string
   end_date?: string
+  // Rolling window for hourly granularity (when start/end are omitted)
+  hours?: number
   granularity?: 'day' | 'hour'
 }
 
@@ -215,10 +217,7 @@ export async function getDashboardTrend(params?: TrendParams): Promise<TrendResp
  * @param params - Query parameters for filtering
  * @returns Model usage statistics for current user
  */
-export async function getDashboardModels(params?: {
-  start_date?: string
-  end_date?: string
-}): Promise<ModelStatsResponse> {
+export async function getDashboardModels(params?: TrendParams): Promise<ModelStatsResponse> {
   const { data } = await apiClient.get<ModelStatsResponse>('/usage/dashboard/models', { params })
   return data
 }

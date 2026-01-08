@@ -92,7 +92,7 @@
             </p>
           </div>
 
-          <div class="grid gap-6 md:grid-cols-3">
+          <div class="grid gap-6 md:grid-cols-2">
             <div class="group rounded-3xl border border-black/5 bg-white/70 p-6 shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:border-white/10 dark:bg-dark-900/40">
               <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-600/20">
                 <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -130,23 +130,6 @@
               </p>
             </div>
 
-            <div class="group rounded-3xl border border-black/5 bg-white/70 p-6 shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/5 dark:border-white/10 dark:bg-dark-900/40">
-              <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-600 text-white shadow-lg shadow-purple-600/20">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3"
-                  />
-                </svg>
-              </div>
-              <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-                {{ t('home.features.balanceQuota') }}
-              </h3>
-              <p class="text-sm leading-relaxed text-gray-600 dark:text-dark-400">
-                {{ t('home.features.balanceQuotaDesc') }}
-              </p>
-            </div>
           </div>
         </div>
       </section>

@@ -158,36 +158,6 @@
                 @change="onDateRangeChange"
               />
             </div>
-
-            <!-- Actions -->
-            <div class="ml-auto flex items-center gap-3">
-              <button @click="resetFilters" class="btn btn-secondary">
-                {{ t('common.reset') }}
-              </button>
-              <button @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
-                <svg
-                  v-if="exporting"
-                  class="-ml-1 mr-2 h-4 w-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="4"
-                  ></circle>
-                  <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                {{ exporting ? t('usage.exporting') : t('usage.exportCsv') }}
-              </button>
-            </div>
           </div>
         </div>
         </div>
@@ -362,19 +332,6 @@
             </div>
           </template>
 
-          <template #cell-billing_type="{ row }">
-            <span
-              class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium"
-              :class="
-                row.billing_type === 1
-                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
-              "
-            >
-              {{ row.billing_type === 1 ? t('usage.subscription') : t('usage.balance') }}
-            </span>
-          </template>
-
           <template #cell-first_token="{ row }">
             <span
               v-if="row.first_token_ms != null"
@@ -544,7 +501,6 @@ const columns = computed<Column[]>(() => [
   { key: 'stream', label: t('usage.type'), sortable: false },
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
   { key: 'cost', label: t('usage.cost'), sortable: false },
-  { key: 'billing_type', label: t('usage.billingType'), sortable: false },
   { key: 'first_token', label: t('usage.firstToken'), sortable: false },
   { key: 'duration', label: t('usage.duration'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true }
@@ -553,7 +509,6 @@ const columns = computed<Column[]>(() => [
 const usageLogs = ref<UsageLog[]>([])
 const apiKeys = ref<ApiKey[]>([])
 const loading = ref(false)
-const exporting = ref(false)
 
 const apiKeyOptions = computed(() => {
   return [
@@ -700,25 +655,6 @@ const applyFilters = () => {
   loadUsageStats()
 }
 
-const resetFilters = () => {
-  filters.value = {
-    api_key_id: undefined,
-    start_date: undefined,
-    end_date: undefined
-  }
-  // Reset date range to default (last 7 days)
-  const now = new Date()
-  const weekAgo = new Date(now)
-  weekAgo.setDate(weekAgo.getDate() - 6)
-  startDate.value = formatLocalDate(weekAgo)
-  endDate.value = formatLocalDate(now)
-  filters.value.start_date = startDate.value
-  filters.value.end_date = endDate.value
-  pagination.page = 1
-  loadUsageLogs()
-  loadUsageStats()
-}
-
 const handlePageChange = (page: number) => {
   pagination.page = page
   loadUsageLogs()
@@ -728,114 +664,6 @@ const handlePageSizeChange = (pageSize: number) => {
   pagination.page_size = pageSize
   pagination.page = 1
   loadUsageLogs()
-}
-
-/**
- * Escape CSV value to prevent injection and handle special characters
- */
-const escapeCSVValue = (value: unknown): string => {
-  if (value == null) return ''
-
-  const str = String(value)
-  const escaped = str.replace(/"/g, '""')
-
-  // Prevent formula injection by prefixing dangerous characters with single quote
-  if (/^[=+\-@\t\r]/.test(str)) {
-    return `"\'${escaped}"`
-  }
-
-  // Escape values containing comma, quote, or newline
-  if (/[,"\n\r]/.test(str)) {
-    return `"${escaped}"`
-  }
-
-  return str
-}
-
-const exportToCSV = async () => {
-  if (pagination.total === 0) {
-    appStore.showWarning(t('usage.noDataToExport'))
-    return
-  }
-
-  exporting.value = true
-  appStore.showInfo(t('usage.preparingExport'))
-
-  try {
-    const allLogs: UsageLog[] = []
-    const pageSize = 100 // Use a larger page size for export to reduce requests
-    const totalRequests = Math.ceil(pagination.total / pageSize)
-
-    for (let page = 1; page <= totalRequests; page++) {
-      const params: UsageQueryParams = {
-        page: page,
-        page_size: pageSize,
-        ...filters.value
-      }
-      const response = await usageAPI.query(params)
-      allLogs.push(...response.items)
-    }
-
-    if (allLogs.length === 0) {
-      appStore.showWarning(t('usage.noDataToExport'))
-      return
-    }
-
-    const headers = [
-      'Time',
-      'API Key Name',
-      'Model',
-      'Type',
-      'Input Tokens',
-      'Output Tokens',
-      'Cache Read Tokens',
-      'Cache Creation Tokens',
-      'Rate Multiplier',
-      'Billed Cost',
-      'Original Cost',
-      'Billing Type',
-      'First Token (ms)',
-      'Duration (ms)'
-    ]
-    const rows = allLogs.map((log) =>
-      [
-        log.created_at,
-        log.api_key?.name || '',
-        log.model,
-        log.stream ? 'Stream' : 'Sync',
-        log.input_tokens,
-        log.output_tokens,
-        log.cache_read_tokens,
-        log.cache_creation_tokens,
-        log.rate_multiplier,
-        log.actual_cost.toFixed(8),
-        log.total_cost.toFixed(8),
-        log.billing_type === 1 ? 'Subscription' : 'Balance',
-        log.first_token_ms ?? '',
-        log.duration_ms
-      ].map(escapeCSVValue)
-    )
-
-    const csvContent = [
-      headers.map(escapeCSVValue).join(','),
-      ...rows.map((row) => row.join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `usage_${filters.value.start_date}_to_${filters.value.end_date}.csv`
-    link.click()
-    window.URL.revokeObjectURL(url)
-
-    appStore.showSuccess(t('usage.exportSuccess'))
-  } catch (error) {
-    appStore.showError(t('usage.exportFailed'))
-    console.error('CSV Export failed:', error)
-  } finally {
-    exporting.value = false
-  }
 }
 
 // Tooltip functions
