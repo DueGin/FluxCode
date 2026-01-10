@@ -114,24 +114,6 @@
         </div>
       </section>
     </main>
-
-    <footer class="border-t border-black/5 bg-[#faf7f2] px-6 py-10 dark:border-white/10 dark:bg-dark-950">
-      <div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
-        <p class="text-sm text-gray-500 dark:text-dark-400">
-          &copy; {{ currentYear }} {{ siteName }}. {{ t('home.footer.allRightsReserved') }}
-        </p>
-        <div class="flex items-center gap-4">
-          <!-- <a
-            :href="githubUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-dark-400 dark:hover:text-white"
-          >
-            GitHub
-          </a> -->
-        </div>
-      </div>
-    </footer>
   </div>
 </template>
 
@@ -152,9 +134,6 @@ const docUrl = computed(() => appStore.docUrl || '')
 
 // GitHub URL
 const githubUrl = 'https://github.com/DueGin/FluxCode'
-
-// Current year for footer
-const currentYear = computed(() => new Date().getFullYear())
 
 onMounted(() => {
   appStore.fetchPublicSettings()

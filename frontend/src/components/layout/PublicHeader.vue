@@ -31,22 +31,6 @@
             </span>
           </router-link>
 
-          <!-- Center Nav -->
-          <div class="hidden flex-1 items-center justify-center gap-10 md:flex">
-            <router-link
-              to="/docs"
-              class="text-sm font-medium transition-colors"
-              :class="
-                route.path === '/docs'
-                  ? 'text-gray-900 dark:text-white'
-                  : 'text-gray-700 hover:text-gray-900 dark:text-dark-200 dark:hover:text-white'
-              "
-              @click="closeMobileMenu"
-            >
-              {{ t('home.nav.docs') }}
-            </router-link>
-          </div>
-
           <!-- Right Actions -->
           <div class="ml-auto flex items-center gap-2 sm:gap-3">
             <LocaleSwitcher class="hidden md:block" />
@@ -152,17 +136,7 @@
         >
           <div v-if="isMobileMenuOpen" class="md:hidden">
             <div class="border-t border-black/5 px-4 py-4 dark:border-white/10">
-              <div class="grid gap-2">
-                <router-link
-                  to="/docs"
-                  class="rounded-xl px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-dark-200 dark:hover:bg-white/10 dark:hover:text-white"
-                  @click="closeMobileMenu"
-                >
-                  {{ t('home.nav.docs') }}
-                </router-link>
-              </div>
-
-              <div class="mt-4 flex items-center gap-3">
+              <div class="flex items-center gap-3">
                 <LocaleSwitcher />
               </div>
             </div>
@@ -176,7 +150,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
 import { useWindowScroll } from '@vueuse/core'
 import { useAuthStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
@@ -187,7 +160,6 @@ defineProps<{
 }>()
 
 const { t } = useI18n()
-const route = useRoute()
 
 const authStore = useAuthStore()
 

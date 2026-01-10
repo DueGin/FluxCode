@@ -18,7 +18,7 @@ export default {
     },
     hero: {
       headline: '稳定高速 · 专业服务',
-      description: '统一入口，兼容多模型接口；支持账号池、粘性会话与实时计费，让你的团队可观测、可控、可扩展。',
+      description: '统一入口，兼容多模型接口；提供可观测、可控、稳定可靠的 API 中转服务。',
       secondaryCta: '查看用量',
       stats: {
         performance: '高速稳定转发',
@@ -28,7 +28,7 @@ export default {
     },
     sections: {
       featuresTitle: '功能特性',
-      featuresSubtitle: '统一入口、账号池与实时计费，构建稳定可控的 API 中转层。',
+      featuresSubtitle: '统一入口，实时计费，构建稳定可控的 API 中转层。',
       pricingTitle: '定价方案',
       pricingSubtitle: '按量计费 + 配额管理，账单清晰可追踪。',
       docsTitle: '使用文档',
