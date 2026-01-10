@@ -307,33 +307,63 @@
             <div class="flex flex-wrap items-center gap-4">
               <div class="flex items-center gap-2">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >{{ t('admin.dashboard.timeRange') }}:</span
-                >
-                <DateRangePicker
-                  v-model:start-date="startDate"
-                  v-model:end-date="endDate"
-                  @change="onDateRangeChange"
-                />
-              </div>
-              <div class="ml-auto flex items-center gap-2">
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >{{ t('admin.dashboard.granularity') }}:</span
                 >
                 <div class="w-28">
                   <Select
                     v-model="granularity"
                     :options="granularityOptions"
-                    @change="loadChartData"
+                    @change="onGranularityChange"
                   />
                 </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >{{ t('admin.dashboard.timeRange') }}:</span
+                >
+                <div v-if="granularity === 'hour'" class="flex items-center gap-1">
+                  <button
+                    type="button"
+                    @click="selectRollingHours(24)"
+                    :class="[
+                      'rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150',
+                      isRollingHoursActive(24)
+                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-dark-700'
+                    ]"
+                  >
+                    {{ t('dates.last24Hours') }}
+                  </button>
+                  <button
+                    type="button"
+                    @click="selectRollingHours(48)"
+                    :class="[
+                      'rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150',
+                      isRollingHoursActive(48)
+                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-dark-700'
+                    ]"
+                  >
+                    {{ t('dates.last48Hours') }}
+                  </button>
+                </div>
+                <DateRangePicker
+                  v-if="granularity !== 'hour'"
+                  v-model:start-date="startDate"
+                  v-model:end-date="endDate"
+                  :exclude-presets="['today', 'yesterday']"
+                  @change="onDateRangeChange"
+                />
               </div>
             </div>
           </div>
 
           <!-- Charts Grid -->
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <ModelDistributionChart :model-stats="modelStats" :loading="chartsLoading" />
-            <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+            <ModelDistributionChart :model-stats="modelStats" :loading="chartsLoading" split />
+            <div class="lg:col-span-2">
+              <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+            </div>
           </div>
 
           <!-- User Usage Trend (Full Width) -->
@@ -371,6 +401,7 @@ import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
+import type { TrendParams as AdminTrendParams } from '@/api/admin/dashboard'
 
 import {
   Chart as ChartJS,
@@ -410,6 +441,44 @@ const userTrend = ref<UserUsageTrendPoint[]>([])
 // Helper function to format date in local timezone
 const formatLocalDate = (date: Date): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+const useRollingHourly = ref(false)
+const rollingHours = ref(24)
+
+const setRollingHourlyRange = (hours: number) => {
+  useRollingHourly.value = true
+  rollingHours.value = hours
+
+  const now = new Date()
+  const start = new Date(now)
+  start.setHours(start.getHours() - hours)
+  startDate.value = formatLocalDate(start)
+  endDate.value = formatLocalDate(now)
+}
+
+const setDefaultDateRange = (g: 'day' | 'hour') => {
+  if (g === 'hour') {
+    setRollingHourlyRange(24)
+    return
+  }
+
+  useRollingHourly.value = false
+  const now = new Date()
+  const weekAgo = new Date(now)
+  weekAgo.setDate(weekAgo.getDate() - 6)
+  startDate.value = formatLocalDate(weekAgo)
+  endDate.value = formatLocalDate(now)
+}
+
+const isRollingHoursActive = (hours: number): boolean => {
+  return granularity.value === 'hour' && useRollingHourly.value && rollingHours.value === hours
+}
+
+const selectRollingHours = (hours: number) => {
+  granularity.value = 'hour'
+  setRollingHourlyRange(hours)
+  loadChartData()
 }
 
 // Initialize date range immediately
@@ -592,6 +661,8 @@ const onDateRangeChange = (range: {
   endDate: string
   preset: string | null
 }) => {
+  useRollingHourly.value = false
+
   // Auto-select granularity based on date range
   const start = new Date(range.startDate)
   const end = new Date(range.endDate)
@@ -604,6 +675,11 @@ const onDateRangeChange = (range: {
     granularity.value = 'day'
   }
 
+  loadChartData()
+}
+
+const onGranularityChange = () => {
+  setDefaultDateRange(granularity.value)
   loadChartData()
 }
 
@@ -623,16 +699,18 @@ const loadDashboardStats = async () => {
 const loadChartData = async () => {
   chartsLoading.value = true
   try {
-    const params = {
-      start_date: startDate.value,
-      end_date: endDate.value,
-      granularity: granularity.value
+    const trendParams: AdminTrendParams = { granularity: granularity.value }
+    if (granularity.value === 'hour' && useRollingHourly.value) {
+      trendParams.hours = rollingHours.value
+    } else {
+      trendParams.start_date = startDate.value
+      trendParams.end_date = endDate.value
     }
 
     const [trendResponse, modelResponse, userResponse] = await Promise.all([
-      adminAPI.dashboard.getUsageTrend(params),
+      adminAPI.dashboard.getUsageTrend(trendParams),
       adminAPI.dashboard.getModelStats({ start_date: startDate.value, end_date: endDate.value }),
-      adminAPI.dashboard.getUserUsageTrend({ ...params, limit: 12 })
+      adminAPI.dashboard.getUserUsageTrend({ ...trendParams, limit: 12 })
     ])
 
     trendData.value = trendResponse.trend || []

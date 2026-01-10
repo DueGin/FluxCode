@@ -1,4 +1,4 @@
-# Sub2API
+# FluxCode
 
 <div align="center">
 
@@ -24,11 +24,11 @@
 
 | 邮箱 | 密码 |
 |------|------|
-| admin@sub2api.com | admin123 |
+| admin@fluxcode.com | admin123 |
 
 ## 项目概述
 
-Sub2API 是一个 AI API 网关平台，用于分发和管理 AI 产品订阅（如 Claude Code $200/月）的 API 配额。用户通过平台生成的 API Key 调用上游 AI 服务，平台负责鉴权、计费、负载均衡和请求转发。
+FluxCode 是一个 AI API 网关平台，用于分发和管理 AI 产品订阅（如 Claude Code $200/月）的 API 配额。用户通过平台生成的 API Key 调用上游 AI 服务，平台负责鉴权、计费、负载均衡和请求转发。
 
 ## 核心功能
 
@@ -67,13 +67,13 @@ Sub2API 是一个 AI API 网关平台，用于分发和管理 AI 产品订阅（
 #### 安装步骤
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/DueGin/FluxCode/main/deploy/install.sh | sudo bash
 ```
 
 脚本会自动：
 1. 检测系统架构
 2. 下载最新版本
-3. 安装二进制文件到 `/opt/sub2api`
+3. 安装二进制文件到 `/opt/fluxcode`
 4. 创建 systemd 服务
 5. 配置系统用户和权限
 
@@ -81,10 +81,10 @@ curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install
 
 ```bash
 # 1. 启动服务
-sudo systemctl start sub2api
+sudo systemctl start fluxcode
 
 # 2. 设置开机自启
-sudo systemctl enable sub2api
+sudo systemctl enable fluxcode
 
 # 3. 在浏览器中打开设置向导
 # http://你的服务器IP:8080
@@ -108,16 +108,16 @@ sudo systemctl enable sub2api
 
 ```bash
 # 查看状态
-sudo systemctl status sub2api
+sudo systemctl status fluxcode
 
 # 查看日志
-sudo journalctl -u sub2api -f
+sudo journalctl -u fluxcode -f
 
 # 重启服务
-sudo systemctl restart sub2api
+sudo systemctl restart fluxcode
 
 # 卸载
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | sudo bash -s -- uninstall -y
+curl -sSL https://raw.githubusercontent.com/DueGin/FluxCode/main/deploy/install.sh | sudo bash -s -- uninstall -y
 ```
 
 ---
@@ -135,8 +135,8 @@ curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/Wei-Shaw/sub2api.git
-cd sub2api
+git clone https://github.com/DueGin/FluxCode.git
+cd FluxCode
 
 # 2. 进入 deploy 目录
 cd deploy
@@ -170,7 +170,7 @@ docker-compose up -d
 docker-compose ps
 
 # 7. 查看日志
-docker-compose logs -f sub2api
+docker-compose logs -f fluxcode
 ```
 
 #### 访问
@@ -215,8 +215,8 @@ docker-compose logs -f
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/Wei-Shaw/sub2api.git
-cd sub2api
+git clone https://github.com/DueGin/FluxCode.git
+cd FluxCode
 
 # 2. 编译前端
 cd frontend
@@ -226,18 +226,23 @@ npm run build
 
 # 3. 编译后端（嵌入前端）
 cd ../backend
-go build -tags embed -o sub2api ./cmd/server
+go build -tags embed -o fluxcode ./cmd/server
 
-# 4. 创建配置文件
-cp ../deploy/config.example.yaml ./config.yaml
+# 4. 首次初始化（生成 config.yaml + .installed + 管理员账号）
+# 注意：只有当当前目录下同时不存在 config.yaml 和 .installed 时，才会进入安装流程
+./fluxcode -setup
 
-# 5. 编辑配置
-nano config.yaml
+# 也可以使用 Web 安装向导：
+#   ./fluxcode
+#   然后在浏览器打开 http://localhost:8080
 ```
 
 > **注意：** `-tags embed` 参数会将前端嵌入到二进制文件中。不使用此参数编译的程序将不包含前端界面。
 
 **`config.yaml` 关键配置：**
+
+> **管理员账号说明：** 首次管理员账号是在安装流程中创建并写入数据库的。
+> 配置模板里的 `default.admin_email` / `default.admin_password` **不会**用于自动创建管理员账号。
 
 ```yaml
 server:
@@ -250,7 +255,7 @@ database:
   port: 5432
   user: "postgres"
   password: "your_password"
-  dbname: "sub2api"
+  dbname: "fluxcode"
 
 redis:
   host: "localhost"
@@ -269,8 +274,8 @@ default:
 ```
 
 ```bash
-# 6. 运行应用
-./sub2api
+# 5. 运行应用
+./fluxcode
 ```
 
 #### 开发模式
@@ -278,6 +283,10 @@ default:
 ```bash
 # 后端（支持热重载）
 cd backend
+# 首次初始化（生成 config.yaml + .installed + 管理员账号）
+go run ./cmd/server -setup
+
+# 正常启动
 go run ./cmd/server
 
 # 前端（支持热重载）
@@ -309,7 +318,7 @@ go generate ./cmd/server
 
 ## Antigravity 使用说明
 
-Sub2API 支持 [Antigravity](https://antigravity.so/) 账户，授权后可通过专用端点访问 Claude 和 Gemini 模型。
+FluxCode 支持 [Antigravity](https://antigravity.so/) 账户，授权后可通过专用端点访问 Claude 和 Gemini 模型。
 
 ### 专用端点
 
@@ -340,7 +349,7 @@ Antigravity 账户支持可选的**混合调度**功能。开启后，通用端�
 ## 项目结构
 
 ```
-sub2api/
+FluxCode/
 ├── backend/                  # Go 后端服务
 │   ├── cmd/server/           # 应用入口
 │   ├── internal/             # 内部模块

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
+	"github.com/DueGin/FluxCode/internal/config"
+	"github.com/DueGin/FluxCode/internal/pkg/geminicli"
 )
 
 func TestGeminiOAuthService_GenerateAuthURL_RedirectURIStrategy(t *testing.T) {
@@ -89,7 +89,7 @@ func TestGeminiOAuthService_GenerateAuthURL_RedirectURIStrategy(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			svc := NewGeminiOAuthService(nil, nil, nil, tt.cfg)
+			svc := NewGeminiOAuthService(nil, nil, nil, tt.cfg, nil)
 			got, err := svc.GenerateAuthURL(context.Background(), nil, "https://example.com/auth/callback", tt.projectID, tt.oauthType, "")
 			if tt.wantErrSubstr != "" {
 				if err == nil {

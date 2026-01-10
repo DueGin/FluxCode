@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
-	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
+	"github.com/DueGin/FluxCode/internal/config"
+	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
+	"github.com/DueGin/FluxCode/internal/pkg/timezone"
 )
 
 var (

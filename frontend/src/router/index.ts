@@ -1,5 +1,5 @@
 /**
- * Vue Router configuration for Sub2API frontend
+ * Vue Router configuration for FluxCode frontend
  * Defines all application routes with lazy loading and navigation guards
  */
 
@@ -29,6 +29,24 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: false,
       title: 'Home'
+    }
+  },
+  {
+    path: '/pricing',
+    name: 'Pricing',
+    component: () => import('@/views/PricingView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Pricing'
+    }
+  },
+  {
+    path: '/docs',
+    name: 'Docs',
+    component: () => import('@/views/DocsView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Docs'
     }
   },
   {
@@ -277,10 +295,14 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
-  scrollBehavior(_to, _from, savedPosition) {
+  scrollBehavior(to, _from, savedPosition) {
     // Scroll to saved position when using browser back/forward
     if (savedPosition) {
       return savedPosition
+    }
+    // Anchor support
+    if (to.hash) {
+      return { el: to.hash, behavior: 'smooth' }
     }
     // Scroll to top for new routes
     return { top: 0 }
@@ -299,13 +321,6 @@ router.beforeEach((to, _from, next) => {
   if (!authInitialized) {
     authStore.checkAuth()
     authInitialized = true
-  }
-
-  // Set page title
-  if (to.meta.title) {
-    document.title = `${to.meta.title} - Sub2API`
-  } else {
-    document.title = 'Sub2API'
   }
 
   // Check if route requires authentication

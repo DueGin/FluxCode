@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 )
 
 // MaxExpiresAt is the maximum allowed expiration date (year 2099)

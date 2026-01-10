@@ -18,14 +18,14 @@ import (
 	"strconv"
 	"time"
 
-	dbent "github.com/Wei-Shaw/sub2api/ent"
-	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
-	dbaccountgroup "github.com/Wei-Shaw/sub2api/ent/accountgroup"
-	dbgroup "github.com/Wei-Shaw/sub2api/ent/group"
-	dbpredicate "github.com/Wei-Shaw/sub2api/ent/predicate"
-	dbproxy "github.com/Wei-Shaw/sub2api/ent/proxy"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	dbent "github.com/DueGin/FluxCode/ent"
+	dbaccount "github.com/DueGin/FluxCode/ent/account"
+	dbaccountgroup "github.com/DueGin/FluxCode/ent/accountgroup"
+	dbgroup "github.com/DueGin/FluxCode/ent/group"
+	dbpredicate "github.com/DueGin/FluxCode/ent/predicate"
+	dbproxy "github.com/DueGin/FluxCode/ent/proxy"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
+	"github.com/DueGin/FluxCode/internal/service"
 	"github.com/lib/pq"
 
 	entsql "entgo.io/ent/dialect/sql"
@@ -758,6 +758,10 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		return 0, nil
 	}
 
+	if updates.ClearProxyID && updates.ProxyID != nil {
+		return 0, errors.New("invalid bulk update: both proxy_id and clear_proxy_id are set")
+	}
+
 	setClauses := make([]string, 0, 8)
 	args := make([]any, 0, 8)
 
@@ -766,6 +770,9 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		setClauses = append(setClauses, "name = $"+itoa(idx))
 		args = append(args, *updates.Name)
 		idx++
+	}
+	if updates.ClearProxyID {
+		setClauses = append(setClauses, "proxy_id = NULL")
 	}
 	if updates.ProxyID != nil {
 		setClauses = append(setClauses, "proxy_id = $"+itoa(idx))

@@ -38,7 +38,7 @@ type DashboardStats struct {
 	TodayCacheCreationTokens int64   `json:"today_cache_creation_tokens"`
 	TodayCacheReadTokens     int64   `json:"today_cache_read_tokens"`
 	TodayTokens              int64   `json:"today_tokens"`
-	TodayCost                float64 `json:"today_cost"`        // 今日标准计费
+	TodayCost                float64 `json:"today_cost"`        // 当前用户订阅下所有日额度之和
 	TodayActualCost          float64 `json:"today_actual_cost"` // 今日实际扣除
 
 	// 系统运行统计

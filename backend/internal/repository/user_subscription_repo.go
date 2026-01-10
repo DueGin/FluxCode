@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	dbent "github.com/Wei-Shaw/sub2api/ent"
-	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	dbent "github.com/DueGin/FluxCode/ent"
+	"github.com/DueGin/FluxCode/ent/usersubscription"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
+	"github.com/DueGin/FluxCode/internal/service"
 )
 
 type userSubscriptionRepository struct {

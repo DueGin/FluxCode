@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/internal/pkg/httpclient"
+	"github.com/DueGin/FluxCode/internal/service"
 )
 
 func NewProxyExitInfoProber() service.ProxyExitInfoProber {

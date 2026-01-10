@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
-import { onMounted, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import Toast from '@/components/common/Toast.vue'
 import { useAppStore, useAuthStore, useSubscriptionStore } from '@/stores'
 import { getSetupStatus } from '@/api/setup'
@@ -38,15 +38,14 @@ watch(
   { immediate: true }
 )
 
-watch(
-  () => appStore.siteName,
-  (newName) => {
-    if (newName) {
-      document.title = `${newName} - AI API Gateway`
-    }
-  },
-  { immediate: true }
-)
+const routeTitle = computed(() => (route.meta.title as string | undefined) || '')
+
+const updateDocumentTitle = () => {
+  const baseTitle = appStore.siteName || 'FluxCode'
+  document.title = routeTitle.value ? `${routeTitle.value} - ${baseTitle}` : baseTitle
+}
+
+watch([() => appStore.siteName, () => routeTitle.value], updateDocumentTitle, { immediate: true })
 
 // Watch for authentication state and manage subscription data
 watch(

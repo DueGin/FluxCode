@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 )
 
 // AdminService interface defines admin management operations
@@ -134,6 +134,7 @@ type UpdateAccountInput struct {
 	Credentials           map[string]any
 	Extra                 map[string]any
 	ProxyID               *int64
+	ProxyIDSet            bool // true=更新(允许置空)，false=不更新
 	Concurrency           *int // 使用指针区分"未提供"和"设置为0"
 	Priority              *int // 使用指针区分"未提供"和"设置为0"
 	Status                string
@@ -146,6 +147,7 @@ type BulkUpdateAccountsInput struct {
 	AccountIDs  []int64
 	Name        string
 	ProxyID     *int64
+	ProxyIDSet  bool // true=更新(允许置空)，false=不更新
 	Concurrency *int
 	Priority    *int
 	Status      string
@@ -695,7 +697,7 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	if len(input.Extra) > 0 {
 		account.Extra = input.Extra
 	}
-	if input.ProxyID != nil {
+	if input.ProxyIDSet {
 		account.ProxyID = input.ProxyID
 		account.Proxy = nil // 清除关联对象，防止 GORM Save 时根据 Proxy.ID 覆盖 ProxyID
 	}
@@ -775,8 +777,12 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	if input.Name != "" {
 		repoUpdates.Name = &input.Name
 	}
-	if input.ProxyID != nil {
-		repoUpdates.ProxyID = input.ProxyID
+	if input.ProxyIDSet {
+		if input.ProxyID == nil {
+			repoUpdates.ClearProxyID = true
+		} else {
+			repoUpdates.ProxyID = input.ProxyID
+		}
 	}
 	if input.Concurrency != nil {
 		repoUpdates.Concurrency = input.Concurrency

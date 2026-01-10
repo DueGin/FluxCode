@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
-	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/DueGin/FluxCode/internal/config"
+	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
 )
 
 // 错误定义

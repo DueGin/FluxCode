@@ -1,5 +1,5 @@
 # =============================================================================
-# Sub2API Multi-Stage Dockerfile
+# FluxCode Multi-Stage Dockerfile
 # =============================================================================
 # Stage 1: Build frontend
 # Stage 2: Build Go backend with embedded frontend
@@ -11,6 +11,10 @@ ARG GOLANG_IMAGE=golang:1.25-alpine
 ARG ALPINE_IMAGE=alpine:3.19
 ARG GOPROXY=https://goproxy.cn,direct
 ARG GOSUMDB=sum.golang.google.cn
+# Alpine APK 镜像（多架构构建时偶发网络问题可通过切换镜像缓解）
+# - 默认使用国内镜像加速（Aliyun），失败时回退官方源
+ARG APK_MIRROR=https://mirrors.aliyun.com/alpine
+ARG APK_MIRROR_FALLBACK=https://dl-cdn.alpinelinux.org/alpine
 
 # -----------------------------------------------------------------------------
 # Stage 1: Frontend Builder
@@ -38,12 +42,40 @@ ARG COMMIT=docker
 ARG DATE
 ARG GOPROXY
 ARG GOSUMDB
+ARG APK_MIRROR
+ARG APK_MIRROR_FALLBACK
 
 ENV GOPROXY=${GOPROXY}
 ENV GOSUMDB=${GOSUMDB}
 
 # Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
+RUN set -eux; \
+    APK_MIRROR="${APK_MIRROR%/}"; \
+    APK_MIRROR_FALLBACK="${APK_MIRROR_FALLBACK%/}"; \
+    sed -i \
+      -e "s|https://dl-cdn.alpinelinux.org/alpine|${APK_MIRROR}|g" \
+      -e "s|http://dl-cdn.alpinelinux.org/alpine|${APK_MIRROR}|g" \
+      /etc/apk/repositories; \
+    ok=0; \
+    for i in 1 2 3; do \
+      if apk add --no-cache git ca-certificates tzdata; then ok=1; break; fi; \
+      echo "apk add failed (attempt ${i}), retrying..." >&2; \
+      sleep $((i * 2)); \
+    done; \
+    if [ "$ok" -ne 1 ]; then \
+      echo "apk add still failed, switching mirror to fallback: ${APK_MIRROR_FALLBACK}" >&2; \
+      sed -i \
+        -e "s|${APK_MIRROR}|${APK_MIRROR_FALLBACK}|g" \
+        -e "s|https://dl-cdn.alpinelinux.org/alpine|${APK_MIRROR_FALLBACK}|g" \
+        -e "s|http://dl-cdn.alpinelinux.org/alpine|${APK_MIRROR_FALLBACK}|g" \
+        /etc/apk/repositories; \
+      for i in 1 2 3; do \
+        if apk add --no-cache git ca-certificates tzdata; then ok=1; break; fi; \
+        echo "apk add (fallback) failed (attempt ${i}), retrying..." >&2; \
+        sleep $((i * 2)); \
+      done; \
+    fi; \
+    [ "$ok" -eq 1 ]
 
 WORKDIR /app/backend
 
@@ -61,7 +93,7 @@ COPY --from=frontend-builder /app/backend/internal/web/dist ./internal/web/dist
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -tags embed \
     -ldflags="-s -w -X main.Commit=${COMMIT} -X main.Date=${DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)} -X main.BuildType=release" \
-    -o /app/sub2api \
+    -o /app/fluxcode \
     ./cmd/server
 
 # -----------------------------------------------------------------------------
@@ -70,32 +102,59 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 FROM ${ALPINE_IMAGE}
 
 # Labels
-LABEL maintainer="Wei-Shaw <github.com/Wei-Shaw>"
-LABEL description="Sub2API - AI API Gateway Platform"
-LABEL org.opencontainers.image.source="https://github.com/Wei-Shaw/sub2api"
+LABEL maintainer="DueGin <github.com/DueGin>"
+LABEL description="FluxCode - AI API Gateway Platform"
+LABEL org.opencontainers.image.source="https://github.com/DueGin/FluxCode"
+
+# Re-declare build args for this stage
+ARG APK_MIRROR
+ARG APK_MIRROR_FALLBACK
 
 # Install runtime dependencies
-RUN apk add --no-cache \
-    ca-certificates \
-    tzdata \
-    curl \
-    && rm -rf /var/cache/apk/*
+RUN set -eux; \
+    APK_MIRROR="${APK_MIRROR%/}"; \
+    APK_MIRROR_FALLBACK="${APK_MIRROR_FALLBACK%/}"; \
+    sed -i \
+      -e "s|https://dl-cdn.alpinelinux.org/alpine|${APK_MIRROR}|g" \
+      -e "s|http://dl-cdn.alpinelinux.org/alpine|${APK_MIRROR}|g" \
+      /etc/apk/repositories; \
+    ok=0; \
+    for i in 1 2 3; do \
+      if apk add --no-cache ca-certificates tzdata curl; then ok=1; break; fi; \
+      echo "apk add failed (attempt ${i}), retrying..." >&2; \
+      sleep $((i * 2)); \
+    done; \
+    if [ "$ok" -ne 1 ]; then \
+      echo "apk add still failed, switching mirror to fallback: ${APK_MIRROR_FALLBACK}" >&2; \
+      sed -i \
+        -e "s|${APK_MIRROR}|${APK_MIRROR_FALLBACK}|g" \
+        -e "s|https://dl-cdn.alpinelinux.org/alpine|${APK_MIRROR_FALLBACK}|g" \
+        -e "s|http://dl-cdn.alpinelinux.org/alpine|${APK_MIRROR_FALLBACK}|g" \
+        /etc/apk/repositories; \
+      for i in 1 2 3; do \
+        if apk add --no-cache ca-certificates tzdata curl; then ok=1; break; fi; \
+        echo "apk add (fallback) failed (attempt ${i}), retrying..." >&2; \
+        sleep $((i * 2)); \
+      done; \
+    fi; \
+    [ "$ok" -eq 1 ]; \
+    rm -rf /var/cache/apk/*
 
 # Create non-root user
-RUN addgroup -g 1000 sub2api && \
-    adduser -u 1000 -G sub2api -s /bin/sh -D sub2api
+RUN addgroup -g 1000 fluxcode && \
+    adduser -u 1000 -G fluxcode -s /bin/sh -D fluxcode
 
 # Set working directory
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=backend-builder /app/sub2api /app/sub2api
+COPY --from=backend-builder /app/fluxcode /app/fluxcode
 
 # Create data directory
-RUN mkdir -p /app/data && chown -R sub2api:sub2api /app
+RUN mkdir -p /app/data && chown -R fluxcode:fluxcode /app
 
 # Switch to non-root user
-USER sub2api
+USER fluxcode
 
 # Expose port (can be overridden by SERVER_PORT env var)
 EXPOSE 8080
@@ -105,4 +164,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:${SERVER_PORT:-8080}/health || exit 1
 
 # Run the application
-ENTRYPOINT ["/app/sub2api"]
+ENTRYPOINT ["/app/fluxcode"]

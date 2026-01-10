@@ -14,13 +14,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/handler"
-	adminhandler "github.com/Wei-Shaw/sub2api/internal/handler/admin"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
-	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/internal/config"
+	"github.com/DueGin/FluxCode/internal/handler"
+	adminhandler "github.com/DueGin/FluxCode/internal/handler/admin"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
+	"github.com/DueGin/FluxCode/internal/pkg/usagestats"
+	"github.com/DueGin/FluxCode/internal/server/middleware"
+	"github.com/DueGin/FluxCode/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -264,14 +264,14 @@ func TestAPIContracts(t *testing.T) {
 					service.SettingKeySMTPUsername: "user",
 					service.SettingKeySMTPPassword: "secret",
 					service.SettingKeySMTPFrom:     "no-reply@example.com",
-					service.SettingKeySMTPFromName: "Sub2API",
+					service.SettingKeySMTPFromName: "FluxCode",
 					service.SettingKeySMTPUseTLS:   "true",
 
 					service.SettingKeyTurnstileEnabled:   "true",
 					service.SettingKeyTurnstileSiteKey:   "site-key",
 					service.SettingKeyTurnstileSecretKey: "secret-key",
 
-					service.SettingKeySiteName:     "Sub2API",
+					service.SettingKeySiteName:     "FluxCode",
 					service.SettingKeySiteLogo:     "",
 					service.SettingKeySiteSubtitle: "Subtitle",
 					service.SettingKeyAPIBaseURL:   "https://api.example.com",
@@ -296,12 +296,12 @@ func TestAPIContracts(t *testing.T) {
 					"smtp_username": "user",
 					"smtp_password": "secret",
 					"smtp_from_email": "no-reply@example.com",
-					"smtp_from_name": "Sub2API",
+					"smtp_from_name": "FluxCode",
 					"smtp_use_tls": true,
 					"turnstile_enabled": true,
 					"turnstile_site_key": "site-key",
 					"turnstile_secret_key": "secret-key",
-					"site_name": "Sub2API",
+					"site_name": "FluxCode",
 					"site_logo": "",
 					"site_subtitle": "Subtitle",
 					"api_base_url": "https://api.example.com",

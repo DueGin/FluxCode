@@ -426,7 +426,7 @@ function generateOpenAIFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
 
   // config.toml content
-  const configContent = `model_provider = "sub2api"
+  const configContent = `model_provider = "fluxcode"
 model = "gpt-5.2-codex"
 model_reasoning_effort = "high"
 network_access = "enabled"
@@ -434,13 +434,13 @@ disable_response_storage = true
 windows_wsl_setup_acknowledged = true
 model_verbosity = "high"
 
-[model_providers.sub2api]
-name = "sub2api"
+[model_providers.fluxcode]
+name = "fluxcode"
 base_url = "${baseUrl}"
 wire_api = "responses"
 requires_openai_auth = true`
 
-  const configHighlighted = `${key('model_provider')} ${operator('=')} ${string('"sub2api"')}
+  const configHighlighted = `${key('model_provider')} ${operator('=')} ${string('"fluxcode"')}
 ${key('model')} ${operator('=')} ${string('"gpt-5.2-codex"')}
 ${key('model_reasoning_effort')} ${operator('=')} ${string('"high"')}
 ${key('network_access')} ${operator('=')} ${string('"enabled"')}
@@ -448,8 +448,8 @@ ${key('disable_response_storage')} ${operator('=')} ${keyword('true')}
 ${key('windows_wsl_setup_acknowledged')} ${operator('=')} ${keyword('true')}
 ${key('model_verbosity')} ${operator('=')} ${string('"high"')}
 
-${comment('[model_providers.sub2api]')}
-${key('name')} ${operator('=')} ${string('"sub2api"')}
+${comment('[model_providers.fluxcode]')}
+${key('name')} ${operator('=')} ${string('"fluxcode"')}
 ${key('base_url')} ${operator('=')} ${string(`"${baseUrl}"`)}
 ${key('wire_api')} ${operator('=')} ${string('"responses"')}
 ${key('requires_openai_auth')} ${operator('=')} ${keyword('true')}`

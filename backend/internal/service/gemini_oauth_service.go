@@ -13,13 +13,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
+	"github.com/DueGin/FluxCode/internal/config"
+	"github.com/DueGin/FluxCode/internal/pkg/geminicli"
+	"github.com/DueGin/FluxCode/internal/pkg/httpclient"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
-	// Canonical tier IDs used by sub2api (2026-aligned).
+	// Canonical tier IDs used by fluxcode (2026-aligned).
 	GeminiTierGoogleOneFree    = "google_one_free"
 	GeminiTierGoogleAIPro      = "google_ai_pro"
 	GeminiTierGoogleAIUltra    = "google_ai_ultra"
@@ -50,7 +51,7 @@ const (
 )
 
 type GeminiOAuthService struct {
-	sessionStore *geminicli.SessionStore
+	sessionStore OAuthSessionStore[geminicli.OAuthSession]
 	proxyRepo    ProxyRepository
 	oauthClient  GeminiOAuthClient
 	codeAssist   GeminiCliCodeAssistClient
@@ -67,9 +68,17 @@ func NewGeminiOAuthService(
 	oauthClient GeminiOAuthClient,
 	codeAssist GeminiCliCodeAssistClient,
 	cfg *config.Config,
+	rdb *redis.Client,
 ) *GeminiOAuthService {
+	var store OAuthSessionStore[geminicli.OAuthSession]
+	if rdb != nil {
+		store = NewRedisJSONOAuthSessionStore[geminicli.OAuthSession](rdb, "fluxcode:oauth:gemini:", geminicli.SessionTTL)
+	} else {
+		store = NewInMemoryOAuthSessionStoreAdapter[geminicli.OAuthSession](geminicli.NewSessionStore())
+	}
+
 	return &GeminiOAuthService{
-		sessionStore: geminicli.NewSessionStore(),
+		sessionStore: store,
 		proxyRepo:    proxyRepo,
 		oauthClient:  oauthClient,
 		codeAssist:   codeAssist,
@@ -143,7 +152,9 @@ func (s *GeminiOAuthService) GenerateAuthURL(ctx context.Context, proxyID *int64
 		OAuthType:    oauthType,
 		CreatedAt:    time.Now(),
 	}
-	s.sessionStore.Set(sessionID, session)
+	if err := s.sessionStore.Set(ctx, sessionID, session); err != nil {
+		return nil, fmt.Errorf("failed to store oauth session: %w", err)
+	}
 
 	effectiveCfg, err := geminicli.EffectiveOAuthConfig(oauthCfg, oauthType)
 	if err != nil {
@@ -167,7 +178,9 @@ func (s *GeminiOAuthService) GenerateAuthURL(ctx context.Context, proxyID *int64
 		redirectURI = geminicli.AIStudioOAuthRedirectURI
 	}
 	session.RedirectURI = redirectURI
-	s.sessionStore.Set(sessionID, session)
+	if err := s.sessionStore.Set(ctx, sessionID, session); err != nil {
+		return nil, fmt.Errorf("failed to store oauth session: %w", err)
+	}
 
 	authURL, err := geminicli.BuildAuthorizationURL(effectiveCfg, state, codeChallenge, redirectURI, session.ProjectID, oauthType)
 	if err != nil {
@@ -445,7 +458,11 @@ func (s *GeminiOAuthService) ExchangeCode(ctx context.Context, input *GeminiExch
 	log.Printf("[GeminiOAuth] ========== ExchangeCode START ==========")
 	log.Printf("[GeminiOAuth] SessionID: %s", input.SessionID)
 
-	session, ok := s.sessionStore.Get(input.SessionID)
+	session, ok, err := s.sessionStore.Get(ctx, input.SessionID)
+	if err != nil {
+		log.Printf("[GeminiOAuth] ERROR: Failed to load oauth session: %v", err)
+		return nil, fmt.Errorf("failed to load oauth session: %w", err)
+	}
 	if !ok {
 		log.Printf("[GeminiOAuth] ERROR: Session not found or expired")
 		return nil, fmt.Errorf("session not found or expired")
@@ -506,7 +523,9 @@ func (s *GeminiOAuthService) ExchangeCode(ctx context.Context, input *GeminiExch
 	log.Printf("[GeminiOAuth] Token expires_in: %d seconds", tokenResp.ExpiresIn)
 
 	sessionProjectID := strings.TrimSpace(session.ProjectID)
-	s.sessionStore.Delete(input.SessionID)
+	if err := s.sessionStore.Delete(ctx, input.SessionID); err != nil {
+		log.Printf("[GeminiOAuth] Warning: failed to delete oauth session: %v", err)
+	}
 
 	// 计算过期时间：减去 5 分钟安全时间窗口（考虑网络延迟和时钟偏差）
 	// 同时设置下界保护，防止 expires_in 过小导致过去时间（引发刷新风暴）

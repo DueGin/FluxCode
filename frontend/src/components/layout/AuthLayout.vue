@@ -64,7 +64,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { getPublicSettings } from '@/api/auth'
 
-const siteName = ref('Sub2API')
+const siteName = ref('FluxCode')
 const siteLogo = ref('')
 const siteSubtitle = ref('Subscription to API Conversion Platform')
 
@@ -73,7 +73,7 @@ const currentYear = computed(() => new Date().getFullYear())
 onMounted(async () => {
   try {
     const settings = await getPublicSettings()
-    siteName.value = settings.site_name || 'Sub2API'
+    siteName.value = settings.site_name || 'FluxCode'
     siteLogo.value = settings.site_logo || ''
     siteSubtitle.value = settings.site_subtitle || 'Subscription to API Conversion Platform'
   } catch (error) {

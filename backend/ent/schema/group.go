@@ -1,8 +1,8 @@
 package schema
 
 import (
-	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/ent/schema/mixins"
+	"github.com/DueGin/FluxCode/internal/service"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"

@@ -41,7 +41,7 @@
         <!-- Quick presets -->
         <div class="date-picker-presets">
           <button
-            v-for="preset in presets"
+            v-for="preset in visiblePresets"
             :key="preset.value"
             @click="selectPreset(preset)"
             :class="['date-picker-preset', isPresetActive(preset) && 'date-picker-preset-active']"
@@ -116,6 +116,7 @@ interface DatePreset {
 interface Props {
   startDate: string
   endDate: string
+  excludePresets?: string[]
 }
 
 interface Emits {
@@ -233,6 +234,12 @@ const presets: DatePreset[] = [
   }
 ]
 
+const visiblePresets = computed(() => {
+  if (!props.excludePresets?.length) return presets
+  const excluded = new Set(props.excludePresets)
+  return presets.filter((preset) => !excluded.has(preset.value))
+})
+
 const displayValue = computed(() => {
   if (activePreset.value) {
     const preset = presets.find((p) => p.value === activePreset.value)
@@ -269,7 +276,7 @@ const selectPreset = (preset: DatePreset) => {
 const onDateChange = () => {
   // Check if current dates match any preset
   activePreset.value = null
-  for (const preset of presets) {
+  for (const preset of visiblePresets.value) {
     const range = preset.getRange()
     if (range.start === localStartDate.value && range.end === localEndDate.value) {
       activePreset.value = preset.value

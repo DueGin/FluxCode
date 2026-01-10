@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/DueGin/FluxCode/internal/config"
 )
 
 // BillingCache defines cache operations for billing service

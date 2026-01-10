@@ -1,16 +1,16 @@
-# Sub2API Docker Image
+# FluxCode Docker Image
 
-Sub2API is an AI API Gateway Platform for distributing and managing AI product subscription API quotas.
+FluxCode is an AI API Gateway Platform for distributing and managing AI product subscription API quotas.
 
 ## Quick Start
 
 ```bash
-docker run -d \
-  --name sub2api \
-  -p 8080:8080 \
-  -e DATABASE_URL="postgres://user:pass@host:5432/sub2api" \
-  -e REDIS_URL="redis://host:6379" \
-  weishaw/sub2api:latest
+	docker run -d \
+	  --name fluxcode \
+	  -p 8080:8080 \
+	  -e DATABASE_URL="postgres://user:pass@host:5432/fluxcode" \
+	  -e REDIS_URL="redis://host:6379" \
+	  duegin/fluxcode:latest
 ```
 
 ## Docker Compose
@@ -18,13 +18,13 @@ docker run -d \
 ```yaml
 version: '3.8'
 
-services:
-  sub2api:
-    image: weishaw/sub2api:latest
+	services:
+	  fluxcode:
+	    image: duegin/fluxcode:latest
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/sub2api?sslmode=disable
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/fluxcode?sslmode=disable
       - REDIS_URL=redis://redis:6379
     depends_on:
       - db
@@ -35,7 +35,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=sub2api
+      - POSTGRES_DB=fluxcode
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -72,5 +72,5 @@ volumes:
 
 ## Links
 
-- [GitHub Repository](https://github.com/weishaw/sub2api)
-- [Documentation](https://github.com/weishaw/sub2api#readme)
+- [GitHub Repository](https://github.com/DueGin/FluxCode)
+- [Documentation](https://github.com/DueGin/FluxCode#readme)

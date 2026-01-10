@@ -9,11 +9,11 @@ import (
 
 	"github.com/google/uuid"
 
-	dbent "github.com/Wei-Shaw/sub2api/ent"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	dbent "github.com/DueGin/FluxCode/ent"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
+	"github.com/DueGin/FluxCode/internal/pkg/timezone"
+	"github.com/DueGin/FluxCode/internal/pkg/usagestats"
+	"github.com/DueGin/FluxCode/internal/service"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -557,7 +557,12 @@ func (s *UsageLogRepoSuite) TestGetUserUsageTrendByUserID() {
 	endTime := base.Add(48 * time.Hour)
 	trend, err := s.repo.GetUserUsageTrendByUserID(s.ctx, user.ID, startTime, endTime, "day")
 	s.Require().NoError(err, "GetUserUsageTrendByUserID")
-	s.Require().Len(trend, 2) // 2 different days
+	s.Require().Len(trend, 3) // 包含无数据日期（补0）
+	s.Require().Equal("2025-01-15", trend[0].Date)
+	s.Require().Equal("2025-01-16", trend[1].Date)
+	s.Require().Equal("2025-01-17", trend[2].Date)
+	s.Require().Equal(int64(0), trend[2].Requests)
+	s.Require().Equal(int64(0), trend[2].TotalTokens)
 }
 
 func (s *UsageLogRepoSuite) TestGetUserUsageTrendByUserID_HourlyGranularity() {
@@ -574,7 +579,9 @@ func (s *UsageLogRepoSuite) TestGetUserUsageTrendByUserID_HourlyGranularity() {
 	endTime := base.Add(3 * time.Hour)
 	trend, err := s.repo.GetUserUsageTrendByUserID(s.ctx, user.ID, startTime, endTime, "hour")
 	s.Require().NoError(err, "GetUserUsageTrendByUserID hourly")
-	s.Require().Len(trend, 3) // 3 different hours
+	s.Require().Len(trend, 4) // 包含无数据小时（补0）
+	s.Require().Equal("2025-01-15 11:00", trend[0].Date)
+	s.Require().Equal(int64(0), trend[0].Requests)
 }
 
 // --- GetUserModelStats ---
@@ -643,17 +650,19 @@ func (s *UsageLogRepoSuite) TestGetUsageTrendWithFilters() {
 	// Test with user filter
 	trend, err := s.repo.GetUsageTrendWithFilters(s.ctx, startTime, endTime, "day", user.ID, 0)
 	s.Require().NoError(err, "GetUsageTrendWithFilters user filter")
-	s.Require().Len(trend, 2)
+	s.Require().Len(trend, 3)
+	s.Require().Equal("2025-01-17", trend[2].Date)
+	s.Require().Equal(int64(0), trend[2].Requests)
 
 	// Test with apiKey filter
 	trend, err = s.repo.GetUsageTrendWithFilters(s.ctx, startTime, endTime, "day", 0, apiKey.ID)
 	s.Require().NoError(err, "GetUsageTrendWithFilters apiKey filter")
-	s.Require().Len(trend, 2)
+	s.Require().Len(trend, 3)
 
 	// Test with both filters
 	trend, err = s.repo.GetUsageTrendWithFilters(s.ctx, startTime, endTime, "day", user.ID, apiKey.ID)
 	s.Require().NoError(err, "GetUsageTrendWithFilters both filters")
-	s.Require().Len(trend, 2)
+	s.Require().Len(trend, 3)
 }
 
 func (s *UsageLogRepoSuite) TestGetUsageTrendWithFilters_HourlyGranularity() {
@@ -670,7 +679,9 @@ func (s *UsageLogRepoSuite) TestGetUsageTrendWithFilters_HourlyGranularity() {
 
 	trend, err := s.repo.GetUsageTrendWithFilters(s.ctx, startTime, endTime, "hour", user.ID, 0)
 	s.Require().NoError(err, "GetUsageTrendWithFilters hourly")
-	s.Require().Len(trend, 2)
+	s.Require().Len(trend, 4)
+	s.Require().Equal("2025-01-15 11:00", trend[0].Date)
+	s.Require().Equal(int64(0), trend[0].Requests)
 }
 
 // --- GetModelStatsWithFilters ---

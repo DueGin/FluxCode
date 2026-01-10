@@ -6,10 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
-	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/DueGin/FluxCode/internal/config"
+	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
 )
 
 var (
@@ -31,6 +33,13 @@ type SettingRepository interface {
 type SettingService struct {
 	settingRepo SettingRepository
 	cfg         *config.Config
+}
+
+func (s *SettingService) webTitleDefault() string {
+	if title := strings.TrimSpace(os.Getenv("WEB_TITLE")); title != "" {
+		return title
+	}
+	return "FluxCode"
 }
 
 // NewSettingService 创建系统设置服务实例
@@ -71,12 +80,17 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		return nil, fmt.Errorf("get public settings: %w", err)
 	}
 
+	siteName := s.getStringOrDefault(settings, SettingKeySiteName, s.webTitleDefault())
+	if title := strings.TrimSpace(os.Getenv("WEB_TITLE")); title != "" {
+		siteName = title
+	}
+
 	return &PublicSettings{
 		RegistrationEnabled: settings[SettingKeyRegistrationEnabled] == "true",
 		EmailVerifyEnabled:  settings[SettingKeyEmailVerifyEnabled] == "true",
 		TurnstileEnabled:    settings[SettingKeyTurnstileEnabled] == "true",
 		TurnstileSiteKey:    settings[SettingKeyTurnstileSiteKey],
-		SiteName:            s.getStringOrDefault(settings, SettingKeySiteName, "Sub2API"),
+		SiteName:            siteName,
 		SiteLogo:            settings[SettingKeySiteLogo],
 		SiteSubtitle:        s.getStringOrDefault(settings, SettingKeySiteSubtitle, "Subscription to API Conversion Platform"),
 		APIBaseURL:          settings[SettingKeyAPIBaseURL],
@@ -154,9 +168,12 @@ func (s *SettingService) IsEmailVerifyEnabled(ctx context.Context) bool {
 
 // GetSiteName 获取网站名称
 func (s *SettingService) GetSiteName(ctx context.Context) string {
+	if title := strings.TrimSpace(os.Getenv("WEB_TITLE")); title != "" {
+		return title
+	}
 	value, err := s.settingRepo.GetValue(ctx, SettingKeySiteName)
 	if err != nil || value == "" {
-		return "Sub2API"
+		return s.webTitleDefault()
 	}
 	return value
 }
@@ -201,7 +218,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	defaults := map[string]string{
 		SettingKeyRegistrationEnabled: "true",
 		SettingKeyEmailVerifyEnabled:  "false",
-		SettingKeySiteName:            "Sub2API",
+		SettingKeySiteName:            s.webTitleDefault(),
 		SettingKeySiteLogo:            "",
 		SettingKeyDefaultConcurrency:  strconv.Itoa(s.cfg.Default.UserConcurrency),
 		SettingKeyDefaultBalance:      strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
@@ -220,6 +237,11 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 // parseSettings 解析设置到结构体
 func (s *SettingService) parseSettings(settings map[string]string) *SystemSettings {
+	siteName := s.getStringOrDefault(settings, SettingKeySiteName, s.webTitleDefault())
+	if title := strings.TrimSpace(os.Getenv("WEB_TITLE")); title != "" {
+		siteName = title
+	}
+
 	result := &SystemSettings{
 		RegistrationEnabled: settings[SettingKeyRegistrationEnabled] == "true",
 		EmailVerifyEnabled:  settings[SettingKeyEmailVerifyEnabled] == "true",
@@ -230,7 +252,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		SMTPUseTLS:          settings[SettingKeySMTPUseTLS] == "true",
 		TurnstileEnabled:    settings[SettingKeyTurnstileEnabled] == "true",
 		TurnstileSiteKey:    settings[SettingKeyTurnstileSiteKey],
-		SiteName:            s.getStringOrDefault(settings, SettingKeySiteName, "Sub2API"),
+		SiteName:            siteName,
 		SiteLogo:            settings[SettingKeySiteLogo],
 		SiteSubtitle:        s.getStringOrDefault(settings, SettingKeySiteSubtitle, "Subscription to API Conversion Platform"),
 		APIBaseURL:          settings[SettingKeyAPIBaseURL],

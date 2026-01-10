@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
 )
 
 var (

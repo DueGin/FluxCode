@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/internal/pkg/response"
+	"github.com/DueGin/FluxCode/internal/pkg/timezone"
+	"github.com/DueGin/FluxCode/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,10 +28,26 @@ func NewDashboardHandler(dashboardService *service.DashboardService) *DashboardH
 // parseTimeRange parses start_date, end_date query parameters
 func parseTimeRange(c *gin.Context) (time.Time, time.Time) {
 	now := timezone.Now()
+	granularity := c.DefaultQuery("granularity", "day")
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
 
 	var startTime, endTime time.Time
+
+	if granularity == "hour" && startDate == "" && endDate == "" {
+		hours := 24
+		if hoursStr := c.Query("hours"); hoursStr != "" {
+			if h, err := strconv.Atoi(hoursStr); err == nil && h > 0 {
+				hours = h
+			}
+		}
+		if hours > 168 {
+			hours = 168
+		}
+
+		startTime, endTime = rollingHoursRange(now, hours)
+		return startTime, endTime
+	}
 
 	if startDate != "" {
 		if t, err := timezone.ParseInLocation("2006-01-02", startDate); err == nil {
@@ -54,6 +70,17 @@ func parseTimeRange(c *gin.Context) (time.Time, time.Time) {
 	}
 
 	return startTime, endTime
+}
+
+func rollingHoursRange(now time.Time, hours int) (time.Time, time.Time) {
+	if hours <= 0 {
+		hours = 24
+	}
+	loc := timezone.Location()
+	current := now.In(loc)
+	end := time.Date(current.Year(), current.Month(), current.Day(), current.Hour(), 0, 0, 0, loc).Add(time.Hour)
+	start := end.Add(-time.Duration(hours) * time.Hour)
+	return start, end
 }
 
 // GetStats handles getting dashboard statistics
@@ -156,7 +183,7 @@ func (h *DashboardHandler) GetUsageTrend(c *gin.Context) {
 	response.Success(c, gin.H{
 		"trend":       trend,
 		"start_date":  startTime.Format("2006-01-02"),
-		"end_date":    endTime.Add(-24 * time.Hour).Format("2006-01-02"),
+		"end_date":    endTime.Add(-time.Nanosecond).Format("2006-01-02"),
 		"granularity": granularity,
 	})
 }
@@ -189,7 +216,7 @@ func (h *DashboardHandler) GetModelStats(c *gin.Context) {
 	response.Success(c, gin.H{
 		"models":     stats,
 		"start_date": startTime.Format("2006-01-02"),
-		"end_date":   endTime.Add(-24 * time.Hour).Format("2006-01-02"),
+		"end_date":   endTime.Add(-time.Nanosecond).Format("2006-01-02"),
 	})
 }
 
@@ -214,7 +241,7 @@ func (h *DashboardHandler) GetAPIKeyUsageTrend(c *gin.Context) {
 	response.Success(c, gin.H{
 		"trend":       trend,
 		"start_date":  startTime.Format("2006-01-02"),
-		"end_date":    endTime.Add(-24 * time.Hour).Format("2006-01-02"),
+		"end_date":    endTime.Add(-time.Nanosecond).Format("2006-01-02"),
 		"granularity": granularity,
 	})
 }
@@ -240,7 +267,7 @@ func (h *DashboardHandler) GetUserUsageTrend(c *gin.Context) {
 	response.Success(c, gin.H{
 		"trend":       trend,
 		"start_date":  startTime.Format("2006-01-02"),
-		"end_date":    endTime.Add(-24 * time.Hour).Format("2006-01-02"),
+		"end_date":    endTime.Add(-time.Nanosecond).Format("2006-01-02"),
 		"granularity": granularity,
 	})
 }

@@ -10,10 +10,10 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/Wei-Shaw/sub2api/ent/account"
-	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
-	"github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/predicate"
+	"github.com/DueGin/FluxCode/ent/account"
+	"github.com/DueGin/FluxCode/ent/accountgroup"
+	"github.com/DueGin/FluxCode/ent/group"
+	"github.com/DueGin/FluxCode/ent/predicate"
 )
 
 // AccountGroupUpdate is the builder for updating AccountGroup entities.

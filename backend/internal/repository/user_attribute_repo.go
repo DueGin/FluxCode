@@ -3,10 +3,10 @@ package repository
 import (
 	"context"
 
-	dbent "github.com/Wei-Shaw/sub2api/ent"
-	"github.com/Wei-Shaw/sub2api/ent/userattributedefinition"
-	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	dbent "github.com/DueGin/FluxCode/ent"
+	"github.com/DueGin/FluxCode/ent/userattributedefinition"
+	"github.com/DueGin/FluxCode/ent/userattributevalue"
+	"github.com/DueGin/FluxCode/internal/service"
 )
 
 // UserAttributeDefinitionRepository implementation

@@ -66,6 +66,21 @@ const chartColors = computed(() => ({
   cache: '#f59e0b'
 }))
 
+const toNonNegativeToken = (value: number): number => {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, value)
+}
+
+const shouldUseKUnitByDefault = computed(() => {
+  if (!props.trendData?.length) return true
+  return props.trendData.every(
+    (d) =>
+      toNonNegativeToken(d.input_tokens) === 0 &&
+      toNonNegativeToken(d.output_tokens) === 0 &&
+      toNonNegativeToken(d.cache_tokens) === 0
+  )
+})
+
 const chartData = computed(() => {
   if (!props.trendData?.length) return null
 
@@ -74,7 +89,7 @@ const chartData = computed(() => {
     datasets: [
       {
         label: 'Input',
-        data: props.trendData.map((d) => d.input_tokens),
+        data: props.trendData.map((d) => toNonNegativeToken(d.input_tokens)),
         borderColor: chartColors.value.input,
         backgroundColor: `${chartColors.value.input}20`,
         fill: true,
@@ -82,7 +97,7 @@ const chartData = computed(() => {
       },
       {
         label: 'Output',
-        data: props.trendData.map((d) => d.output_tokens),
+        data: props.trendData.map((d) => toNonNegativeToken(d.output_tokens)),
         borderColor: chartColors.value.output,
         backgroundColor: `${chartColors.value.output}20`,
         fill: true,
@@ -90,7 +105,7 @@ const chartData = computed(() => {
       },
       {
         label: 'Cache',
-        data: props.trendData.map((d) => d.cache_tokens),
+        data: props.trendData.map((d) => toNonNegativeToken(d.cache_tokens)),
         borderColor: chartColors.value.cache,
         backgroundColor: `${chartColors.value.cache}20`,
         fill: true,
@@ -123,7 +138,10 @@ const lineOptions = computed(() => ({
     tooltip: {
       callbacks: {
         label: (context: any) => {
-          return `${context.dataset.label}: ${formatTokens(context.raw)}`
+          return `${context.dataset.label}: ${formatTokens(
+            context.raw,
+            shouldUseKUnitByDefault.value ? 'K' : undefined
+          )}`
         },
         footer: (tooltipItems: any) => {
           const dataIndex = tooltipItems[0]?.dataIndex
@@ -149,6 +167,8 @@ const lineOptions = computed(() => ({
       }
     },
     y: {
+      beginAtZero: true,
+      ...(shouldUseKUnitByDefault.value ? { suggestedMax: 1000 } : {}),
       grid: {
         color: chartColors.value.grid
       },
@@ -157,13 +177,23 @@ const lineOptions = computed(() => ({
         font: {
           size: 10
         },
-        callback: (value: string | number) => formatTokens(Number(value))
+        callback: (value: string | number) =>
+          formatTokens(Number(value), shouldUseKUnitByDefault.value ? 'K' : undefined)
       }
     }
   }
 }))
 
-const formatTokens = (value: number): string => {
+const formatTokens = (value: number, forceUnit?: 'K'): string => {
+  if (!Number.isFinite(value)) return forceUnit === 'K' ? '0K' : '0'
+  value = Math.max(0, value)
+
+  if (forceUnit === 'K') {
+    const k = value / 1000
+    const text = k.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')
+    return `${text}K`
+  }
+
   if (value >= 1_000_000_000) {
     return `${(value / 1_000_000_000).toFixed(2)}B`
   } else if (value >= 1_000_000) {

@@ -10,22 +10,73 @@ export default {
     login: '登录',
     getStarted: '开始使用',
     goToDashboard: '进入控制台',
+    nav: {
+      features: '功能特性',
+      pricing: '定价方案',
+      docs: '使用文档',
+      menu: '菜单'
+    },
+    hero: {
+      headline: '稳定高速 · 专业服务',
+      description: '统一入口，兼容多模型接口；提供可观测、可控、稳定可靠的 API 中转服务。',
+      secondaryCta: '查看用量',
+      stats: {
+        performance: '高速稳定转发',
+        control: '计费与配额可控',
+        security: '数据安全与隔离'
+      }
+    },
+    sections: {
+      featuresTitle: '功能特性',
+      featuresSubtitle: '统一入口，实时计费，构建稳定可控的 API 中转层。',
+      pricingTitle: '定价方案',
+      pricingSubtitle: '按量计费 + 配额管理，账单清晰可追踪。',
+      docsTitle: '使用文档',
+      docsSubtitle: '快速开始、API 说明与最佳实践。'
+    },
+    pricing: {
+      usageTitle: '按量计费',
+      usageDesc: '基于 Token 的精确计费与用量追踪，实时可见。',
+      quotaTitle: '配额管理',
+      quotaDesc: '支持用户/分组配额与限额策略，避免超支。',
+      redeemTitle: '充值与兑换码',
+      redeemDesc: '支持充值、兑换码与余额管理，结算更灵活。'
+    },
+    quickstart: {
+      title: '快速上手',
+      subtitle: '三步接入：创建 Key → 选择接口 → 直接调用。',
+      cta: '打开控制台',
+      steps: {
+        createKey: {
+          title: '创建 API Key',
+          desc: '在控制台生成 Key，并绑定分组/权限与配额策略。'
+        },
+        chooseApi: {
+          title: '选择兼容接口',
+          desc: 'Claude：/v1/messages；OpenAI：/v1/responses；Gemini：/v1beta/。'
+        },
+        call: {
+          title: '开始调用',
+          desc: '把 Base URL 指向你的 FluxCode，SDK/CLI 即可直连运行。'
+        }
+      }
+    },
     tags: {
       subscriptionToApi: '订阅转 API',
       stickySession: '粘性会话',
       realtimeBilling: '实时计费'
     },
     features: {
-      unifiedGateway: '统一 API 网关',
-      unifiedGatewayDesc: '将 Claude 订阅转换为 API 接口，通过标准 /v1/messages 接口访问 AI 能力。',
-      multiAccount: '多账号池',
-      multiAccountDesc: '智能负载均衡管理多个上游账号，支持 OAuth 和 API Key 认证。',
+      unifiedGateway: '稳定安全',
+      unifiedGatewayDesc: '官方原版，无降智风险。',
+      multiAccount: '高速稳定的中转服务',
+      multiAccountDesc: '专线直连，99.9% 可用性保障，告别连接不稳定。',
       balanceQuota: '余额与配额',
-      balanceQuotaDesc: '基于 Token 的精确计费和用量追踪，支持配额管理和兑换码充值。'
+      balanceQuotaDesc: '基于 Token 的精确计费和用量追踪。'
     },
     providers: {
-      title: '支持的服务商',
-      description: 'AI 服务的统一 API 接口',
+      title: '受信赖的伙伴与技术栈',
+      description: '与 OpenAI、Anthropic、Claude 等生态深度兼容，持续扩展。',
       supported: '已支持',
       soon: '即将推出',
       claude: 'Claude',
@@ -40,8 +91,8 @@ export default {
 
   // Setup Wizard
   setup: {
-    title: 'Sub2API 安装向导',
-    description: '配置您的 Sub2API 实例',
+    title: 'FluxCode 安装向导',
+    description: '配置您的 FluxCode 实例',
     database: {
       title: '数据库配置',
       host: '主机',
@@ -230,6 +281,10 @@ export default {
     avgResponse: '平均响应',
     averageTime: '平均时间',
     timeRange: '时间范围',
+    range24Hours: '24小时',
+    range7Days: '7天',
+    range14Days: '14天',
+    range30Days: '30天',
     granularity: '粒度',
     day: '按天',
     hour: '按小时',
@@ -241,6 +296,7 @@ export default {
     tokens: 'Token',
     actual: '实际',
     standard: '标准',
+    dailyLimit: '日额度',
     input: '输入',
     output: '输出',
     cache: '缓存',
@@ -518,6 +574,8 @@ export default {
     lastWeek: '上周',
     thisMonth: '本月',
     lastMonth: '上月',
+    last24Hours: '近 24 小时',
+    last48Hours: '近 48 小时',
     last7Days: '近 7 天',
     last14Days: '近 14 天',
     last30Days: '近 30 天',
@@ -1862,7 +1920,7 @@ export default {
         description: '自定义站点品牌',
         siteName: '站点名称',
         siteNameHint: '显示在邮件和页面标题中',
-        siteNamePlaceholder: 'Sub2API',
+        siteNamePlaceholder: 'FluxCode',
         siteSubtitle: '站点副标题',
         siteSubtitleHint: '显示在登录和注册页面',
         siteSubtitlePlaceholder: '订阅转 API 转换平台',
@@ -1900,7 +1958,7 @@ export default {
         fromEmail: '发件人邮箱',
         fromEmailPlaceholder: "noreply{'@'}example.com",
         fromName: '发件人名称',
-        fromNamePlaceholder: 'Sub2API',
+        fromNamePlaceholder: 'FluxCode',
         useTls: '使用 TLS',
         useTlsHint: '为 SMTP 连接启用 TLS 加密'
       },
@@ -2030,14 +2088,14 @@ export default {
     // Admin tour steps
     admin: {
       welcome: {
-        title: '👋 欢迎使用 Sub2API',
-        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">Sub2API 是一个强大的 AI 服务中转平台，让您轻松管理和分发 AI 服务。</p><p style="margin-bottom: 12px;"><b>🎯 核心功能：</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>📦 <b>分组管理</b> - 创建不同的服务套餐（VIP、免费试用等）</li><li>🔗 <b>账号池</b> - 连接多个上游 AI 服务商账号</li><li>🔑 <b>密钥分发</b> - 为用户生成独立的 API Key</li><li>💰 <b>计费管理</b> - 灵活的费率和配额控制</li></ul><p style="color: #10b981; font-weight: 600;">接下来，我们将用 3 分钟带您完成首次配置 →</p></div>',
+        title: '👋 欢迎使用 FluxCode',
+        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">FluxCode 是一个强大的 AI 服务中转平台，让您轻松管理和分发 AI 服务。</p><p style="margin-bottom: 12px;"><b>🎯 核心功能：</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>📦 <b>分组管理</b> - 创建不同的服务套餐（VIP、免费试用等）</li><li>🔗 <b>账号池</b> - 连接多个上游 AI 服务商账号</li><li>🔑 <b>密钥分发</b> - 为用户生成独立的 API Key</li><li>💰 <b>计费管理</b> - 灵活的费率和配额控制</li></ul><p style="color: #10b981; font-weight: 600;">接下来，我们将用 3 分钟带您完成首次配置 →</p></div>',
         nextBtn: '开始配置 🚀',
         prevBtn: '跳过'
       },
       groupManage: {
         title: '📦 第一步：分组管理',
-        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>什么是分组？</b></p><p style="margin-bottom: 12px;">分组是 Sub2API 的核心概念，它就像一个"服务套餐"：</p><ul style="margin-left: 20px; margin-bottom: 12px; font-size: 13px;"><li>🎯 每个分组可以包含多个上游账号</li><li>💰 每个分组有独立的计费倍率</li><li>👥 可以设置为公开或专属分组</li></ul><p style="margin-top: 12px; padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 示例：</b>您可以创建"VIP专线"（高倍率）和"免费试用"（低倍率）两个分组</p><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 点击左侧的"分组管理"开始</p></div>'
+        description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;"><b>什么是分组？</b></p><p style="margin-bottom: 12px;">分组是 FluxCode 的核心概念，它就像一个"服务套餐"：</p><ul style="margin-left: 20px; margin-bottom: 12px; font-size: 13px;"><li>🎯 每个分组可以包含多个上游账号</li><li>💰 每个分组有独立的计费倍率</li><li>👥 可以设置为公开或专属分组</li></ul><p style="margin-top: 12px; padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>💡 示例：</b>您可以创建"VIP专线"（高倍率）和"免费试用"（低倍率）两个分组</p><p style="margin-top: 16px; color: #10b981; font-weight: 600;">👉 点击左侧的"分组管理"开始</p></div>'
       },
       createGroup: {
         title: '➕ 创建新分组',
@@ -2130,8 +2188,8 @@ export default {
     // User tour steps
     user: {
       welcome: {
-        title: '👋 欢迎使用 Sub2API',
-        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">您好！欢迎来到 Sub2API AI 服务平台。</p><p style="margin-bottom: 12px;"><b>🎯 快速开始：</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>🔑 创建 API 密钥</li><li>📋 复制密钥到您的应用</li><li>🚀 开始使用 AI 服务</li></ul><p style="color: #10b981; font-weight: 600;">只需 1 分钟，让我们开始吧 →</p></div>',
+        title: '👋 欢迎使用 FluxCode',
+        description: '<div style="line-height: 1.8;"><p style="margin-bottom: 16px;">您好！欢迎来到 FluxCode AI 服务平台。</p><p style="margin-bottom: 12px;"><b>🎯 快速开始：</b></p><ul style="margin-left: 20px; margin-bottom: 16px;"><li>🔑 创建 API 密钥</li><li>📋 复制密钥到您的应用</li><li>🚀 开始使用 AI 服务</li></ul><p style="color: #10b981; font-weight: 600;">只需 1 分钟，让我们开始吧 →</p></div>',
         nextBtn: '开始 🚀',
         prevBtn: '跳过'
       },

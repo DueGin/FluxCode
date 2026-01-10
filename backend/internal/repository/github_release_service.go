@@ -9,8 +9,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/internal/pkg/httpclient"
+	"github.com/DueGin/FluxCode/internal/service"
 )
 
 type githubReleaseClient struct {
@@ -37,7 +37,7 @@ func (c *githubReleaseClient) FetchLatestRelease(ctx context.Context, repo strin
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("User-Agent", "Sub2API-Updater")
+	req.Header.Set("User-Agent", "FluxCode-Updater")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

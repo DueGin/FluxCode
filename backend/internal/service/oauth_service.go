@@ -6,8 +6,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/oauth"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+	"github.com/DueGin/FluxCode/internal/pkg/oauth"
+	"github.com/DueGin/FluxCode/internal/pkg/openai"
+	"github.com/redis/go-redis/v9"
 )
 
 // OpenAIOAuthClient interface for OpenAI OAuth operations
@@ -26,15 +27,22 @@ type ClaudeOAuthClient interface {
 
 // OAuthService handles OAuth authentication flows
 type OAuthService struct {
-	sessionStore *oauth.SessionStore
+	sessionStore OAuthSessionStore[oauth.OAuthSession]
 	proxyRepo    ProxyRepository
 	oauthClient  ClaudeOAuthClient
 }
 
 // NewOAuthService creates a new OAuth service
-func NewOAuthService(proxyRepo ProxyRepository, oauthClient ClaudeOAuthClient) *OAuthService {
+func NewOAuthService(proxyRepo ProxyRepository, oauthClient ClaudeOAuthClient, rdb *redis.Client) *OAuthService {
+	var store OAuthSessionStore[oauth.OAuthSession]
+	if rdb != nil {
+		store = NewRedisJSONOAuthSessionStore[oauth.OAuthSession](rdb, "fluxcode:oauth:claude:", oauth.SessionTTL)
+	} else {
+		store = NewInMemoryOAuthSessionStoreAdapter[oauth.OAuthSession](oauth.NewSessionStore())
+	}
+
 	return &OAuthService{
-		sessionStore: oauth.NewSessionStore(),
+		sessionStore: store,
 		proxyRepo:    proxyRepo,
 		oauthClient:  oauthClient,
 	}
@@ -95,7 +103,9 @@ func (s *OAuthService) generateAuthURLWithScope(ctx context.Context, scope strin
 		ProxyURL:     proxyURL,
 		CreatedAt:    time.Now(),
 	}
-	s.sessionStore.Set(sessionID, session)
+	if err := s.sessionStore.Set(ctx, sessionID, session); err != nil {
+		return nil, fmt.Errorf("failed to store oauth session: %w", err)
+	}
 
 	// Build authorization URL
 	authURL := oauth.BuildAuthorizationURL(state, codeChallenge, scope)
@@ -128,7 +138,10 @@ type TokenInfo struct {
 // ExchangeCode exchanges authorization code for tokens
 func (s *OAuthService) ExchangeCode(ctx context.Context, input *ExchangeCodeInput) (*TokenInfo, error) {
 	// Get session
-	session, ok := s.sessionStore.Get(input.SessionID)
+	session, ok, err := s.sessionStore.Get(ctx, input.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load oauth session: %w", err)
+	}
 	if !ok {
 		return nil, fmt.Errorf("session not found or expired")
 	}
@@ -152,7 +165,9 @@ func (s *OAuthService) ExchangeCode(ctx context.Context, input *ExchangeCodeInpu
 	}
 
 	// Delete session after successful exchange
-	s.sessionStore.Delete(input.SessionID)
+	if err := s.sessionStore.Delete(ctx, input.SessionID); err != nil {
+		log.Printf("[OAuth] failed to delete oauth session %q: %v", input.SessionID, err)
+	}
 
 	return tokenInfo, nil
 }

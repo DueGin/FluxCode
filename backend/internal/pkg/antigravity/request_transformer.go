@@ -66,7 +66,7 @@ func TransformClaudeToGemini(claudeReq *ClaudeRequest, projectID, mappedModel st
 	v1Req := V1InternalRequest{
 		Project:     projectID,
 		RequestID:   "agent-" + uuid.New().String(),
-		UserAgent:   "sub2api",
+		UserAgent:   "fluxcode",
 		RequestType: "agent",
 		Model:       mappedModel,
 		Request:     innerRequest,

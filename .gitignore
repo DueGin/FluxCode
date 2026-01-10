@@ -11,7 +11,7 @@ docs/claude-relay-service/
 *.dylib
 backend/bin/
 backend/server
-backend/sub2api
+backend/fluxcode
 backend/main
 
 # 测试覆盖率

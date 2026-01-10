@@ -9,16 +9,16 @@ import (
 	"strings"
 	"time"
 
-	dbent "github.com/Wei-Shaw/sub2api/ent"
-	dbaccount "github.com/Wei-Shaw/sub2api/ent/account"
-	dbapikey "github.com/Wei-Shaw/sub2api/ent/apikey"
-	dbgroup "github.com/Wei-Shaw/sub2api/ent/group"
-	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
-	dbusersub "github.com/Wei-Shaw/sub2api/ent/usersubscription"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	dbent "github.com/DueGin/FluxCode/ent"
+	dbaccount "github.com/DueGin/FluxCode/ent/account"
+	dbapikey "github.com/DueGin/FluxCode/ent/apikey"
+	dbgroup "github.com/DueGin/FluxCode/ent/group"
+	dbuser "github.com/DueGin/FluxCode/ent/user"
+	dbusersub "github.com/DueGin/FluxCode/ent/usersubscription"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
+	"github.com/DueGin/FluxCode/internal/pkg/timezone"
+	"github.com/DueGin/FluxCode/internal/pkg/usagestats"
+	"github.com/DueGin/FluxCode/internal/service"
 	"github.com/lib/pq"
 )
 
@@ -59,6 +59,28 @@ func (r *usageLogRepository) getPerformanceStats(ctx context.Context, userID int
 		return 0, 0, err
 	}
 	return requestCount / 5, tokenCount / 5, nil
+}
+
+func (r *usageLogRepository) getUserActiveSubscriptionDailyLimitUSDTotal(ctx context.Context, userID int64) (float64, error) {
+	query := `
+		SELECT
+			COALESCE(SUM(COALESCE(g.daily_limit_usd, 0)), 0) as daily_limit_usd_total
+		FROM user_subscriptions us
+		JOIN groups g ON us.group_id = g.id
+		WHERE us.user_id = $1
+			AND us.deleted_at IS NULL
+			AND g.deleted_at IS NULL
+			AND us.status = $2
+			AND us.starts_at <= $3
+			AND us.expires_at > $3
+	`
+
+	var total float64
+	now := time.Now()
+	if err := scanSingleRow(ctx, r.sql, query, []any{userID, service.SubscriptionStatusActive, now}, &total); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) (bool, error) {
@@ -924,7 +946,6 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 			COALESCE(SUM(output_tokens), 0) as today_output_tokens,
 			COALESCE(SUM(cache_creation_tokens), 0) as today_cache_creation_tokens,
 			COALESCE(SUM(cache_read_tokens), 0) as today_cache_read_tokens,
-			COALESCE(SUM(total_cost), 0) as today_cost,
 			COALESCE(SUM(actual_cost), 0) as today_actual_cost
 		FROM usage_logs
 		WHERE user_id = $1 AND created_at >= $2
@@ -939,12 +960,17 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 		&stats.TodayOutputTokens,
 		&stats.TodayCacheCreationTokens,
 		&stats.TodayCacheReadTokens,
-		&stats.TodayCost,
 		&stats.TodayActualCost,
 	); err != nil {
 		return nil, err
 	}
 	stats.TodayTokens = stats.TodayInputTokens + stats.TodayOutputTokens + stats.TodayCacheCreationTokens + stats.TodayCacheReadTokens
+
+	dailyLimitUSDTotal, err := r.getUserActiveSubscriptionDailyLimitUSDTotal(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	stats.TodayCost = dailyLimitUSDTotal
 
 	// 性能指标：RPM 和 TPM（最近1分钟，仅统计该用户的请求）
 	rpm, tpm, err := r.getPerformanceStats(ctx, userID)
@@ -997,7 +1023,7 @@ func (r *usageLogRepository) GetUserUsageTrendByUserID(ctx context.Context, user
 	if err != nil {
 		return nil, err
 	}
-	return results, nil
+	return fillTrendGaps(startTime, endTime, granularity, results), nil
 }
 
 // GetUserModelStats 获取指定用户的模型统计
@@ -1294,7 +1320,7 @@ func (r *usageLogRepository) GetUsageTrendWithFilters(ctx context.Context, start
 	if err != nil {
 		return nil, err
 	}
-	return results, nil
+	return fillTrendGaps(startTime, endTime, granularity, results), nil
 }
 
 // GetModelStatsWithFilters returns model statistics with optional user/api_key filters
@@ -1892,6 +1918,87 @@ func scanTrendRows(rows *sql.Rows) ([]TrendDataPoint, error) {
 		return nil, err
 	}
 	return results, nil
+}
+
+func fillTrendGaps(startTime, endTime time.Time, granularity string, points []TrendDataPoint) []TrendDataPoint {
+	if !startTime.Before(endTime) {
+		return points
+	}
+
+	pointByDate := make(map[string]TrendDataPoint, len(points))
+	for _, p := range points {
+		if p.Date == "" {
+			continue
+		}
+		if existing, ok := pointByDate[p.Date]; ok {
+			existing.Requests += p.Requests
+			existing.InputTokens += p.InputTokens
+			existing.OutputTokens += p.OutputTokens
+			existing.CacheTokens += p.CacheTokens
+			existing.TotalTokens += p.TotalTokens
+			existing.Cost += p.Cost
+			existing.ActualCost += p.ActualCost
+			pointByDate[p.Date] = existing
+			continue
+		}
+		pointByDate[p.Date] = p
+	}
+
+	loc := timezone.Location()
+	isHour := granularity == "hour"
+
+	var seriesStart, seriesEnd time.Time
+	var layout string
+
+	if isHour {
+		start := startTime.In(loc)
+		seriesStart = time.Date(start.Year(), start.Month(), start.Day(), start.Hour(), 0, 0, 0, loc)
+
+		end := endTime.In(loc)
+		seriesEnd = time.Date(end.Year(), end.Month(), end.Day(), end.Hour(), 0, 0, 0, loc)
+		if endTime.After(seriesEnd) {
+			seriesEnd = seriesEnd.Add(time.Hour)
+		}
+
+		layout = "2006-01-02 15:00"
+	} else {
+		seriesStart = timezone.StartOfDay(startTime)
+		seriesEnd = timezone.StartOfDay(endTime)
+		if endTime.After(seriesEnd) {
+			seriesEnd = seriesEnd.AddDate(0, 0, 1)
+		}
+
+		layout = "2006-01-02"
+	}
+
+	if !seriesStart.Before(seriesEnd) {
+		return points
+	}
+
+	if isHour {
+		expected := int(seriesEnd.Sub(seriesStart) / time.Hour)
+		filled := make([]TrendDataPoint, 0, expected)
+		for t := seriesStart; t.Before(seriesEnd); t = t.Add(time.Hour) {
+			key := t.Format(layout)
+			if p, ok := pointByDate[key]; ok {
+				filled = append(filled, p)
+				continue
+			}
+			filled = append(filled, TrendDataPoint{Date: key})
+		}
+		return filled
+	}
+
+	filled := make([]TrendDataPoint, 0)
+	for t := seriesStart; t.Before(seriesEnd); t = t.AddDate(0, 0, 1) {
+		key := t.Format(layout)
+		if p, ok := pointByDate[key]; ok {
+			filled = append(filled, p)
+			continue
+		}
+		filled = append(filled, TrendDataPoint{Date: key})
+	}
+	return filled
 }
 
 func scanModelStatsRows(rows *sql.Rows) ([]ModelStat, error) {

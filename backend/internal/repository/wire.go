@@ -5,9 +5,9 @@ import (
 	"errors"
 
 	entsql "entgo.io/ent/dialect/sql"
-	"github.com/Wei-Shaw/sub2api/ent"
-	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/ent"
+	"github.com/DueGin/FluxCode/internal/config"
+	"github.com/DueGin/FluxCode/internal/service"
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
 )

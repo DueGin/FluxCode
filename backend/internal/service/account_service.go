@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 )
 
 var (
@@ -60,13 +60,14 @@ type AccountRepository interface {
 // AccountBulkUpdate describes the fields that can be updated in a bulk operation.
 // Nil pointers mean "do not change".
 type AccountBulkUpdate struct {
-	Name        *string
-	ProxyID     *int64
-	Concurrency *int
-	Priority    *int
-	Status      *string
-	Credentials map[string]any
-	Extra       map[string]any
+	Name         *string
+	ProxyID      *int64
+	ClearProxyID bool
+	Concurrency  *int
+	Priority     *int
+	Status       *string
+	Credentials  map[string]any
+	Extra        map[string]any
 }
 
 // CreateAccountRequest 创建账号请求

@@ -3,11 +3,11 @@ package admin
 import (
 	"strconv"
 
-	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
-	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/internal/handler/dto"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
+	"github.com/DueGin/FluxCode/internal/pkg/response"
+	middleware2 "github.com/DueGin/FluxCode/internal/server/middleware"
+	"github.com/DueGin/FluxCode/internal/service"
 
 	"github.com/gin-gonic/gin"
 )

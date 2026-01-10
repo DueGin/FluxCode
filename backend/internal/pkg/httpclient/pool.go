@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyutil"
+	"github.com/DueGin/FluxCode/internal/pkg/proxyutil"
 )
 
 // Transport 连接池默认配置

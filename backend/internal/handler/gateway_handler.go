@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
-	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/internal/pkg/antigravity"
+	"github.com/DueGin/FluxCode/internal/pkg/claude"
+	"github.com/DueGin/FluxCode/internal/pkg/openai"
+	middleware2 "github.com/DueGin/FluxCode/internal/server/middleware"
+	"github.com/DueGin/FluxCode/internal/service"
 
 	"github.com/gin-gonic/gin"
 )

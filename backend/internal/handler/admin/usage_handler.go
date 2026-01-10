@@ -4,12 +4,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/DueGin/FluxCode/internal/handler/dto"
+	"github.com/DueGin/FluxCode/internal/pkg/pagination"
+	"github.com/DueGin/FluxCode/internal/pkg/response"
+	"github.com/DueGin/FluxCode/internal/pkg/timezone"
+	"github.com/DueGin/FluxCode/internal/pkg/usagestats"
+	"github.com/DueGin/FluxCode/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
