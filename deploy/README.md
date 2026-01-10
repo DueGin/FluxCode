@@ -14,8 +14,16 @@ This directory contains files for deploying FluxCode on Linux servers.
 | File | Description |
 |------|-------------|
 | `docker-compose.yml` | Docker Compose configuration |
+| `docker-compose.scale.yml` | Scale-ready compose (single-host, with Caddy ingress) |
+| `docker-compose.infra.yml` | Multi-host infra (PostgreSQL + Redis) |
+| `docker-compose.app.yml` | Multi-host ingress + app (Caddy + FluxCode) |
+| `docker-compose.node.yml` | Multi-host app node (FluxCode only) |
 | `.env.example` | Docker environment variables template |
+| `.env.infra.example` | Multi-host infra env template |
+| `.env.app.example` | Multi-host ingress/app env template |
+| `.env.node.example` | Multi-host node env template |
 | `DOCKER.md` | Docker Hub documentation |
+| `MULTI_HOST.md` | Multi-host deployment guide |
 | `install.sh` | One-click binary installation script |
 | `fluxcode.service` | Systemd service unit file |
 | `config.example.yaml` | Example configuration file |

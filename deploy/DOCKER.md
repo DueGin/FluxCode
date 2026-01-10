@@ -10,7 +10,7 @@ FluxCode is an AI API Gateway Platform for distributing and managing AI product 
 	  -p 8080:8080 \
 	  -e DATABASE_URL="postgres://user:pass@host:5432/fluxcode" \
 	  -e REDIS_URL="redis://host:6379" \
-	  ghcr.io/duegin/fluxcode:latest
+	  duegin/fluxcode:latest
 ```
 
 ## Docker Compose
@@ -20,7 +20,7 @@ version: '3.8'
 
 	services:
 	  fluxcode:
-	    image: ghcr.io/duegin/fluxcode:latest
+	    image: duegin/fluxcode:latest
     ports:
       - "8080:8080"
     environment:

@@ -758,6 +758,10 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		return 0, nil
 	}
 
+	if updates.ClearProxyID && updates.ProxyID != nil {
+		return 0, errors.New("invalid bulk update: both proxy_id and clear_proxy_id are set")
+	}
+
 	setClauses := make([]string, 0, 8)
 	args := make([]any, 0, 8)
 
@@ -766,6 +770,9 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		setClauses = append(setClauses, "name = $"+itoa(idx))
 		args = append(args, *updates.Name)
 		idx++
+	}
+	if updates.ClearProxyID {
+		setClauses = append(setClauses, "proxy_id = NULL")
 	}
 	if updates.ProxyID != nil {
 		setClauses = append(setClauses, "proxy_id = $"+itoa(idx))

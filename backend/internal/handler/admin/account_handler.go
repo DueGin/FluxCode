@@ -2,6 +2,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -19,6 +20,29 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
 )
+
+// optionalInt64 用于区分：字段未提供 vs 提供且为 null/数值。
+// - Set=false：未提供该字段
+// - Set=true, Value=nil：显式设置为 null（用于清空）
+// - Set=true, Value!=nil：设置为具体值
+type optionalInt64 struct {
+	Set   bool
+	Value *int64
+}
+
+func (o *optionalInt64) UnmarshalJSON(data []byte) error {
+	o.Set = true
+	if string(data) == "null" {
+		o.Value = nil
+		return nil
+	}
+	var v int64
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	o.Value = &v
+	return nil
+}
 
 // OAuthHandler handles OAuth-related operations for accounts
 type OAuthHandler struct {
@@ -85,13 +109,14 @@ type CreateAccountRequest struct {
 }
 
 // UpdateAccountRequest represents update account request
-// 使用指针类型来区分"未提供"和"设置为0"
+// Concurrency/Priority 使用指针类型来区分"未提供"和"设置为0"；
+// ProxyID 使用 optionalInt64 来区分"未提供"和"显式置空(null)"。
 type UpdateAccountRequest struct {
 	Name                    string         `json:"name"`
 	Type                    string         `json:"type" binding:"omitempty,oneof=oauth setup-token apikey"`
 	Credentials             map[string]any `json:"credentials"`
 	Extra                   map[string]any `json:"extra"`
-	ProxyID                 *int64         `json:"proxy_id"`
+	ProxyID                 optionalInt64  `json:"proxy_id"`
 	Concurrency             *int           `json:"concurrency"`
 	Priority                *int           `json:"priority"`
 	Status                  string         `json:"status" binding:"omitempty,oneof=active inactive"`
@@ -103,7 +128,7 @@ type UpdateAccountRequest struct {
 type BulkUpdateAccountsRequest struct {
 	AccountIDs              []int64        `json:"account_ids" binding:"required,min=1"`
 	Name                    string         `json:"name"`
-	ProxyID                 *int64         `json:"proxy_id"`
+	ProxyID                 optionalInt64  `json:"proxy_id"`
 	Concurrency             *int           `json:"concurrency"`
 	Priority                *int           `json:"priority"`
 	Status                  string         `json:"status" binding:"omitempty,oneof=active inactive error"`
@@ -249,7 +274,8 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		Type:                  req.Type,
 		Credentials:           req.Credentials,
 		Extra:                 req.Extra,
-		ProxyID:               req.ProxyID,
+		ProxyID:               req.ProxyID.Value,
+		ProxyIDSet:            req.ProxyID.Set,
 		Concurrency:           req.Concurrency, // 指针类型，nil 表示未提供
 		Priority:              req.Priority,    // 指针类型，nil 表示未提供
 		Status:                req.Status,
@@ -622,7 +648,7 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 	skipCheck := req.ConfirmMixedChannelRisk != nil && *req.ConfirmMixedChannelRisk
 
 	hasUpdates := req.Name != "" ||
-		req.ProxyID != nil ||
+		req.ProxyID.Set ||
 		req.Concurrency != nil ||
 		req.Priority != nil ||
 		req.Status != "" ||
@@ -638,7 +664,8 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 	result, err := h.adminService.BulkUpdateAccounts(c.Request.Context(), &service.BulkUpdateAccountsInput{
 		AccountIDs:            req.AccountIDs,
 		Name:                  req.Name,
-		ProxyID:               req.ProxyID,
+		ProxyID:               req.ProxyID.Value,
+		ProxyIDSet:            req.ProxyID.Set,
 		Concurrency:           req.Concurrency,
 		Priority:              req.Priority,
 		Status:                req.Status,

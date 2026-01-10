@@ -44,7 +44,7 @@ services:
   # FluxCode Application (scale this service)
   # ===========================================================================
   fluxcode:
-    image: ghcr.io/duegin/fluxcode:latest
+    image: duegin/fluxcode:latest
     restart: unless-stopped
     ulimits:
       nofile:

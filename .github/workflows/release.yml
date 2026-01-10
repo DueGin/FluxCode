@@ -210,7 +210,7 @@ jobs:
           fi
           VERSION=${TAG_NAME#v}
           REPO="${{ github.repository }}"
-          GHCR_IMAGE="ghcr.io/${REPO,,}"  # ${,,} converts to lowercase
+          GHCR_IMAGE="${REPO,,}"  # ${,,} converts to lowercase
 
           # 获取 tag message 内容
           TAG_MESSAGE='${{ steps.tag_message.outputs.message }}'

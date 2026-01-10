@@ -16,7 +16,7 @@ services:
   # FluxCode Application
   # ===========================================================================
   fluxcode:
-    image: weishaw/sub2api:latest
+    image: duegin/fluxcode:latest
     container_name: fluxcode
     restart: unless-stopped
     ulimits:

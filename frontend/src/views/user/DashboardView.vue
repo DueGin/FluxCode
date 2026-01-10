@@ -288,7 +288,7 @@
 	                <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
 	                  {{ t('dashboard.tokenUsageTrend') }}
 	                </h3>
-	                <div class="h-48">
+	                <div class="h-64 lg:h-72">
 	                  <Line
 	                    v-if="trendChartData"
 	                    ref="trendChartRef"

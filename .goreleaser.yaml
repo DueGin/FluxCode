@@ -86,7 +86,7 @@ dockers:
     goos: linux
     goarch: amd64
     image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-amd64"
+      - "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-amd64"
     dockerfile: Dockerfile.goreleaser
     use: buildx
     build_flag_templates:
@@ -99,7 +99,7 @@ dockers:
     goos: linux
     goarch: arm64
     image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-arm64"
+      - "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-arm64"
     dockerfile: Dockerfile.goreleaser
     use: buildx
     build_flag_templates:
@@ -136,25 +136,25 @@ docker_manifests:
       - "{{ .Env.DOCKERHUB_USERNAME }}/fluxcode:{{ .Version }}-arm64"
 
   # GHCR manifests (owner must be lowercase)
-  - name_template: "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}"
+  - name_template: "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}"
     image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-amd64"
-      - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-arm64"
+      - "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-amd64"
+      - "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-arm64"
 
-  - name_template: "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:latest"
+  - name_template: "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:latest"
     image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-amd64"
-      - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-arm64"
+      - "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-amd64"
+      - "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-arm64"
 
-  - name_template: "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Major }}.{{ .Minor }}"
+  - name_template: "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Major }}.{{ .Minor }}"
     image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-amd64"
-      - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-arm64"
+      - "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-amd64"
+      - "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-arm64"
 
-  - name_template: "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Major }}"
+  - name_template: "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Major }}"
     image_templates:
-      - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-amd64"
-      - "ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-arm64"
+      - "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-amd64"
+      - "{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}-arm64"
 
 release:
   github:
@@ -183,7 +183,7 @@ release:
 
     {{ end -}}
     # GitHub Container Registry
-    docker pull ghcr.io/{{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}
+    docker pull {{ .Env.GITHUB_REPO_OWNER_LOWER }}/fluxcode:{{ .Version }}
     ```
 
     **One-line install (Linux):**
