@@ -3,14 +3,10 @@
 # =============================================================================
 # 作用：
 # - 作为唯一入口（默认监听 :8080），把流量负载均衡到多个 fluxcode 实例
-# - 启用 sticky session（cookie）以保证 OAuth 授权流程不丢 session
+# - OAuth 临时状态已存入 Redis，无需 sticky session；可使用 least_conn 等策略均衡流量
 #
 # 配套用法：
 #   docker compose -f docker-compose.scale.yml up -d --scale fluxcode=3
-#
-# 可选：如果你想自定义 cookie HMAC secret（防止用户伪造 cookie 选择上游），
-# 可以在 caddy 服务中设置环境变量 CADDY_LB_COOKIE_SECRET，并把下面这一行改成：
-#   lb_policy cookie fluxcode_sticky {env.CADDY_LB_COOKIE_SECRET}
 # =============================================================================
 
 {
@@ -23,8 +19,19 @@
 		# 通过 Docker DNS 的 A 记录动态发现并负载均衡（支持 docker compose --scale）
 		dynamic a fluxcode 8080
 
-		# 关键：OAuth 会话在内存中，回调必须落到同一实例
-		lb_policy cookie fluxcode_sticky
+		# 主动健康检查：宕机/不可达时自动摘除节点
+		health_uri /health
+		health_interval 30s
+		health_timeout 3s
+		health_status 200
+
+		# OAuth 临时状态已存入 Redis，入口无需粘性会话
+		lb_policy least_conn
+
+		# 被动健康检查：请求连续失败后快速熔断（避免一直粘到坏节点）
+		fail_duration 10s
+		max_fails 1
+		unhealthy_status 500 502 503 504
 
 		# 负载均衡重试（可选）
 		lb_try_duration 5s
@@ -37,4 +44,3 @@
 		header_up X-Forwarded-Host {host}
 	}
 }
-

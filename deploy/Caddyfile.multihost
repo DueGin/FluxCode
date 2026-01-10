@@ -2,8 +2,8 @@
 # FluxCode - Caddy Reverse Proxy (Multi-Host)
 # =============================================================================
 # 作用：
-# - 作为唯一入口（默认监听 :8080；配置域名后自动启用 HTTPS），把流量负载均衡到一个或多个 fluxcode 节点
-# - 启用 sticky session（cookie）以保证 OAuth 授权流程不丢 session
+# - 作为唯一入口（默认监听 :80；配置域名后自动启用 HTTPS），把流量负载均衡到一个或多个 fluxcode 节点
+# - OAuth 临时状态已存入 Redis，无需 sticky session；可安全做健康检查与故障切换
 #
 # 配套用法：
 #   docker compose -f docker-compose.app.yml up -d
@@ -14,8 +14,6 @@
 # - 方式 B：多机部署，手动维护节点列表（或用你自己的 DNS A 记录聚合多个节点）
 #     to fluxcode:8080 10.0.0.12:8080 10.0.0.13:8080
 #
-# 可选：如果你想自定义 cookie HMAC secret（防止用户伪造 cookie 选择上游），
-# 只需在 caddy 服务中设置环境变量 CADDY_LB_COOKIE_SECRET（无需改文件）。
 # =============================================================================
 
 {
@@ -24,35 +22,70 @@
 	# - 443 用于正式 HTTPS 流量
 }
 
+# -----------------------------------------------------------------------------
+# Common upstream configuration (shared by API and web routes)
+# -----------------------------------------------------------------------------
+(fluxcode_upstreams) {
+	# 方式 A（默认）：同机 Docker Compose，多副本动态发现（支持 --scale fluxcode=N）
+	# dynamic a fluxcode 8080
+
+	# 方式 B：多机（手动维护节点 IP:PORT 列表）
+	#
+	# 注意：Caddy 运行在容器内时，127.0.0.1/localhost 指向“Caddy 容器自身”，不是宿主机。
+	# 默认：入口机本机的 fluxcode（docker-compose.app.yml 里的服务名）
+	to fluxcode:8080 192.168.10.174:8081 192.168.10.114:8080
+
+	# 多机扩容：把其他节点内网 IP:PORT 追加到同一行，例如：
+	# to fluxcode:8080 10.0.0.12:8080 10.0.0.13:8080
+	#
+	# 同机模拟“额外节点”（Docker Desktop）：用 host.docker.internal 访问宿主机端口，例如：
+	# to fluxcode:8080 host.docker.internal:8081
+
+	# 主动健康检查：宕机/不可达时自动摘除节点
+	health_uri /health
+	health_interval 30s
+	health_timeout 3s
+	health_status 200
+
+	# 被动健康检查：请求连续失败后快速熔断（避免一直粘到坏节点）
+	fail_duration 10s
+	max_fails 1
+	unhealthy_status 500 502 503 504
+
+	# 负载均衡重试（可选）
+	lb_try_duration 5s
+	lb_try_interval 250ms
+
+	# 传递真实客户端信息
+	header_up X-Real-IP {remote_host}
+	header_up X-Forwarded-For {remote_host}
+	header_up X-Forwarded-Proto {scheme}
+	header_up X-Forwarded-Host {host}
+}
+
 # 访问方式：
 # - 默认（未设置 CADDY_ADDRESS）：监听 :80（HTTP），适合内网/测试
 # - 设置 CADDY_ADDRESS=your.domain.com：自动启用 HTTPS（需 80/443 可达）
 {$CADDY_ADDRESS::80} {
-	reverse_proxy {
-		# 方式 A（默认）：同机 Docker Compose，多副本动态发现（支持 --scale fluxcode=N）
-		# dynamic a fluxcode 8080
+	# 根路径访问时跳转到前端首页路由
+	@root path /
+	redir @root /home 302
 
-		# 方式 B：多机（手动维护节点 IP:PORT 列表）
-		#
-		# 注意：Caddy 运行在容器内时，127.0.0.1/localhost 指向“Caddy 容器自身”，不是宿主机。
-		# - 同机模拟“额外节点”（Docker Desktop）：在 .env.app.local 设置：
-		#     CADDY_UPSTREAMS=host.docker.internal:8081
-		# - 真多机：写节点内网 IP，例如：
-		#     CADDY_UPSTREAMS=10.0.0.12:8080 10.0.0.13:8080
-		to 192.168.10.174:8080 192.168.10.174:8081
+	# API/网关接口：无状态（OAuth 临时状态已存入 Redis），可按 least_conn 均衡流量
+	@api path /api/* /v1/* /v1beta/* /antigravity/* /setup/* /health /responses
+	handle @api {
+		reverse_proxy {
+			import fluxcode_upstreams
+			lb_policy least_conn
+		}
+	}
 
-		# 关键：OAuth 会话在内存中，回调必须落到同一实例
-		# 可选：指定 HMAC secret 防止用户伪造 cookie 选择上游
-		lb_policy cookie fluxcode_sticky {$CADDY_LB_COOKIE_SECRET}
-
-		# 负载均衡重试（可选）
-		lb_try_duration 5s
-		lb_try_interval 250ms
-
-		# 传递真实客户端信息
-		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-Host {host}
+	# Web/静态资源：按客户端 IP 固定到同一节点，避免 index.html 与 /assets 分流到不同节点
+	# （当节点版本不一致或滚动升级期间，否则可能出现“模块脚本请求返回 text/html”的报错）
+	handle {
+		reverse_proxy {
+			import fluxcode_upstreams
+			lb_policy ip_hash
+		}
 	}
 }

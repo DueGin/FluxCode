@@ -8,16 +8,24 @@ import (
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/pkg/antigravity"
+	"github.com/redis/go-redis/v9"
 )
 
 type AntigravityOAuthService struct {
-	sessionStore *antigravity.SessionStore
+	sessionStore OAuthSessionStore[antigravity.OAuthSession]
 	proxyRepo    ProxyRepository
 }
 
-func NewAntigravityOAuthService(proxyRepo ProxyRepository) *AntigravityOAuthService {
+func NewAntigravityOAuthService(proxyRepo ProxyRepository, rdb *redis.Client) *AntigravityOAuthService {
+	var store OAuthSessionStore[antigravity.OAuthSession]
+	if rdb != nil {
+		store = NewRedisJSONOAuthSessionStore[antigravity.OAuthSession](rdb, "fluxcode:oauth:antigravity:", antigravity.SessionTTL)
+	} else {
+		store = NewInMemoryOAuthSessionStoreAdapter[antigravity.OAuthSession](antigravity.NewSessionStore())
+	}
+
 	return &AntigravityOAuthService{
-		sessionStore: antigravity.NewSessionStore(),
+		sessionStore: store,
 		proxyRepo:    proxyRepo,
 	}
 }
@@ -60,7 +68,9 @@ func (s *AntigravityOAuthService) GenerateAuthURL(ctx context.Context, proxyID *
 		ProxyURL:     proxyURL,
 		CreatedAt:    time.Now(),
 	}
-	s.sessionStore.Set(sessionID, session)
+	if err := s.sessionStore.Set(ctx, sessionID, session); err != nil {
+		return nil, fmt.Errorf("保存 oauth session 失败: %w", err)
+	}
 
 	codeChallenge := antigravity.GenerateCodeChallenge(codeVerifier)
 	authURL := antigravity.BuildAuthorizationURL(state, codeChallenge)
@@ -93,7 +103,10 @@ type AntigravityTokenInfo struct {
 
 // ExchangeCode 用 authorization code 交换 token
 func (s *AntigravityOAuthService) ExchangeCode(ctx context.Context, input *AntigravityExchangeCodeInput) (*AntigravityTokenInfo, error) {
-	session, ok := s.sessionStore.Get(input.SessionID)
+	session, ok, err := s.sessionStore.Get(ctx, input.SessionID)
+	if err != nil {
+		return nil, fmt.Errorf("读取 oauth session 失败: %w", err)
+	}
 	if !ok {
 		return nil, fmt.Errorf("session 不存在或已过期")
 	}
@@ -120,7 +133,9 @@ func (s *AntigravityOAuthService) ExchangeCode(ctx context.Context, input *Antig
 	}
 
 	// 删除 session
-	s.sessionStore.Delete(input.SessionID)
+	if err := s.sessionStore.Delete(ctx, input.SessionID); err != nil {
+		fmt.Printf("[AntigravityOAuth] 警告: 删除 oauth session 失败: %v\n", err)
+	}
 
 	// 计算过期时间（减去 5 分钟安全窗口）
 	expiresAt := time.Now().Unix() + tokenResp.ExpiresIn - 300

@@ -23,6 +23,11 @@ services:
   fluxcode:
     image: ${FLUXCODE_IMAGE:-duegin/fluxcode:latest}
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "${DOCKER_LOG_MAX_SIZE:-20m}"
+        max-file: "${DOCKER_LOG_MAX_FILE:-5}"
     ulimits:
       nofile:
         soft: 100000

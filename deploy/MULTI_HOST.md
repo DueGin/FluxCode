@@ -28,12 +28,26 @@
 - `JWT_SECRET`：建议 `openssl rand -hex 32`
 - `ADMIN_PASSWORD`：建议固定（避免首启并发时日志里出现多个不同的随机密码）
 
-2) **规划内网地址**
+2) **固定镜像版本（强烈建议）**
+
+多机负载均衡场景里，前端 `index.html` 会引用带 hash 的静态资源（如 `/assets/index-xxxx.js`）。如果你的多个节点 **镜像版本不一致**（或滚动升级期间一半新一半旧），入口层按“请求”分流时就可能出现：
+
+- `index.html` 来自节点 A（引用 `index-AAAA.js`）
+- `/assets/index-AAAA.js` 请求却被转发到节点 B（只有 `index-BBBB.js`，文件不存在）
+
+表现就是浏览器偶发报错：`Failed to load module script ... the server responded with a MIME type of "text/html"`。
+
+建议：
+
+- **所有节点使用同一个 `FLUXCODE_IMAGE`（同 tag 或 digest）**
+- 升级时先在所有节点 `docker compose pull`，再逐个 `docker compose up -d`（或用编排工具做一致性发布）
+
+3) **规划内网地址**
 
 - 记下服务器 A 的内网 IP（下文示例：`10.0.0.10`）
 - 记下服务器 B 的内网 IP（用于防火墙放行）
 
-3) **防火墙（最重要）**
+4) **防火墙（最重要）**
 
 - 服务器 A：只允许服务器 B 访问 `5432/6379`（不要暴露公网）
 - 服务器 B：只对公网开放 `80/443`（或你在 `.env` 里自定义的 `HTTP_PORT/HTTPS_PORT`）
@@ -136,14 +150,12 @@ docker compose -f docker-compose.node.yml up -d
 
 ### 3.2 服务器 B：把新节点加入入口负载均衡
 
-编辑 `deploy/Caddyfile.multihost`，把 upstream 改成多节点列表（示例）：
+编辑 `deploy/Caddyfile.multihost`，在 `(fluxcode_upstreams)` 片段中把 `to ...` 改成多节点列表（示例）：
 
 ```caddyfile
-reverse_proxy {
+(fluxcode_upstreams) {
     # 方式 B：多机（手动维护节点 IP:PORT 列表）
-    # 注意：使用方式 B 时，需要把 Caddyfile.multihost 里默认的 dynamic a 注释掉
     to fluxcode:8080 10.0.0.12:8080 10.0.0.13:8080
-    lb_policy cookie fluxcode_sticky
 }
 ```
 
@@ -233,9 +245,8 @@ docker compose -p fluxcode-node1 --env-file .env.node1.local -f docker-compose.n
 2) 修改 `deploy/Caddyfile.multihost`：注释 `dynamic a fluxcode 8080`，改用方式 B，例如：
 
 ```caddyfile
-reverse_proxy {
+(fluxcode_upstreams) {
     to fluxcode:8080 host.docker.internal:8081
-    lb_policy cookie fluxcode_sticky
 }
 ```
 
@@ -327,9 +338,8 @@ curl http://localhost:8080/health
 - 启用方式 B，并加入电脑 B 的内网 IP（示例：`192.168.1.23`）：
 
 ```caddyfile
-reverse_proxy {
+(fluxcode_upstreams) {
     to fluxcode:8080 192.168.1.23:8080
-    lb_policy cookie fluxcode_sticky {$CADDY_LB_COOKIE_SECRET}
 }
 ```
 
@@ -353,3 +363,26 @@ docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.y
 
 - 电脑 B 的 `8080` **不要暴露公网**，只给电脑 A 访问（防火墙放行入口机 IP）。
 - 外部 PG/Redis 同理：只允许应用节点所在网段/入口机访问。
+
+## 7. 日志与清理（上线必做）
+
+### 7.1 Docker/Compose 场景
+
+- FluxCode / Caddy 的日志默认输出到容器 stdout/stderr，由 Docker 负责落盘（通常是 `json-file`）。
+- 本仓库的 compose 文件已加入日志轮转（`max-size`/`max-file`），默认：
+  - `DOCKER_LOG_MAX_SIZE=20m`
+  - `DOCKER_LOG_MAX_FILE=5`
+- 如需调整，在入口机/应用节点的 `.env` 里设置上述变量，然后重建容器即可生效：
+
+```bash
+docker compose -f docker-compose.app.yml up -d
+docker compose -f docker-compose.node.yml up -d
+```
+
+### 7.2 systemd 场景（可选）
+
+如果你用的是 `deploy/fluxcode.service` 这种 systemd 部署，日志进入 journald，一般会自动按磁盘策略滚动；需要手动清理时可用：
+
+```bash
+sudo journalctl --vacuum-time=14d
+```
