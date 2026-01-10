@@ -37,8 +37,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      # 为空则走 Caddyfile 默认值（:80，仅 HTTP）；设置为域名后自动启用 HTTPS（需 80/443 可达）
-      - CADDY_ADDRESS=${CADDY_ADDRESS:-}
+      # 留空则使用 :80（仅 HTTP）；设置为域名后自动启用 HTTPS（需 80/443 可达）
+      - CADDY_ADDRESS=${CADDY_ADDRESS:-:80}
       # 可选：自定义 sticky cookie 的 HMAC secret（防伪造，建议随机生成）
       - CADDY_LB_COOKIE_SECRET=${CADDY_LB_COOKIE_SECRET:-}
       - TZ=${TZ:-Asia/Shanghai}
@@ -52,7 +52,7 @@ services:
   # FluxCode Application
   # ===========================================================================
   fluxcode:
-    image: ${FLUXCODE_IMAGE:-duegin/fluxcode:latest}
+    image: ${FLUXCODE_IMAGE:-duegin/fluxcode:v1.0.1}
     restart: unless-stopped
     ulimits:
       nofile:

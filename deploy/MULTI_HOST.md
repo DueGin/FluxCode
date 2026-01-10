@@ -162,3 +162,194 @@ docker compose -f docker-compose.app.yml restart caddy
   - `DATABASE_MAX_OPEN_CONNS`、`DATABASE_MAX_IDLE_CONNS`
   - `REDIS_POOL_SIZE`、`REDIS_MIN_IDLE_CONNS`
 - Redis 一定要有密码 + 防火墙（跨主机暴露 `6379` 非常危险）
+
+## 5. 在本地电脑模拟多机（可选）
+
+你可以在一台电脑上用同一套 compose 文件“分项目启动”来模拟：
+
+- infra：PostgreSQL + Redis（映射到宿主机端口）
+- app：Caddy + FluxCode（通过 `host.docker.internal` 访问“宿主机端口”，相当于访问远端）
+
+> 注意：**本地通常无法完整验证 Caddy 的 Let’s Encrypt 自动 HTTPS**（需要域名解析到当前机器公网 IP，且公网可访问 `80/443`）。建议先用 HTTP 验证联通与功能，生产环境再切到真实域名 + `80/443`。
+
+### 5.1 准备本地 env 文件（避免覆盖 `deploy/.env`）
+
+```bash
+cd deploy
+cp .env.infra.example .env.infra.local
+cp .env.app.example .env.app.local
+```
+
+### 5.2 启动 infra（本地模拟“状态机”）
+
+编辑 `.env.infra.local`：
+
+- 建议本地只绑定回环：`POSTGRES_BIND_HOST=127.0.0.1`、`REDIS_BIND_HOST=127.0.0.1`
+- 如果你本机已有 Postgres/Redis 占用 `5432/6379`，可改成 `POSTGRES_EXPOSE_PORT=15432`、`REDIS_EXPOSE_PORT=16379`
+
+启动：
+
+```bash
+docker compose -p fluxcode-infra --env-file .env.infra.local -f docker-compose.infra.yml up -d
+docker compose -p fluxcode-infra --env-file .env.infra.local -f docker-compose.infra.yml ps
+```
+
+### 5.3 启动 app（本地模拟“入口机”）
+
+编辑 `.env.app.local`：
+
+- `DATABASE_HOST=host.docker.internal`
+- `REDIS_HOST=host.docker.internal`
+- `DATABASE_PORT` / `REDIS_PORT` 与上一步映射端口保持一致
+- 本地避免占用 `80/443`：可设 `HTTP_PORT=8080`、`HTTPS_PORT=8443`
+- 本地测试建议先留空 `CADDY_ADDRESS=`（只走 HTTP）
+
+启动：
+
+```bash
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml up -d
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml ps
+```
+
+访问：
+
+- `http://localhost:8080/`（如果你改了 `HTTP_PORT`，端口按你的值）
+
+### 5.4（可选）在本机模拟“新增应用节点”
+
+如果你想验证“入口反代到多个节点”的方式 B（手动 upstream 列表）：
+
+1) 再准备一个节点 env，并把 `NODE_PORT` 改成非 `8080`（例如 `8081`）：
+
+```bash
+cp .env.node.example .env.node1.local
+# 编辑 .env.node1.local：
+# - DATABASE_HOST/REDIS_HOST=host.docker.internal
+# - NODE_PORT=8081
+# - JWT_SECRET/ADMIN_PASSWORD 必须与 .env.app.local 一致
+docker compose -p fluxcode-node1 --env-file .env.node1.local -f docker-compose.node.yml up -d
+```
+
+2) 修改 `deploy/Caddyfile.multihost`：注释 `dynamic a fluxcode 8080`，改用方式 B，例如：
+
+```caddyfile
+reverse_proxy {
+    to fluxcode:8080 host.docker.internal:8081
+    lb_policy cookie fluxcode_sticky
+}
+```
+
+然后重启入口容器：
+
+```bash
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml restart caddy
+```
+
+### 5.5 清理
+
+```bash
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml down -v
+docker compose -p fluxcode-node1 --env-file .env.node1.local -f docker-compose.node.yml down -v
+docker compose -p fluxcode-infra --env-file .env.infra.local -f docker-compose.infra.yml down -v
+```
+
+> `host.docker.internal` 在 macOS/Windows Docker Desktop 默认可用；Linux 上如不可用，可改用 `172.17.0.1`（或自行添加 `host-gateway` 映射）。
+
+## 6. 两台本地电脑“真·多机”联调（推荐）
+
+如果你手上已经有两台电脑（同一局域网），并且 **PostgreSQL/Redis 已经是独立部署**（可被两台电脑同时访问），可以用下面方式最接近真实“加一台机器扩容”的体验：
+
+### 6.1 规划角色
+
+- **电脑 A（入口机）**：跑 `Caddy + FluxCode`（负责对外入口与负载均衡）
+- **电脑 B（新增节点）**：只跑 `FluxCode`（把 `8080` 暴露给入口机）
+
+> 你也可以让电脑 A 上的 `fluxcode` 作为其中一个 upstream（默认就是这样），电脑 B 作为第二个 upstream。
+
+### 6.2 电脑 A：启动入口机（HTTP 本地测试）
+
+在电脑 A 上：
+
+```bash
+cd deploy
+cp .env.app.example .env.app.local
+```
+
+编辑 `deploy/.env.app.local`（关键项）：
+
+- `DATABASE_HOST` / `REDIS_HOST`：填你的外部 PG/Redis 地址
+- `POSTGRES_PASSWORD` / `REDIS_PASSWORD`：填实际密码
+- `JWT_SECRET` / `ADMIN_PASSWORD`：**固定值**（后续所有节点必须一致）
+- 建议本地先用 HTTP：`CADDY_ADDRESS=`（留空），`HTTP_PORT=8080`（避免占用 80）
+
+启动：
+
+```bash
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml up -d
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml ps
+```
+
+### 6.3 电脑 B：启动新增应用节点
+
+在电脑 B 上：
+
+```bash
+cd deploy
+cp .env.node.example .env.node.local
+```
+
+编辑 `deploy/.env.node.local`（关键项）：
+
+- `DATABASE_HOST` / `REDIS_HOST`：与电脑 A 一样，指向外部 PG/Redis
+- `POSTGRES_PASSWORD` / `REDIS_PASSWORD`：与电脑 A 一样
+- `JWT_SECRET` / `ADMIN_PASSWORD`：**必须与电脑 A 完全一致**
+- `NODE_BIND_HOST=0.0.0.0`，`NODE_PORT=8080`（或你自定义端口）
+
+启动：
+
+```bash
+docker compose -p fluxcode-node1 --env-file .env.node.local -f docker-compose.node.yml up -d
+docker compose -p fluxcode-node1 --env-file .env.node.local -f docker-compose.node.yml ps
+```
+
+在电脑 B 上先自检：
+
+```bash
+curl http://localhost:8080/health
+```
+
+### 6.4 电脑 A：把电脑 B 加入负载均衡
+
+1) 在电脑 A 上编辑 `deploy/Caddyfile.multihost`：
+
+- 注释掉方式 A：
+  - `dynamic a fluxcode 8080`
+- 启用方式 B，并加入电脑 B 的内网 IP（示例：`192.168.1.23`）：
+
+```caddyfile
+reverse_proxy {
+    to fluxcode:8080 192.168.1.23:8080
+    lb_policy cookie fluxcode_sticky {$CADDY_LB_COOKIE_SECRET}
+}
+```
+
+2) 重启入口机 Caddy：
+
+```bash
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml restart caddy
+```
+
+### 6.5 验证是否生效
+
+- 从任意机器访问入口机（电脑 A）：
+  - `http://<电脑A局域网IP>:8080/health`
+- 看入口机 Caddy 日志是否有请求分发：
+
+```bash
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml logs -f caddy
+```
+
+### 6.6 安全/联通性检查（强烈建议）
+
+- 电脑 B 的 `8080` **不要暴露公网**，只给电脑 A 访问（防火墙放行入口机 IP）。
+- 外部 PG/Redis 同理：只允许应用节点所在网段/入口机访问。

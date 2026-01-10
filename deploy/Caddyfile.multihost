@@ -30,10 +30,16 @@
 {$CADDY_ADDRESS::80} {
 	reverse_proxy {
 		# 方式 A（默认）：同机 Docker Compose，多副本动态发现（支持 --scale fluxcode=N）
-		dynamic a fluxcode 8080
+		# dynamic a fluxcode 8080
 
-		# 方式 B：多机（手动维护节点 IP:PORT 列表），示例：
-		# to fluxcode:8080 10.0.0.12:8080 10.0.0.13:8080
+		# 方式 B：多机（手动维护节点 IP:PORT 列表）
+		#
+		# 注意：Caddy 运行在容器内时，127.0.0.1/localhost 指向“Caddy 容器自身”，不是宿主机。
+		# - 同机模拟“额外节点”（Docker Desktop）：在 .env.app.local 设置：
+		#     CADDY_UPSTREAMS=host.docker.internal:8081
+		# - 真多机：写节点内网 IP，例如：
+		#     CADDY_UPSTREAMS=10.0.0.12:8080 10.0.0.13:8080
+		to 192.168.10.174:8080 192.168.10.174:8081
 
 		# 关键：OAuth 会话在内存中，回调必须落到同一实例
 		# 可选：指定 HMAC secret 防止用户伪造 cookie 选择上游
