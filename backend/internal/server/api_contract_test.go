@@ -5,6 +5,7 @@ package server_test
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"errors"
 	"io"
 	"math"
@@ -67,7 +68,7 @@ func TestAPIContracts(t *testing.T) {
 			name:   "POST /api/v1/keys",
 			method: http.MethodPost,
 			path:   "/api/v1/keys",
-			body:   `{"name":"Key One","custom_key":"sk_custom_1234567890"}`,
+			body:   `{"name":"Key One"}`,
 			headers: map[string]string{
 				"Content-Type": "application/json",
 			},
@@ -78,7 +79,7 @@ func TestAPIContracts(t *testing.T) {
 				"data": {
 					"id": 100,
 					"user_id": 1,
-					"key": "sk_custom_1234567890",
+					"key": "sk-000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
 					"name": "Key One",
 					"group_id": null,
 					"status": "active",
@@ -345,6 +346,17 @@ func newContractDeps(t *testing.T) *contractDeps {
 	t.Helper()
 
 	now := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
+
+	origRandReader := rand.Reader
+	rand.Reader = bytes.NewReader(bytes.Repeat([]byte{
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+		0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+		0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+		0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+	}, 8))
+	t.Cleanup(func() {
+		rand.Reader = origRandReader
+	})
 
 	userRepo := &stubUserRepo{
 		users: map[int64]*service.User{

@@ -389,12 +389,6 @@ export default {
         note: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。',
       },
     },
-    customKeyLabel: '自定义密钥',
-    customKeyPlaceholder: '输入自定义密钥（至少16个字符）',
-    customKeyHint: '仅允许字母、数字、下划线和连字符，最少16个字符。',
-    customKeyTooShort: '自定义密钥至少需要16个字符',
-    customKeyInvalidChars: '自定义密钥只能包含字母、数字、下划线和连字符',
-    customKeyRequired: '请输入自定义密钥',
     ccSwitchNotInstalled: 'CC-Switch 未安装或协议处理程序未注册。请先安装 CC-Switch 或手动复制 API 密钥。',
     ccsClientSelect: {
       title: '选择客户端',

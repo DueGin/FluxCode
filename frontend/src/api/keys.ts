@@ -41,20 +41,12 @@ export async function getById(id: number): Promise<ApiKey> {
  * Create new API key
  * @param name - Key name
  * @param groupId - Optional group ID
- * @param customKey - Optional custom key value
  * @returns Created API key
  */
-export async function create(
-  name: string,
-  groupId?: number | null,
-  customKey?: string
-): Promise<ApiKey> {
+export async function create(name: string, groupId?: number | null): Promise<ApiKey> {
   const payload: CreateApiKeyRequest = { name }
   if (groupId !== undefined) {
     payload.group_id = groupId
-  }
-  if (customKey) {
-    payload.custom_key = customKey
   }
 
   const { data } = await apiClient.post<ApiKey>('/keys', payload)

@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 	"github.com/stretchr/testify/require"
@@ -96,42 +95,6 @@ func (s *apiKeyRepoStub) CountByGroupID(ctx context.Context, groupID int64) (int
 	panic("unexpected CountByGroupID call")
 }
 
-// apiKeyCacheStub 是 APIKeyCache 接口的测试桩实现。
-// 用于验证删除操作时缓存清理逻辑是否被正确调用。
-//
-// 设计说明：
-//   - invalidated: 记录被清除缓存的用户 ID 列表
-type apiKeyCacheStub struct {
-	invalidated []int64 // 记录调用 DeleteCreateAttemptCount 时传入的用户 ID
-}
-
-// GetCreateAttemptCount 返回 0，表示用户未超过创建次数限制
-func (s *apiKeyCacheStub) GetCreateAttemptCount(ctx context.Context, userID int64) (int, error) {
-	return 0, nil
-}
-
-// IncrementCreateAttemptCount 空实现，本测试不验证此行为
-func (s *apiKeyCacheStub) IncrementCreateAttemptCount(ctx context.Context, userID int64) error {
-	return nil
-}
-
-// DeleteCreateAttemptCount 记录被清除缓存的用户 ID。
-// 删除 API Key 时会调用此方法清除用户的创建尝试计数缓存。
-func (s *apiKeyCacheStub) DeleteCreateAttemptCount(ctx context.Context, userID int64) error {
-	s.invalidated = append(s.invalidated, userID)
-	return nil
-}
-
-// IncrementDailyUsage 空实现，本测试不验证此行为
-func (s *apiKeyCacheStub) IncrementDailyUsage(ctx context.Context, apiKey string) error {
-	return nil
-}
-
-// SetDailyUsageExpiry 空实现，本测试不验证此行为
-func (s *apiKeyCacheStub) SetDailyUsageExpiry(ctx context.Context, apiKey string, ttl time.Duration) error {
-	return nil
-}
-
 // TestApiKeyService_Delete_OwnerMismatch 测试非所有者尝试删除时返回权限错误。
 // 预期行为：
 //   - GetOwnerID 返回所有者 ID 为 1
@@ -141,13 +104,11 @@ func (s *apiKeyCacheStub) SetDailyUsageExpiry(ctx context.Context, apiKey string
 //   - 缓存不被清除
 func TestApiKeyService_Delete_OwnerMismatch(t *testing.T) {
 	repo := &apiKeyRepoStub{ownerID: 1}
-	cache := &apiKeyCacheStub{}
-	svc := &APIKeyService{apiKeyRepo: repo, cache: cache}
+	svc := &APIKeyService{apiKeyRepo: repo}
 
 	err := svc.Delete(context.Background(), 10, 2) // API Key ID=10, 调用者 userID=2
 	require.ErrorIs(t, err, ErrInsufficientPerms)
-	require.Empty(t, repo.deletedIDs)   // 验证删除操作未被调用
-	require.Empty(t, cache.invalidated) // 验证缓存未被清除
+	require.Empty(t, repo.deletedIDs) // 验证删除操作未被调用
 }
 
 // TestApiKeyService_Delete_Success 测试所有者成功删除 API Key 的场景。
@@ -159,13 +120,11 @@ func TestApiKeyService_Delete_OwnerMismatch(t *testing.T) {
 //   - 返回 nil 错误
 func TestApiKeyService_Delete_Success(t *testing.T) {
 	repo := &apiKeyRepoStub{ownerID: 7}
-	cache := &apiKeyCacheStub{}
-	svc := &APIKeyService{apiKeyRepo: repo, cache: cache}
+	svc := &APIKeyService{apiKeyRepo: repo}
 
 	err := svc.Delete(context.Background(), 42, 7) // API Key ID=42, 调用者 userID=7
 	require.NoError(t, err)
-	require.Equal(t, []int64{42}, repo.deletedIDs)  // 验证正确的 API Key 被删除
-	require.Equal(t, []int64{7}, cache.invalidated) // 验证所有者的缓存被清除
+	require.Equal(t, []int64{42}, repo.deletedIDs) // 验证正确的 API Key 被删除
 }
 
 // TestApiKeyService_Delete_NotFound 测试删除不存在的 API Key 时返回正确的错误。
@@ -176,13 +135,11 @@ func TestApiKeyService_Delete_Success(t *testing.T) {
 //   - 缓存不被清除
 func TestApiKeyService_Delete_NotFound(t *testing.T) {
 	repo := &apiKeyRepoStub{ownerErr: ErrAPIKeyNotFound}
-	cache := &apiKeyCacheStub{}
-	svc := &APIKeyService{apiKeyRepo: repo, cache: cache}
+	svc := &APIKeyService{apiKeyRepo: repo}
 
 	err := svc.Delete(context.Background(), 99, 1)
 	require.ErrorIs(t, err, ErrAPIKeyNotFound)
 	require.Empty(t, repo.deletedIDs)
-	require.Empty(t, cache.invalidated)
 }
 
 // TestApiKeyService_Delete_DeleteFails 测试删除操作失败时的错误处理。
@@ -197,12 +154,10 @@ func TestApiKeyService_Delete_DeleteFails(t *testing.T) {
 		ownerID:   3,
 		deleteErr: errors.New("delete failed"),
 	}
-	cache := &apiKeyCacheStub{}
-	svc := &APIKeyService{apiKeyRepo: repo, cache: cache}
+	svc := &APIKeyService{apiKeyRepo: repo}
 
 	err := svc.Delete(context.Background(), 3, 3) // API Key ID=3, 调用者 userID=3
 	require.Error(t, err)
 	require.ErrorContains(t, err, "delete api key")
-	require.Equal(t, []int64{3}, repo.deletedIDs)   // 验证删除操作被调用
-	require.Equal(t, []int64{3}, cache.invalidated) // 验证缓存已被清除（即使删除失败）
+	require.Equal(t, []int64{3}, repo.deletedIDs) // 验证删除操作被调用
 }

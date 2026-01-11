@@ -392,12 +392,6 @@ export default {
         note: 'These environment variables will be active in the current terminal session. For permanent configuration, add them to ~/.bashrc, ~/.zshrc, or the appropriate configuration file.',
       },
     },
-    customKeyLabel: 'Custom Key',
-    customKeyPlaceholder: 'Enter your custom key (min 16 chars)',
-    customKeyHint: 'Only letters, numbers, underscores and hyphens allowed. Minimum 16 characters.',
-    customKeyTooShort: 'Custom key must be at least 16 characters',
-    customKeyInvalidChars: 'Custom key can only contain letters, numbers, underscores, and hyphens',
-    customKeyRequired: 'Please enter a custom key',
     ccSwitchNotInstalled: 'CC-Switch is not installed or the protocol handler is not registered. Please install CC-Switch first or manually copy the API key.',
     ccsClientSelect: {
       title: 'Select Client',
