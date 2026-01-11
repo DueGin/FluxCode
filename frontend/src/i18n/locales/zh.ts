@@ -461,7 +461,7 @@ export default {
   // Redeem
   redeem: {
     title: '兑换码',
-    description: '输入兑换码以充值余额或增加并发数',
+    description: '输入兑换码以订阅服务',
     currentBalance: '当前余额',
     concurrency: '并发数',
     requests: '请求',

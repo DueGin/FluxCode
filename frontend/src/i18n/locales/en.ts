@@ -19,7 +19,7 @@ export default {
     hero: {
       headline: 'Fast & Stable · Built for Teams',
       description:
-        'One entry for multi-model APIs. Account pooling, sticky sessions, and real-time billing — observable, controllable, and scalable.',
+        'One entry for multi-model APIs. Providing observable, controllable, stable and reliable API relay services.',
       secondaryCta: 'View Usage',
       stats: {
         performance: 'Fast & stable routing',
@@ -29,7 +29,7 @@ export default {
     },
     sections: {
       featuresTitle: 'Features',
-      featuresSubtitle: 'One entry, account pooling, and real-time billing to build a stable, controllable API hub.',
+      featuresSubtitle: 'One entry, real-time billing, stable & reliable.',
       pricingTitle: 'Pricing',
       pricingSubtitle: 'Usage-based billing + quota control, with clear and traceable bills.',
       docsTitle: 'Documentation',
@@ -464,7 +464,7 @@ export default {
   // Redeem
   redeem: {
     title: 'Redeem Code',
-    description: 'Enter your redeem code to add balance or increase concurrency',
+    description: 'Enter your redeem code to subscribe to services',
     currentBalance: 'Current Balance',
     concurrency: 'Concurrency',
     requests: 'requests',

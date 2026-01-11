@@ -51,24 +51,17 @@
       <div class="mt-6 text-center text-sm">
         <slot name="footer" />
       </div>
-
-      <!-- Copyright -->
-      <div class="mt-8 text-center text-xs text-gray-400 dark:text-dark-500">
-        &copy; {{ currentYear }} {{ siteName }}. All rights reserved.
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { getPublicSettings } from '@/api/auth'
 
 const siteName = ref('FluxCode')
 const siteLogo = ref('')
 const siteSubtitle = ref('Subscription to API Conversion Platform')
-
-const currentYear = computed(() => new Date().getFullYear())
 
 onMounted(async () => {
   try {
