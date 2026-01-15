@@ -261,6 +261,9 @@ export default {
     sendingCode: 'Sending...',
     clickToResend: 'Click to resend code',
     resendCode: 'Resend verification code',
+    verifyCodeQueued: 'Verification code queued, sending...',
+    verifyCodeSent: 'Verification code sent! Please check your inbox.',
+    verifyCodeFailed: 'Failed to send verification code. Please try again.',
     oauth: {
       code: 'Code',
       state: 'State',

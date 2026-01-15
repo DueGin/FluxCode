@@ -36,7 +36,7 @@ type VerificationCodeData struct {
 
 const (
 	verifyCodeTTL         = 15 * time.Minute
-	verifyCodeCooldown    = 1 * time.Minute
+	verifyCodeCooldown    = 30 * time.Second
 	maxVerifyCodeAttempts = 5
 )
 
@@ -227,15 +227,33 @@ func (s *EmailService) SendVerifyCode(ctx context.Context, email, siteName strin
 		return fmt.Errorf("save verify code: %w", err)
 	}
 
-	// 构建邮件内容
+	// 发送邮件
+	if err := s.sendVerifyCodeEmail(ctx, email, code, siteName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// ResendVerifyCode 重新发送当前未过期的验证码（用于队列重试场景）
+// - 不检查冷却期（冷却用于限制用户重复请求；重试需要尽快补发）
+// - 若没有现成验证码，则退化为重新生成并发送
+func (s *EmailService) ResendVerifyCode(ctx context.Context, email, siteName string) error {
+	existing, err := s.cache.GetVerificationCode(ctx, email)
+	if err == nil && existing != nil && existing.Code != "" {
+		return s.sendVerifyCodeEmail(ctx, email, existing.Code, siteName)
+	}
+
+	// 没有可复用的验证码时，重新生成并发送
+	return s.SendVerifyCode(ctx, email, siteName)
+}
+
+func (s *EmailService) sendVerifyCodeEmail(ctx context.Context, email, code, siteName string) error {
 	subject := fmt.Sprintf("[%s] Email Verification Code", siteName)
 	body := s.buildVerifyCodeEmailBody(code, siteName)
-
-	// 发送邮件
 	if err := s.SendEmail(ctx, email, subject, body); err != nil {
 		return fmt.Errorf("send email: %w", err)
 	}
-
 	return nil
 }
 

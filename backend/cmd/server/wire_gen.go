@@ -50,7 +50,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	emailService := service.NewEmailService(settingRepository, emailCache)
 	turnstileVerifier := repository.NewTurnstileVerifier()
 	turnstileService := service.NewTurnstileService(settingService, turnstileVerifier)
-	emailQueueService := service.ProvideEmailQueueService(emailService)
+	emailQueueService := service.ProvideEmailQueueService(redisClient, emailService)
 	authService := service.NewAuthService(userRepository, configConfig, settingService, emailService, turnstileService, emailQueueService)
 	userService := service.NewUserService(userRepository)
 	authHandler := handler.NewAuthHandler(configConfig, authService, userService)

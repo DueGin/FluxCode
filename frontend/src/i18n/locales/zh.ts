@@ -259,6 +259,9 @@ export default {
     sendingCode: '发送中...',
     clickToResend: '点击重新发送验证码',
     resendCode: '重新发送验证码',
+    verifyCodeQueued: '验证码已进入队列，正在发送...',
+    verifyCodeSent: '验证码已发送，请检查邮箱',
+    verifyCodeFailed: '验证码发送失败，请重试',
     oauth: {
       code: '授权码',
       state: '状态',

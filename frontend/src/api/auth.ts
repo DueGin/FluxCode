@@ -11,6 +11,7 @@ import type {
   CurrentUserResponse,
   SendVerifyCodeRequest,
   SendVerifyCodeResponse,
+  VerifyCodeTaskStatus,
   PublicSettings
 } from '@/types'
 
@@ -113,6 +114,17 @@ export async function sendVerifyCode(
   return data
 }
 
+/**
+ * Get verification code task status (queue delivery/consumption ack)
+ * @param taskId - Task ID returned from sendVerifyCode
+ */
+export async function getVerifyCodeStatus(taskId: string): Promise<VerifyCodeTaskStatus> {
+  const { data } = await apiClient.get<VerifyCodeTaskStatus>('/auth/verify-code-status', {
+    params: { task_id: taskId }
+  })
+  return data
+}
+
 export const authAPI = {
   login,
   register,
@@ -123,7 +135,8 @@ export const authAPI = {
   getAuthToken,
   clearAuthToken,
   getPublicSettings,
-  sendVerifyCode
+  sendVerifyCode,
+  getVerifyCodeStatus
 }
 
 export default authAPI

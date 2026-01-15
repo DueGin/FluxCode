@@ -40,6 +40,29 @@ export interface SendVerifyCodeRequest {
 export interface SendVerifyCodeResponse {
   message: string
   countdown: number
+  task_id?: string
+  queue_message_id?: string
+  send_ack?: boolean
+  consume_ack?: boolean
+  delivery_status?: string
+}
+
+export interface VerifyCodeTaskStatus {
+  task_id: string
+  task_type: string
+  email: string
+  site_name: string
+  status: string
+  queue_message_id?: string
+  attempt: number
+  next_attempt?: number
+  max_attempts: number
+  send_ack_at: number
+  consume_ack_at?: number
+  next_retry_at?: number
+  last_error?: string
+  worker?: string
+  updated_at: number
 }
 
 export interface PublicSettings {

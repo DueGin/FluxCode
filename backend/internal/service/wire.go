@@ -5,6 +5,7 @@ import (
 
 	"github.com/DueGin/FluxCode/internal/config"
 	"github.com/google/wire"
+	"github.com/redis/go-redis/v9"
 )
 
 // BuildInfo contains build information
@@ -29,8 +30,8 @@ func ProvideUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, b
 }
 
 // ProvideEmailQueueService creates EmailQueueService with default worker count
-func ProvideEmailQueueService(emailService *EmailService) *EmailQueueService {
-	return NewEmailQueueService(emailService, 3)
+func ProvideEmailQueueService(rdb *redis.Client, emailService *EmailService) *EmailQueueService {
+	return NewEmailQueueService(rdb, emailService, 3)
 }
 
 // ProvideTokenRefreshService creates and starts TokenRefreshService

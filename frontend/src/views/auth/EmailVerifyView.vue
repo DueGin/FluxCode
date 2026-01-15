@@ -68,7 +68,7 @@
 
         <!-- Code Status -->
         <div
-          v-if="codeSent"
+          v-if="codeQueued"
           class="rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-800/50 dark:bg-green-900/20"
         >
           <div class="flex items-start gap-3">
@@ -88,7 +88,7 @@
               </svg>
             </div>
             <p class="text-sm text-green-700 dark:text-green-400">
-              Verification code sent! Please check your inbox.
+              {{ codeSent ? t('auth.verifyCodeSent') : t('auth.verifyCodeQueued') }}
             </p>
           </div>
         </div>
@@ -236,7 +236,7 @@ import { useI18n } from 'vue-i18n'
 import { AuthLayout } from '@/components/layout'
 import TurnstileWidget from '@/components/TurnstileWidget.vue'
 import { useAuthStore, useAppStore } from '@/stores'
-import { getPublicSettings, sendVerifyCode } from '@/api/auth'
+import { getPublicSettings, sendVerifyCode, getVerifyCodeStatus } from '@/api/auth'
 
 const { t } = useI18n()
 
@@ -252,9 +252,11 @@ const isLoading = ref<boolean>(false)
 const isSendingCode = ref<boolean>(false)
 const errorMessage = ref<string>('')
 const codeSent = ref<boolean>(false)
+const codeQueued = ref<boolean>(false)
 const verifyCode = ref<string>('')
 const countdown = ref<number>(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
+let statusTimer: ReturnType<typeof setInterval> | null = null
 
 // Registration data from sessionStorage
 const email = ref<string>('')
@@ -271,6 +273,7 @@ const siteName = ref<string>('FluxCode')
 const turnstileRef = ref<InstanceType<typeof TurnstileWidget> | null>(null)
 const resendTurnstileToken = ref<string>('')
 const showResendTurnstile = ref<boolean>(false)
+const verifyTaskId = ref<string>('')
 
 const errors = ref({
   code: '',
@@ -315,6 +318,7 @@ onUnmounted(() => {
     clearInterval(countdownTimer)
     countdownTimer = null
   }
+  stopStatusPolling()
 })
 
 // ==================== Countdown ====================
@@ -355,11 +359,55 @@ function onTurnstileError(): void {
   errors.value.turnstile = 'Verification failed, please try again'
 }
 
+// ==================== Task Status Polling ====================
+
+function stopStatusPolling(): void {
+  if (statusTimer) {
+    clearInterval(statusTimer)
+    statusTimer = null
+  }
+}
+
+async function refreshTaskStatus(): Promise<void> {
+  if (!verifyTaskId.value) {
+    return
+  }
+
+  try {
+    const status = await getVerifyCodeStatus(verifyTaskId.value)
+    if (status.status === 'sent') {
+      codeSent.value = true
+      stopStatusPolling()
+      return
+    }
+
+    if (status.status === 'failed' || status.status === 'dropped') {
+      codeSent.value = false
+      errorMessage.value = status.last_error || t('auth.verifyCodeFailed')
+      appStore.showError(errorMessage.value)
+      stopStatusPolling()
+    }
+  } catch (error) {
+    // Ignore transient polling errors
+    console.debug('Failed to fetch verify code status:', error)
+  }
+}
+
+function startStatusPolling(): void {
+  stopStatusPolling()
+  statusTimer = setInterval(() => {
+    void refreshTaskStatus()
+  }, 1000)
+}
+
 // ==================== Send Code ====================
 
 async function sendCode(): Promise<void> {
   isSendingCode.value = true
   errorMessage.value = ''
+  codeQueued.value = false
+  verifyTaskId.value = ''
+  stopStatusPolling()
 
   try {
     const response = await sendVerifyCode({
@@ -368,13 +416,21 @@ async function sendCode(): Promise<void> {
       turnstile_token: resendTurnstileToken.value || initialTurnstileToken.value || undefined
     })
 
-    codeSent.value = true
+    codeQueued.value = true
+    verifyTaskId.value = response.task_id || ''
+    codeSent.value = response.consume_ack === true || response.delivery_status === 'sent'
     startCountdown(response.countdown)
 
     // Reset turnstile state（token 已使用，清除以避免重复使用）
     initialTurnstileToken.value = ''
     showResendTurnstile.value = false
     resendTurnstileToken.value = ''
+
+    if (!codeSent.value && verifyTaskId.value) {
+      startStatusPolling()
+    } else {
+      stopStatusPolling()
+    }
   } catch (error: unknown) {
     const err = error as { message?: string; response?: { data?: { detail?: string } } }
 
