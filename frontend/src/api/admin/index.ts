@@ -16,6 +16,7 @@ import usageAPI from './usage'
 import geminiAPI from './gemini'
 import antigravityAPI from './antigravity'
 import userAttributesAPI from './userAttributes'
+import pricingPlansAPI from './pricingPlans'
 
 /**
  * Unified admin API object for convenient access
@@ -24,6 +25,7 @@ export const adminAPI = {
   dashboard: dashboardAPI,
   users: usersAPI,
   groups: groupsAPI,
+  pricingPlans: pricingPlansAPI,
   accounts: accountsAPI,
   proxies: proxiesAPI,
   redeem: redeemAPI,
@@ -40,6 +42,7 @@ export {
   dashboardAPI,
   usersAPI,
   groupsAPI,
+  pricingPlansAPI,
   accountsAPI,
   proxiesAPI,
   redeemAPI,

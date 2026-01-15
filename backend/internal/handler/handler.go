@@ -9,6 +9,7 @@ type AdminHandlers struct {
 	Dashboard        *admin.DashboardHandler
 	User             *admin.UserHandler
 	Group            *admin.GroupHandler
+	PricingPlan      *admin.PricingPlanHandler
 	Account          *admin.AccountHandler
 	OAuth            *admin.OAuthHandler
 	OpenAIOAuth      *admin.OpenAIOAuthHandler
@@ -35,6 +36,7 @@ type Handlers struct {
 	Gateway       *GatewayHandler
 	OpenAIGateway *OpenAIGatewayHandler
 	Setting       *SettingHandler
+	PricingPlan   *PricingPlanHandler
 }
 
 // BuildInfo contains build-time information

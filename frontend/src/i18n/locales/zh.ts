@@ -30,7 +30,7 @@ export default {
       featuresTitle: '功能特性',
       featuresSubtitle: '统一入口，实时计费，构建稳定可控的 API 中转层。',
       pricingTitle: '定价方案',
-      pricingSubtitle: '按量计费 + 配额管理，账单清晰可追踪。',
+      pricingSubtitle: '订阅制，账单清晰可追踪。',
       docsTitle: '使用文档',
       docsSubtitle: '快速开始、API 说明与最佳实践。'
     },
@@ -178,14 +178,29 @@ export default {
     copiedToClipboard: '已复制到剪贴板',
     copyFailed: '复制失败',
     contactSupport: '联系客服',
+    contactAdvisor: '联系顾问',
+    purchase: '购买',
     selectOption: '请选择',
     searchPlaceholder: '搜索...',
     noOptionsFound: '无匹配选项',
     saving: '保存中...',
     refresh: '刷新',
+    recommended: '推荐',
     notAvailable: '不可用',
     now: '现在',
     unknown: '未知',
+    currency: {
+      cny: '人民币 (CNY)',
+      usd: '美元 (USD)',
+      eur: '欧元 (EUR)',
+      gbp: '英镑 (GBP)'
+    },
+    period: {
+      day: '每天',
+      month: '每月',
+      year: '每年',
+      once: '一次性'
+    },
     time: {
       never: '从未',
       justNow: '刚刚',
@@ -204,6 +219,7 @@ export default {
     profile: '个人资料',
     users: '用户管理',
     groups: '分组管理',
+    pricingPlans: '定价方案',
     subscriptions: '订阅管理',
     accounts: '账号管理',
     proxies: 'IP管理',
@@ -953,6 +969,66 @@ export default {
         validityHint: '分配给用户时订阅的有效天数',
         noLimit: '无限制'
       }
+    },
+
+    // Pricing Plans
+    pricingPlans: {
+      title: '定价方案',
+      description: '管理定价页的分组与方案卡片',
+      createGroup: '创建分组',
+      editGroup: '编辑分组',
+      deleteGroup: '删除分组',
+      createPlan: '创建方案',
+      editPlan: '编辑方案',
+      deletePlan: '删除方案',
+      sortOrder: '排序',
+      columns: {
+        name: '名称',
+        price: '价格',
+        sortOrder: '排序',
+        status: '状态',
+        actions: '操作'
+      },
+      groupForm: {
+        name: '分组名称',
+        description: '分组描述',
+        sortOrder: '排序',
+        status: '状态'
+      },
+      planForm: {
+        group: '所属分组',
+        name: '方案名称',
+        description: '副标题',
+        iconUrl: '图标 URL',
+        iconUrlHint: '例如：https://example.com/icon.svg（留空则显示首字母）',
+        badgeText: '标签',
+        badgeTextHint: '例如：工程效率 / 定制套餐',
+        priceText: '价格文案',
+        priceTextHint: '例如：免费 / 联系咨询（填写后会覆盖金额显示）',
+        tagline: '价格说明',
+        taglineHint: '例如：性价比首选｜量大管饱',
+        priceAmount: '金额',
+        priceCurrency: '币种',
+        pricePeriod: '周期',
+        features: '特性列表',
+        featuresHint: '每行一个特性',
+        purchaseEntries: '购买入口',
+        purchaseEntriesHint: '点击右侧 + 新增入口，拖拽左侧手柄调整顺序',
+        purchaseEntryLabelPlaceholder: '标签（例如：微信支付）',
+        purchaseEntryValuePlaceholder: '值（链接或可复制文本）',
+        addPurchaseEntry: '新增购买入口',
+        removePurchaseEntry: '移除该入口',
+        dragToSort: '拖拽排序',
+        featured: '推荐',
+        sortOrder: '排序',
+        status: '状态'
+      },
+      emptyTitle: '暂无定价分组',
+      emptyDesc: '创建分组后，再在分组内添加不同的定价方案。',
+      noPlans: '该分组暂无方案。',
+      failedToLoad: '加载定价方案失败',
+      deleteGroupConfirm: "确定要删除分组 '{name}' 吗？该分组下的方案将一并删除。",
+      deletePlanConfirm: "确定要删除方案 '{name}'（分组：{group}）吗？"
     },
 
     // Subscriptions Management

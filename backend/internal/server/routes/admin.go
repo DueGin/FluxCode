@@ -50,6 +50,9 @@ func RegisterAdminRoutes(
 		// 系统管理
 		registerSystemRoutes(admin, h)
 
+		// 定价方案管理
+		registerPricingPlanRoutes(admin, h)
+
 		// 订阅管理
 		registerSubscriptionRoutes(admin, h)
 
@@ -223,6 +226,20 @@ func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		system.POST("/update", h.Admin.System.PerformUpdate)
 		system.POST("/rollback", h.Admin.System.Rollback)
 		system.POST("/restart", h.Admin.System.RestartService)
+	}
+}
+
+func registerPricingPlanRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	pricing := admin.Group("/pricing")
+	{
+		pricing.GET("/plan-groups", h.Admin.PricingPlan.ListGroups)
+		pricing.POST("/plan-groups", h.Admin.PricingPlan.CreateGroup)
+		pricing.PUT("/plan-groups/:id", h.Admin.PricingPlan.UpdateGroup)
+		pricing.DELETE("/plan-groups/:id", h.Admin.PricingPlan.DeleteGroup)
+
+		pricing.POST("/plans", h.Admin.PricingPlan.CreatePlan)
+		pricing.PUT("/plans/:id", h.Admin.PricingPlan.UpdatePlan)
+		pricing.DELETE("/plans/:id", h.Admin.PricingPlan.DeletePlan)
 	}
 }
 

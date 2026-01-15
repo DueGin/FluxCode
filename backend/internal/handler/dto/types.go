@@ -219,3 +219,46 @@ type BulkAssignResult struct {
 	Subscriptions []UserSubscription `json:"subscriptions"`
 	Errors        []string           `json:"errors"`
 }
+
+type PricingPlanGroup struct {
+	ID          int64   `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+	SortOrder   int     `json:"sort_order"`
+	Status      string  `json:"status"`
+
+	Plans []PricingPlan `json:"plans,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type PricingPlan struct {
+	ID          int64   `json:"id"`
+	GroupID     int64   `json:"group_id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
+
+	IconURL   *string `json:"icon_url"`
+	BadgeText *string `json:"badge_text"`
+	Tagline   *string `json:"tagline"`
+
+	PriceAmount   *float64 `json:"price_amount"`
+	PriceCurrency string   `json:"price_currency"`
+	PricePeriod   string   `json:"price_period"`
+	PriceText     *string  `json:"price_text"`
+
+	Features       []string                   `json:"features"`
+	ContactMethods []PricingPlanContactMethod `json:"contact_methods"`
+	IsFeatured     bool                       `json:"is_featured"`
+	SortOrder      int                        `json:"sort_order"`
+	Status         string                     `json:"status"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type PricingPlanContactMethod struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
