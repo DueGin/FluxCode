@@ -15,13 +15,14 @@ This directory contains files for deploying FluxCode on Linux servers.
 |------|-------------|
 | `docker-compose.yml` | Docker Compose configuration |
 | `docker-compose.scale.yml` | Scale-ready compose (single-host, with Caddy ingress) |
-| `docker-compose.infra.yml` | Multi-host infra (PostgreSQL + Redis) |
-| `docker-compose.app.yml` | Multi-host ingress + app (Caddy + FluxCode) |
-| `docker-compose.node.yml` | Multi-host app node (FluxCode only) |
+| `infra/docker-compose.infra.yml` | Multi-host infra (PostgreSQL + Redis) |
+| `app/docker-compose.caddy.yml` | Multi-host ingress (Caddy only) |
+| `app/docker-compose.app.yml` | Multi-host ingress + app (Caddy + FluxCode, combined/backup) |
+| `node/docker-compose.node.yml` | Multi-host app node (FluxCode only) |
 | `.env.example` | Docker environment variables template |
-| `.env.infra.example` | Multi-host infra env template |
-| `.env.app.example` | Multi-host ingress/app env template |
-| `.env.node.example` | Multi-host node env template |
+| `infra/.env.infra.example` | Multi-host infra env template |
+| `app/.env.app.example` | Multi-host ingress env template |
+| `node/.env.node.example` | Multi-host node env template |
 | `DOCKER.md` | Docker Hub documentation |
 | `MULTI_HOST.md` | Multi-host deployment guide |
 | `install.sh` | One-click binary installation script |
