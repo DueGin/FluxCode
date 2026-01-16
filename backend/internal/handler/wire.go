@@ -12,6 +12,7 @@ func ProvideAdminHandlers(
 	dashboardHandler *admin.DashboardHandler,
 	userHandler *admin.UserHandler,
 	groupHandler *admin.GroupHandler,
+	pricingPlanHandler *admin.PricingPlanHandler,
 	accountHandler *admin.AccountHandler,
 	oauthHandler *admin.OAuthHandler,
 	openaiOAuthHandler *admin.OpenAIOAuthHandler,
@@ -29,6 +30,7 @@ func ProvideAdminHandlers(
 		Dashboard:        dashboardHandler,
 		User:             userHandler,
 		Group:            groupHandler,
+		PricingPlan:      pricingPlanHandler,
 		Account:          accountHandler,
 		OAuth:            oauthHandler,
 		OpenAIOAuth:      openaiOAuthHandler,
@@ -66,6 +68,7 @@ func ProvideHandlers(
 	gatewayHandler *GatewayHandler,
 	openaiGatewayHandler *OpenAIGatewayHandler,
 	settingHandler *SettingHandler,
+	pricingPlanHandler *PricingPlanHandler,
 ) *Handlers {
 	return &Handlers{
 		Auth:          authHandler,
@@ -78,6 +81,7 @@ func ProvideHandlers(
 		Gateway:       gatewayHandler,
 		OpenAIGateway: openaiGatewayHandler,
 		Setting:       settingHandler,
+		PricingPlan:   pricingPlanHandler,
 	}
 }
 
@@ -93,11 +97,13 @@ var ProviderSet = wire.NewSet(
 	NewGatewayHandler,
 	NewOpenAIGatewayHandler,
 	ProvideSettingHandler,
+	NewPricingPlanHandler,
 
 	// Admin handlers
 	admin.NewDashboardHandler,
 	admin.NewUserHandler,
 	admin.NewGroupHandler,
+	admin.NewPricingPlanHandler,
 	admin.NewAccountHandler,
 	admin.NewOAuthHandler,
 	admin.NewOpenAIOAuthHandler,

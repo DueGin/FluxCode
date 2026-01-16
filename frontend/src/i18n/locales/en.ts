@@ -31,7 +31,7 @@ export default {
       featuresTitle: 'Features',
       featuresSubtitle: 'One entry, real-time billing, stable & reliable.',
       pricingTitle: 'Pricing',
-      pricingSubtitle: 'Usage-based billing + quota control, with clear and traceable bills.',
+      pricingSubtitle: 'Subscription-based, with clear and traceable bills.',
       docsTitle: 'Documentation',
       docsSubtitle: 'Quick start, API reference, and best practices.'
     },
@@ -180,14 +180,29 @@ export default {
     copiedToClipboard: 'Copied to clipboard',
     copyFailed: 'Failed to copy',
     contactSupport: 'Contact Support',
+    contactAdvisor: 'Contact Advisor',
+    purchase: 'Purchase',
     selectOption: 'Select an option',
     searchPlaceholder: 'Search...',
     noOptionsFound: 'No options found',
     saving: 'Saving...',
     refresh: 'Refresh',
+    recommended: 'Recommended',
     notAvailable: 'N/A',
     now: 'Now',
     unknown: 'Unknown',
+    currency: {
+      cny: 'CNY (RMB)',
+      usd: 'USD',
+      eur: 'EUR',
+      gbp: 'GBP'
+    },
+    period: {
+      day: 'Daily',
+      month: 'Monthly',
+      year: 'Yearly',
+      once: 'One-time'
+    },
     time: {
       never: 'Never',
       justNow: 'Just now',
@@ -206,6 +221,7 @@ export default {
     profile: 'Profile',
     users: 'Users',
     groups: 'Groups',
+    pricingPlans: 'Pricing Plans',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
     proxies: 'Proxies',
@@ -868,6 +884,66 @@ export default {
         validityHint: 'Number of days the subscription is valid when assigned to a user',
         noLimit: 'No limit'
       }
+    },
+
+    // Pricing Plans
+    pricingPlans: {
+      title: 'Pricing Plans',
+      description: 'Manage pricing page groups and plan cards',
+      createGroup: 'Create Group',
+      editGroup: 'Edit Group',
+      deleteGroup: 'Delete Group',
+      createPlan: 'Create Plan',
+      editPlan: 'Edit Plan',
+      deletePlan: 'Delete Plan',
+      sortOrder: 'Sort',
+      columns: {
+        name: 'Name',
+        price: 'Price',
+        sortOrder: 'Sort',
+        status: 'Status',
+        actions: 'Actions'
+      },
+      groupForm: {
+        name: 'Group Name',
+        description: 'Description',
+        sortOrder: 'Sort Order',
+        status: 'Status'
+      },
+      planForm: {
+        group: 'Group',
+        name: 'Plan Name',
+        description: 'Subtitle',
+        iconUrl: 'Icon URL',
+        iconUrlHint: 'e.g. https://example.com/icon.svg (leave empty to show initial)',
+        badgeText: 'Badge',
+        badgeTextHint: 'e.g. Productivity / Custom Plan',
+        priceText: 'Price Text',
+        priceTextHint: 'e.g. Free / Contact us (overrides amount display)',
+        tagline: 'Tagline',
+        taglineHint: 'e.g. Best value | Unlimited usage',
+        priceAmount: 'Amount',
+        priceCurrency: 'Currency',
+        pricePeriod: 'Period',
+        features: 'Features',
+        featuresHint: 'One feature per line',
+        purchaseEntries: 'Purchase Entries',
+        purchaseEntriesHint: 'Click + to add a new entry, drag the handle to reorder',
+        purchaseEntryLabelPlaceholder: 'Label (e.g. WeChat Pay)',
+        purchaseEntryValuePlaceholder: 'Value (URL or text)',
+        addPurchaseEntry: 'Add purchase entry',
+        removePurchaseEntry: 'Remove entry',
+        dragToSort: 'Drag to sort',
+        featured: 'Featured',
+        sortOrder: 'Sort Order',
+        status: 'Status'
+      },
+      emptyTitle: 'No pricing groups',
+      emptyDesc: 'Create a group, then add plans under it.',
+      noPlans: 'No plans in this group.',
+      failedToLoad: 'Failed to load pricing plans',
+      deleteGroupConfirm: "Are you sure you want to delete group '{name}'? All plans under it will be deleted.",
+      deletePlanConfirm: "Are you sure you want to delete plan '{name}' (group: {group})?"
     },
 
     // Subscriptions

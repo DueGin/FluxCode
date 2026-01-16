@@ -106,6 +106,7 @@ var ProviderSet = wire.NewSet(
 	NewUserService,
 	NewAPIKeyService,
 	NewGroupService,
+	NewPricingPlanService,
 	NewAccountService,
 	NewProxyService,
 	NewRedeemService,

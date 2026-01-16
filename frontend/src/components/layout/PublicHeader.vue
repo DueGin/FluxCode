@@ -31,6 +31,31 @@
             </span>
           </router-link>
 
+          <!-- Desktop Nav -->
+          <div class="hidden items-center gap-1 md:flex">
+            <!-- <router-link
+              :to="{ path: '/home', hash: '#features' }"
+              class="rounded-full px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-dark-200 dark:hover:bg-white/10 dark:hover:text-white"
+              @click="closeMobileMenu"
+            >
+              {{ t('home.nav.features') }}
+            </router-link> -->
+            <router-link
+              to="/pricing"
+              class="rounded-full px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-dark-200 dark:hover:bg-white/10 dark:hover:text-white"
+              @click="closeMobileMenu"
+            >
+              {{ t('home.nav.pricing') }}
+            </router-link>
+            <!-- <router-link
+              to="/docs"
+              class="rounded-full px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-dark-200 dark:hover:bg-white/10 dark:hover:text-white"
+              @click="closeMobileMenu"
+            >
+              {{ t('home.nav.docs') }}
+            </router-link> -->
+          </div>
+
           <!-- Right Actions -->
           <div class="ml-auto flex items-center gap-2 sm:gap-3">
             <LocaleSwitcher class="hidden md:block" />
@@ -136,8 +161,34 @@
         >
           <div v-if="isMobileMenuOpen" class="md:hidden">
             <div class="border-t border-black/5 px-4 py-4 dark:border-white/10">
-              <div class="flex items-center gap-3">
-                <LocaleSwitcher />
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-3">
+                  <LocaleSwitcher />
+                </div>
+
+                <div class="mt-2 grid gap-2">
+                  <router-link
+                    :to="{ path: '/home', hash: '#features' }"
+                    class="rounded-2xl border border-black/5 bg-white/70 px-4 py-3 text-sm font-medium text-gray-800 shadow-sm backdrop-blur transition-colors hover:bg-white/90 dark:border-white/10 dark:bg-dark-900/40 dark:text-dark-100 dark:hover:bg-dark-900/55"
+                    @click="closeMobileMenu"
+                  >
+                    {{ t('home.nav.features') }}
+                  </router-link>
+                  <router-link
+                    to="/pricing"
+                    class="rounded-2xl border border-black/5 bg-white/70 px-4 py-3 text-sm font-medium text-gray-800 shadow-sm backdrop-blur transition-colors hover:bg-white/90 dark:border-white/10 dark:bg-dark-900/40 dark:text-dark-100 dark:hover:bg-dark-900/55"
+                    @click="closeMobileMenu"
+                  >
+                    {{ t('home.nav.pricing') }}
+                  </router-link>
+                  <router-link
+                    to="/docs"
+                    class="rounded-2xl border border-black/5 bg-white/70 px-4 py-3 text-sm font-medium text-gray-800 shadow-sm backdrop-blur transition-colors hover:bg-white/90 dark:border-white/10 dark:bg-dark-900/40 dark:text-dark-100 dark:hover:bg-dark-900/55"
+                    @click="closeMobileMenu"
+                  >
+                    {{ t('home.nav.docs') }}
+                  </router-link>
+                </div>
               </div>
             </div>
           </div>
