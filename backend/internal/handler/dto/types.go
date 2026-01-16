@@ -67,6 +67,7 @@ type Account struct {
 	Status       string         `json:"status"`
 	ErrorMessage string         `json:"error_message"`
 	LastUsedAt   *time.Time     `json:"last_used_at"`
+	ExpiresAt    *time.Time     `json:"expires_at"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
 

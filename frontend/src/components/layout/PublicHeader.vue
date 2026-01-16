@@ -47,13 +47,13 @@
             >
               {{ t('home.nav.pricing') }}
             </router-link>
-            <!-- <router-link
+            <router-link
               to="/docs"
               class="rounded-full px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-dark-200 dark:hover:bg-white/10 dark:hover:text-white"
               @click="closeMobileMenu"
             >
               {{ t('home.nav.docs') }}
-            </router-link> -->
+            </router-link>
           </div>
 
           <!-- Right Actions -->

@@ -116,6 +116,7 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		Status:                  a.Status,
 		ErrorMessage:            a.ErrorMessage,
 		LastUsedAt:              a.LastUsedAt,
+		ExpiresAt:               a.ExpiresAt,
 		CreatedAt:               a.CreatedAt,
 		UpdatedAt:               a.UpdatedAt,
 		Schedulable:             a.Schedulable,

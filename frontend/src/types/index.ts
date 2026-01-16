@@ -445,6 +445,7 @@ export interface Account {
   status: 'active' | 'inactive' | 'error'
   error_message: string | null
   last_used_at: string | null
+  expires_at: string | null
   created_at: string
   updated_at: string
   proxy?: Proxy
@@ -534,6 +535,7 @@ export interface CreateAccountRequest {
   concurrency?: number
   priority?: number
   group_ids?: number[]
+  expires_at?: string | null
   confirm_mixed_channel_risk?: boolean
 }
 
@@ -547,6 +549,7 @@ export interface UpdateAccountRequest {
   priority?: number
   status?: 'active' | 'inactive'
   group_ids?: number[]
+  expires_at?: string | null
   confirm_mixed_channel_risk?: boolean
 }
 

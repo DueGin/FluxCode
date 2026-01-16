@@ -117,6 +117,11 @@ const isRateLimited = computed(() => {
   return new Date(props.account.rate_limit_reset_at) > new Date()
 })
 
+const isExpired = computed(() => {
+  if (!props.account.expires_at) return false
+  return new Date(props.account.expires_at) <= new Date()
+})
+
 // Computed: is overloaded (529)
 const isOverloaded = computed(() => {
   if (!props.account.overload_until) return false
@@ -138,6 +143,9 @@ const hasError = computed(() => {
 const statusClass = computed(() => {
   if (hasError.value) {
     return 'badge-danger'
+  }
+  if (isExpired.value) {
+    return 'badge-gray'
   }
   if (isTempUnschedulable.value) {
     return 'badge-warning'
@@ -161,6 +169,9 @@ const statusClass = computed(() => {
 const statusText = computed(() => {
   if (hasError.value) {
     return t('common.error')
+  }
+  if (isExpired.value) {
+    return t('admin.accounts.status.expired')
   }
   if (isTempUnschedulable.value) {
     return t('admin.accounts.status.tempUnschedulable')

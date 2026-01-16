@@ -21,6 +21,7 @@ type Account struct {
 	Status       string
 	ErrorMessage string
 	LastUsedAt   *time.Time
+	ExpiresAt    *time.Time
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 
@@ -58,6 +59,9 @@ func (a *Account) IsSchedulable() bool {
 	if !a.IsActive() || !a.Schedulable {
 		return false
 	}
+	if a.IsExpired() {
+		return false
+	}
 	now := time.Now()
 	if a.OverloadUntil != nil && now.Before(*a.OverloadUntil) {
 		return false
@@ -76,6 +80,14 @@ func (a *Account) IsRateLimited() bool {
 		return false
 	}
 	return time.Now().Before(*a.RateLimitResetAt)
+}
+
+// IsExpired 判断账号是否已过期。
+func (a *Account) IsExpired() bool {
+	if a.ExpiresAt == nil {
+		return false
+	}
+	return time.Now().After(*a.ExpiresAt)
 }
 
 func (a *Account) IsOverloaded() bool {

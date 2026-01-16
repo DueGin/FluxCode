@@ -1,11 +1,12 @@
 package service
 
 import (
+	"database/sql"
 	"time"
 
+	"github.com/DueGin/FluxCode/ent"
 	"github.com/DueGin/FluxCode/internal/config"
 	"github.com/google/wire"
-	"github.com/DueGin/FluxCode/ent"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -90,6 +91,12 @@ func ProvideDeferredService(accountRepo AccountRepository, timingWheel *TimingWh
 	return svc
 }
 
+func ProvideAccountExpirationWorker(db *sql.DB, timingWheel *TimingWheelService) *AccountExpirationWorker {
+	svc := NewAccountExpirationWorker(db, timingWheel, 30*time.Second)
+	svc.Start()
+	return svc
+}
+
 // ProvideConcurrencyService creates ConcurrencyService and starts slot cleanup worker.
 func ProvideConcurrencyService(cache ConcurrencyCache, accountRepo AccountRepository, cfg *config.Config) *ConcurrencyService {
 	svc := NewConcurrencyService(cache)
@@ -143,6 +150,7 @@ var ProviderSet = wire.NewSet(
 	ProvideTokenRefreshService,
 	ProvideTimingWheelService,
 	ProvideDeferredService,
+	ProvideAccountExpirationWorker,
 	NewAntigravityQuotaFetcher,
 	NewUserAttributeService,
 	NewUsageCache,

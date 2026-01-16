@@ -227,6 +227,26 @@ func (_u *AccountUpdate) ClearLastUsedAt() *AccountUpdate {
 	return _u
 }
 
+// SetExpiresAt sets the "expires_at" field.
+func (_u *AccountUpdate) SetExpiresAt(v time.Time) *AccountUpdate {
+	_u.mutation.SetExpiresAt(v)
+	return _u
+}
+
+// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableExpiresAt(v *time.Time) *AccountUpdate {
+	if v != nil {
+		_u.SetExpiresAt(*v)
+	}
+	return _u
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (_u *AccountUpdate) ClearExpiresAt() *AccountUpdate {
+	_u.mutation.ClearExpiresAt()
+	return _u
+}
+
 // SetSchedulable sets the "schedulable" field.
 func (_u *AccountUpdate) SetSchedulable(v bool) *AccountUpdate {
 	_u.mutation.SetSchedulable(v)
@@ -583,6 +603,18 @@ func (_u *AccountUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.LastUsedAtCleared() {
 		_spec.ClearField(account.FieldLastUsedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ExpiresAt(); ok {
+		_spec.SetField(account.FieldExpiresAt, field.TypeTime, value)
+	}
+	if _u.mutation.ExpiresAtCleared() {
+		_spec.ClearField(account.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ExpiresAt(); ok {
+		_spec.SetField(account.FieldExpiresAt, field.TypeTime, value)
+	}
+	if _u.mutation.ExpiresAtCleared() {
+		_spec.ClearField(account.FieldExpiresAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.Schedulable(); ok {
 		_spec.SetField(account.FieldSchedulable, field.TypeBool, value)
@@ -967,6 +999,26 @@ func (_u *AccountUpdateOne) SetNillableLastUsedAt(v *time.Time) *AccountUpdateOn
 // ClearLastUsedAt clears the value of the "last_used_at" field.
 func (_u *AccountUpdateOne) ClearLastUsedAt() *AccountUpdateOne {
 	_u.mutation.ClearLastUsedAt()
+	return _u
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (_u *AccountUpdateOne) SetExpiresAt(v time.Time) *AccountUpdateOne {
+	_u.mutation.SetExpiresAt(v)
+	return _u
+}
+
+// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableExpiresAt(v *time.Time) *AccountUpdateOne {
+	if v != nil {
+		_u.SetExpiresAt(*v)
+	}
+	return _u
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (_u *AccountUpdateOne) ClearExpiresAt() *AccountUpdateOne {
+	_u.mutation.ClearExpiresAt()
 	return _u
 }
 

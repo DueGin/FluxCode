@@ -44,6 +44,25 @@ func (o *optionalInt64) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type optionalTime struct {
+	Set   bool
+	Value *time.Time
+}
+
+func (o *optionalTime) UnmarshalJSON(data []byte) error {
+	o.Set = true
+	if string(data) == "null" {
+		o.Value = nil
+		return nil
+	}
+	var v time.Time
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	o.Value = &v
+	return nil
+}
+
 // OAuthHandler handles OAuth-related operations for accounts
 type OAuthHandler struct {
 	oauthService *service.OAuthService
@@ -105,6 +124,7 @@ type CreateAccountRequest struct {
 	Concurrency             int            `json:"concurrency"`
 	Priority                int            `json:"priority"`
 	GroupIDs                []int64        `json:"group_ids"`
+	ExpiresAt               *time.Time     `json:"expires_at"`
 	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
 }
 
@@ -121,6 +141,7 @@ type UpdateAccountRequest struct {
 	Priority                *int           `json:"priority"`
 	Status                  string         `json:"status" binding:"omitempty,oneof=active inactive"`
 	GroupIDs                *[]int64       `json:"group_ids"`
+	ExpiresAt               optionalTime   `json:"expires_at"`
 	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
 }
 
@@ -135,6 +156,7 @@ type BulkUpdateAccountsRequest struct {
 	GroupIDs                *[]int64       `json:"group_ids"`
 	Credentials             map[string]any `json:"credentials"`
 	Extra                   map[string]any `json:"extra"`
+	ExpiresAt               optionalTime   `json:"expires_at"`
 	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
 }
 
@@ -223,6 +245,7 @@ func (h *AccountHandler) Create(c *gin.Context) {
 		Concurrency:           req.Concurrency,
 		Priority:              req.Priority,
 		GroupIDs:              req.GroupIDs,
+		ExpiresAt:             req.ExpiresAt,
 		SkipMixedChannelCheck: skipCheck,
 	})
 	if err != nil {
@@ -279,6 +302,8 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		Concurrency:           req.Concurrency, // 指针类型，nil 表示未提供
 		Priority:              req.Priority,    // 指针类型，nil 表示未提供
 		Status:                req.Status,
+		ExpiresAt:             req.ExpiresAt.Value,
+		ExpiresAtSet:          req.ExpiresAt.Set,
 		GroupIDs:              req.GroupIDs,
 		SkipMixedChannelCheck: skipCheck,
 	})
@@ -652,6 +677,7 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		req.Concurrency != nil ||
 		req.Priority != nil ||
 		req.Status != "" ||
+		req.ExpiresAt.Set ||
 		req.GroupIDs != nil ||
 		len(req.Credentials) > 0 ||
 		len(req.Extra) > 0
@@ -669,6 +695,8 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		Concurrency:           req.Concurrency,
 		Priority:              req.Priority,
 		Status:                req.Status,
+		ExpiresAt:             req.ExpiresAt.Value,
+		ExpiresAtSet:          req.ExpiresAt.Set,
 		GroupIDs:              req.GroupIDs,
 		Credentials:           req.Credentials,
 		Extra:                 req.Extra,

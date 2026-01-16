@@ -1005,6 +1005,7 @@ type AccountMutation struct {
 	status                *string
 	error_message         *string
 	last_used_at          *time.Time
+	expires_at            *time.Time
 	schedulable           *bool
 	rate_limited_at       *time.Time
 	rate_limit_reset_at   *time.Time
@@ -1720,6 +1721,55 @@ func (m *AccountMutation) ResetLastUsedAt() {
 	delete(m.clearedFields, account.FieldLastUsedAt)
 }
 
+// SetExpiresAt sets the "expires_at" field.
+func (m *AccountMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *AccountMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (m *AccountMutation) ClearExpiresAt() {
+	m.expires_at = nil
+	m.clearedFields[account.FieldExpiresAt] = struct{}{}
+}
+
+// ExpiresAtCleared returns if the "expires_at" field was cleared in this mutation.
+func (m *AccountMutation) ExpiresAtCleared() bool {
+	_, ok := m.clearedFields[account.FieldExpiresAt]
+	return ok
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *AccountMutation) ResetExpiresAt() {
+	m.expires_at = nil
+	delete(m.clearedFields, account.FieldExpiresAt)
+}
+
 // SetSchedulable sets the "schedulable" field.
 func (m *AccountMutation) SetSchedulable(b bool) {
 	m.schedulable = &b
@@ -2262,6 +2312,9 @@ func (m *AccountMutation) Fields() []string {
 	if m.last_used_at != nil {
 		fields = append(fields, account.FieldLastUsedAt)
 	}
+	if m.expires_at != nil {
+		fields = append(fields, account.FieldExpiresAt)
+	}
 	if m.schedulable != nil {
 		fields = append(fields, account.FieldSchedulable)
 	}
@@ -2319,6 +2372,8 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.ErrorMessage()
 	case account.FieldLastUsedAt:
 		return m.LastUsedAt()
+	case account.FieldExpiresAt:
+		return m.ExpiresAt()
 	case account.FieldSchedulable:
 		return m.Schedulable()
 	case account.FieldRateLimitedAt:
@@ -2370,6 +2425,8 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldErrorMessage(ctx)
 	case account.FieldLastUsedAt:
 		return m.OldLastUsedAt(ctx)
+	case account.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
 	case account.FieldSchedulable:
 		return m.OldSchedulable(ctx)
 	case account.FieldRateLimitedAt:
@@ -2491,6 +2548,13 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetLastUsedAt(v)
 		return nil
+	case account.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
 	case account.FieldSchedulable:
 		v, ok := value.(bool)
 		if !ok {
@@ -2609,6 +2673,9 @@ func (m *AccountMutation) ClearedFields() []string {
 	if m.FieldCleared(account.FieldLastUsedAt) {
 		fields = append(fields, account.FieldLastUsedAt)
 	}
+	if m.FieldCleared(account.FieldExpiresAt) {
+		fields = append(fields, account.FieldExpiresAt)
+	}
 	if m.FieldCleared(account.FieldRateLimitedAt) {
 		fields = append(fields, account.FieldRateLimitedAt)
 	}
@@ -2652,6 +2719,9 @@ func (m *AccountMutation) ClearField(name string) error {
 		return nil
 	case account.FieldLastUsedAt:
 		m.ClearLastUsedAt()
+		return nil
+	case account.FieldExpiresAt:
+		m.ClearExpiresAt()
 		return nil
 	case account.FieldRateLimitedAt:
 		m.ClearRateLimitedAt()

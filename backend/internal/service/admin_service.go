@@ -124,6 +124,7 @@ type CreateAccountInput struct {
 	Concurrency int
 	Priority    int
 	GroupIDs    []int64
+	ExpiresAt   *time.Time
 	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
 	// This should only be set when the caller has explicitly confirmed the risk.
 	SkipMixedChannelCheck bool
@@ -140,21 +141,25 @@ type UpdateAccountInput struct {
 	Priority              *int // 使用指针区分"未提供"和"设置为0"
 	Status                string
 	GroupIDs              *[]int64
+	ExpiresAt             *time.Time
+	ExpiresAtSet          bool
 	SkipMixedChannelCheck bool // 跳过混合渠道检查（用户已确认风险）
 }
 
 // BulkUpdateAccountsInput describes the payload for bulk updating accounts.
 type BulkUpdateAccountsInput struct {
-	AccountIDs  []int64
-	Name        string
-	ProxyID     *int64
-	ProxyIDSet  bool // true=更新(允许置空)，false=不更新
-	Concurrency *int
-	Priority    *int
-	Status      string
-	GroupIDs    *[]int64
-	Credentials map[string]any
-	Extra       map[string]any
+	AccountIDs   []int64
+	Name         string
+	ProxyID      *int64
+	ProxyIDSet   bool // true=更新(允许置空)，false=不更新
+	Concurrency  *int
+	Priority     *int
+	Status       string
+	GroupIDs     *[]int64
+	Credentials  map[string]any
+	Extra        map[string]any
+	ExpiresAt    *time.Time
+	ExpiresAtSet bool
 	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
 	// This should only be set when the caller has explicitly confirmed the risk.
 	SkipMixedChannelCheck bool
@@ -666,6 +671,7 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		Priority:    input.Priority,
 		Status:      StatusActive,
 		Schedulable: true,
+		ExpiresAt:   input.ExpiresAt,
 	}
 	if err := s.accountRepo.Create(ctx, account); err != nil {
 		return nil, err
@@ -713,6 +719,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	if input.Status != "" {
 		account.Status = input.Status
+	}
+	if input.ExpiresAtSet {
+		account.ExpiresAt = input.ExpiresAt
 	}
 
 	// 先验证分组是否存在（在任何写操作之前）
@@ -794,6 +803,13 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	}
 	if input.Status != "" {
 		repoUpdates.Status = &input.Status
+	}
+	if input.ExpiresAtSet {
+		if input.ExpiresAt == nil {
+			repoUpdates.ClearExpiresAt = true
+		} else {
+			repoUpdates.ExpiresAt = input.ExpiresAt
+		}
 	}
 
 	// Run bulk update for column/jsonb fields first.

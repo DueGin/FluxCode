@@ -1150,6 +1150,7 @@ export default {
         weight: '权重',
         status: '状态',
         schedulable: '调度',
+        expires: '过期时间',
         todayStats: '今日统计',
         groups: '分组',
         usageWindows: '用量窗口',
@@ -1195,7 +1196,32 @@ export default {
       status: {
         paused: '已暂停',
         limited: '受限',
-        tempUnschedulable: '临时不可调度'
+        tempUnschedulable: '临时不可调度',
+        expired: '账号已过期'
+      },
+      expiration: {
+        label: '账号过期时间',
+        hint: '到期后账号会自动移出调度，不再被选用。',
+        enableLabel: '启用过期时间',
+        presetDays: '{days} 天',
+        inputHint: '使用本地时间（不含秒），建议至少提前 1 分钟。',
+        disabledHint: '未启用时账号将保持永久有效。',
+        never: '长期有效',
+        expired: '已过期',
+        today: '今天到期',
+        tomorrow: '明天到期',
+        inDays: '{days} 天后到期'
+      },
+      schedulableReason: {
+        ok: '当前账号可参与调度。',
+        manualOff: '已手动关闭调度开关。',
+        expired: '账号已过期，系统已自动关闭调度开关。',
+        inactive: '账号已停用，无法参与调度。',
+        error: '账号处于错误状态，无法参与调度。',
+        tempUnsched: '账号处于临时不可调度状态。',
+        tempUnschedWithReason: '账号处于临时不可调度状态：{reason}',
+        rateLimitedUntil: '账号触发限流，预计 {time} 后恢复调度。',
+        overloadedUntil: '账号处于过载，预计 {time} 后恢复调度。'
       },
       tempUnschedulable: {
         title: '临时不可调度',

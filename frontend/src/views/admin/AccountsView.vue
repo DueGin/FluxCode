@@ -220,26 +220,57 @@
           </template>
 
           <template #cell-schedulable="{ row }">
-            <button
-              @click="handleToggleSchedulable(row)"
-              :disabled="togglingSchedulable === row.id"
-              class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-dark-800"
-              :class="[
-                row.schedulable
-                  ? 'bg-primary-500 hover:bg-primary-600'
-                  : 'bg-gray-200 hover:bg-gray-300 dark:bg-dark-600 dark:hover:bg-dark-500'
-              ]"
-              :title="
-                row.schedulable
-                  ? t('admin.accounts.schedulableEnabled')
-                  : t('admin.accounts.schedulableDisabled')
-              "
-            >
+            <div class="flex items-center gap-2">
+              <button
+                @click="handleToggleSchedulable(row)"
+                :disabled="togglingSchedulable === row.id || isExpired(row.expires_at)"
+                class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-dark-800"
+                :class="[
+                  row.schedulable
+                    ? 'bg-primary-500 hover:bg-primary-600'
+                    : 'bg-gray-200 hover:bg-gray-300 dark:bg-dark-600 dark:hover:bg-dark-500'
+                ]"
+                :title="
+                  row.schedulable
+                    ? t('admin.accounts.schedulableEnabled')
+                    : t('admin.accounts.schedulableDisabled')
+                "
+              >
+                <span
+                  class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                  :class="[row.schedulable ? 'translate-x-4' : 'translate-x-0']"
+                />
+              </button>
+
+              <div class="group relative">
+                <span
+                  class="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-600 hover:bg-gray-300 dark:bg-dark-600 dark:text-gray-300 dark:hover:bg-dark-500"
+                >
+                  ?
+                </span>
+                <div
+                  class="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded bg-gray-900 px-3 py-2 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
+                >
+                  {{ getSchedulableHint(row) }}
+                  <div
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-gray-900 dark:border-b-gray-700"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template #cell-expires_at="{ row }">
+            <div class="flex flex-col text-xs">
               <span
-                class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                :class="[row.schedulable ? 'translate-x-4' : 'translate-x-0']"
-              />
-            </button>
+                :class="['badge text-xs font-medium', getExpirationState(row.expires_at).variant]"
+              >
+                {{ getExpirationState(row.expires_at).label }}
+              </span>
+              <span v-if="row.expires_at" class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                {{ formatDateTime(row.expires_at) }}
+              </span>
+            </div>
           </template>
 
           <template #cell-today_stats="{ row }">
@@ -529,7 +560,7 @@ import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vu
 import AccountTestModal from '@/components/account/AccountTestModal.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
-import { formatRelativeTime } from '@/utils/format'
+import { formatRelativeTime, formatDateTime } from '@/utils/format'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -545,6 +576,7 @@ const columns = computed<Column[]>(() => {
     { key: 'concurrency', label: t('admin.accounts.columns.concurrencyStatus'), sortable: false },
     { key: 'status', label: t('admin.accounts.columns.status'), sortable: true },
     { key: 'schedulable', label: t('admin.accounts.columns.schedulable'), sortable: true },
+    { key: 'expires_at', label: t('admin.accounts.columns.expires'), sortable: true },
     { key: 'today_stats', label: t('admin.accounts.columns.todayStats'), sortable: false }
   ]
 
@@ -676,6 +708,41 @@ const selectCurrentPageAccounts = () => {
   selectedAccountIds.value = Array.from(merged)
 }
 
+const getExpirationState = (expiresAt: string | null) => {
+  if (!expiresAt) {
+    return {
+      label: t('admin.accounts.expiration.never'),
+      variant: 'badge-gray'
+    }
+  }
+  const target = new Date(expiresAt)
+  if (Number.isNaN(target.getTime())) {
+    return {
+      label: '-',
+      variant: 'badge-gray'
+    }
+  }
+  if (target <= new Date()) {
+    return {
+      label: t('admin.accounts.expiration.expired'),
+      variant: 'badge-gray'
+    }
+  }
+  const diffDays = Math.ceil((target.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  let label = ''
+  if (diffDays === 0) {
+    label = t('admin.accounts.expiration.today')
+  } else if (diffDays === 1) {
+    label = t('admin.accounts.expiration.tomorrow')
+  } else {
+    label = t('admin.accounts.expiration.inDays', { days: diffDays })
+  }
+  return {
+    label,
+    variant: diffDays <= 3 ? 'badge-warning' : 'badge-success'
+  }
+}
+
 // Rate limit / Overload helpers
 const isRateLimited = (account: Account): boolean => {
   if (!account.rate_limit_reset_at) return false
@@ -685,6 +752,48 @@ const isRateLimited = (account: Account): boolean => {
 const isOverloaded = (account: Account): boolean => {
   if (!account.overload_until) return false
   return new Date(account.overload_until) > new Date()
+}
+
+const isTempUnschedulable = (account: Account): boolean => {
+  if (!account.temp_unschedulable_until) return false
+  return new Date(account.temp_unschedulable_until) > new Date()
+}
+
+const isExpired = (expiresAt: string | null): boolean => {
+  if (!expiresAt) return false
+  return new Date(expiresAt) <= new Date()
+}
+
+const getSchedulableHint = (account: Account): string => {
+  if (isExpired(account.expires_at)) {
+    return t('admin.accounts.schedulableReason.expired')
+  }
+  if (account.status === 'inactive') {
+    return t('admin.accounts.schedulableReason.inactive')
+  }
+  if (account.status === 'error') {
+    return t('admin.accounts.schedulableReason.error')
+  }
+  if (!account.schedulable) {
+    return t('admin.accounts.schedulableReason.manualOff')
+  }
+  if (isTempUnschedulable(account)) {
+    const reason = account.temp_unschedulable_reason?.trim()
+    return reason
+      ? t('admin.accounts.schedulableReason.tempUnschedWithReason', { reason })
+      : t('admin.accounts.schedulableReason.tempUnsched')
+  }
+  if (isRateLimited(account)) {
+    return t('admin.accounts.schedulableReason.rateLimitedUntil', {
+      time: account.rate_limit_reset_at ? formatDateTime(account.rate_limit_reset_at) : '-'
+    })
+  }
+  if (isOverloaded(account)) {
+    return t('admin.accounts.schedulableReason.overloadedUntil', {
+      time: account.overload_until ? formatDateTime(account.overload_until) : '-'
+    })
+  }
+  return t('admin.accounts.schedulableReason.ok')
 }
 
 // Data loading

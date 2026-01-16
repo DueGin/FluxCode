@@ -1068,7 +1068,32 @@ export default {
       status: {
         paused: 'Paused',
         limited: 'Limited',
-        tempUnschedulable: 'Temp Unschedulable'
+        tempUnschedulable: 'Temp Unschedulable',
+        expired: 'Expired'
+      },
+      expiration: {
+        label: 'Account Expiration',
+        hint: 'After expiration the account will be excluded from scheduling automatically.',
+        enableLabel: 'Enable expiration',
+        presetDays: '{days}-day',
+        inputHint: 'Uses your local timezone (minute precision).',
+        disabledHint: 'Leave disabled if the account should never expire.',
+        never: 'Never expires',
+        expired: 'Expired',
+        today: 'Expires today',
+        tomorrow: 'Expires tomorrow',
+        inDays: 'Expires in {days} days'
+      },
+      schedulableReason: {
+        ok: 'This account can participate in scheduling.',
+        manualOff: 'Scheduling has been turned off manually.',
+        expired: 'This account has expired; scheduling was turned off automatically.',
+        inactive: 'This account is inactive and cannot be scheduled.',
+        error: 'This account is in error state and cannot be scheduled.',
+        tempUnsched: 'This account is temporarily unschedulable.',
+        tempUnschedWithReason: 'This account is temporarily unschedulable: {reason}',
+        rateLimitedUntil: 'Rate limited; expected to recover after {time}.',
+        overloadedUntil: 'Overloaded; expected to recover after {time}.'
       },
       tempUnschedulable: {
         title: 'Temp Unschedulable',
@@ -1121,6 +1146,7 @@ export default {
         concurrencyStatus: 'Concurrency',
         status: 'Status',
         schedulable: 'Schedule',
+        expires: 'Expiration',
         todayStats: "Today's Stats",
         groups: 'Groups',
         usageWindows: 'Usage Windows',

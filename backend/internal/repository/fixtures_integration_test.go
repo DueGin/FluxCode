@@ -209,6 +209,9 @@ func mustCreateAccount(t *testing.T, client *dbent.Client, a *service.Account) *
 	if a.LastUsedAt != nil {
 		create.SetLastUsedAt(*a.LastUsedAt)
 	}
+	if a.ExpiresAt != nil {
+		create.SetExpiresAt(*a.ExpiresAt)
+	}
 	if a.RateLimitedAt != nil {
 		create.SetRateLimitedAt(*a.RateLimitedAt)
 	}

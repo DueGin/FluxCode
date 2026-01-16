@@ -79,6 +79,7 @@ var (
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
 		{Name: "error_message", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
 		{Name: "last_used_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "expires_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "schedulable", Type: field.TypeBool, Default: true},
 		{Name: "rate_limited_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "rate_limit_reset_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
@@ -96,7 +97,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "accounts_proxies_proxy",
-				Columns:    []*schema.Column{AccountsColumns[21]},
+				Columns:    []*schema.Column{AccountsColumns[22]},
 				RefColumns: []*schema.Column{ProxiesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -120,7 +121,7 @@ var (
 			{
 				Name:    "account_proxy_id",
 				Unique:  false,
-				Columns: []*schema.Column{AccountsColumns[21]},
+				Columns: []*schema.Column{AccountsColumns[22]},
 			},
 			{
 				Name:    "account_priority",
@@ -133,24 +134,29 @@ var (
 				Columns: []*schema.Column{AccountsColumns[13]},
 			},
 			{
-				Name:    "account_schedulable",
+				Name:    "account_expires_at",
 				Unique:  false,
 				Columns: []*schema.Column{AccountsColumns[14]},
 			},
 			{
-				Name:    "account_rate_limited_at",
+				Name:    "account_schedulable",
 				Unique:  false,
 				Columns: []*schema.Column{AccountsColumns[15]},
 			},
 			{
-				Name:    "account_rate_limit_reset_at",
+				Name:    "account_rate_limited_at",
 				Unique:  false,
 				Columns: []*schema.Column{AccountsColumns[16]},
 			},
 			{
-				Name:    "account_overload_until",
+				Name:    "account_rate_limit_reset_at",
 				Unique:  false,
 				Columns: []*schema.Column{AccountsColumns[17]},
+			},
+			{
+				Name:    "account_overload_until",
+				Unique:  false,
+				Columns: []*schema.Column{AccountsColumns[18]},
 			},
 			{
 				Name:    "account_deleted_at",
