@@ -242,7 +242,7 @@
                 />
               </button>
 
-              <div class="group relative">
+              <div v-if="shouldShowSchedulableHint(row)" class="group relative">
                 <span
                   class="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-600 hover:bg-gray-300 dark:bg-dark-600 dark:text-gray-300 dark:hover:bg-dark-500"
                 >
@@ -268,7 +268,7 @@
                 {{ getExpirationState(row.expires_at).label }}
               </span>
               <span v-if="row.expires_at" class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
-                {{ formatDateTime(row.expires_at) }}
+                {{ formatDateTimeBeijing(row.expires_at) }}
               </span>
             </div>
           </template>
@@ -560,7 +560,7 @@ import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vu
 import AccountTestModal from '@/components/account/AccountTestModal.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
-import { formatRelativeTime, formatDateTime } from '@/utils/format'
+import { formatRelativeTime, formatDateTime, formatDateTimeBeijing, diffBeijingDays } from '@/utils/format'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -728,7 +728,7 @@ const getExpirationState = (expiresAt: string | null) => {
       variant: 'badge-gray'
     }
   }
-  const diffDays = Math.ceil((target.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  const diffDays = diffBeijingDays(new Date(), target)
   let label = ''
   if (diffDays === 0) {
     label = t('admin.accounts.expiration.today')
@@ -762,6 +762,15 @@ const isTempUnschedulable = (account: Account): boolean => {
 const isExpired = (expiresAt: string | null): boolean => {
   if (!expiresAt) return false
   return new Date(expiresAt) <= new Date()
+}
+
+const shouldShowSchedulableHint = (account: Account): boolean => {
+  if (isExpired(account.expires_at)) return true
+  if (account.status === 'inactive' || account.status === 'error') return true
+  if (isTempUnschedulable(account)) return true
+  if (isRateLimited(account)) return true
+  if (isOverloaded(account)) return true
+  return false
 }
 
 const getSchedulableHint = (account: Account): string => {

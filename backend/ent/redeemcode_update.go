@@ -299,6 +299,11 @@ func (_u *RedeemCodeUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.WelfareNo(); ok {
+		if err := redeemcode.WelfareNoValidator(v); err != nil {
+			return &ValidationError{Name: "welfare_no", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.welfare_no": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -711,6 +716,11 @@ func (_u *RedeemCodeUpdateOne) check() error {
 	if v, ok := _u.mutation.Status(); ok {
 		if err := redeemcode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.WelfareNo(); ok {
+		if err := redeemcode.WelfareNoValidator(v); err != nil {
+			return &ValidationError{Name: "welfare_no", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.welfare_no": %w`, err)}
 		}
 	}
 	return nil

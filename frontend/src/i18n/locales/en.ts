@@ -1079,7 +1079,7 @@ export default {
         hint: 'After expiration the account will be excluded from scheduling automatically.',
         enableLabel: 'Enable expiration',
         presetDays: '{days}-day',
-        inputHint: 'Uses your local timezone (minute precision).',
+        inputHint: 'Uses Beijing time (UTC+8, minute precision).',
         disabledHint: 'Leave disabled if the account should never expire.',
         never: 'Never expires',
         expired: 'Expired',

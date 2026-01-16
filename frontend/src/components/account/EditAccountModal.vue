@@ -734,6 +734,7 @@ import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
 import type { Account, Proxy, Group } from '@/types'
+import { formatDateTimeLocalBeijing, parseBeijingDateTimeLocal } from '@/utils/format'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
@@ -797,16 +798,7 @@ const interceptWarmupRequests = ref(false)
 const expirationEnabled = ref(false)
 const expirationInput = ref('')
 const selectedExpirationPreset = ref<number | null>(null)
-const formatDateTimeLocal = (date: Date) => {
-  const pad = (n: number) => n.toString().padStart(2, '0')
-  const year = date.getFullYear()
-  const month = pad(date.getMonth() + 1)
-  const day = pad(date.getDate())
-  const hours = pad(date.getHours())
-  const minutes = pad(date.getMinutes())
-  return `${year}-${month}-${day}T${hours}:${minutes}`
-}
-const minExpirationInput = computed(() => formatDateTimeLocal(new Date()))
+const minExpirationInput = computed(() => formatDateTimeLocalBeijing(new Date()))
 const expirationPresets = computed(() => [
   { days: 7, label: t('admin.accounts.expiration.presetDays', { days: 7 }) },
   { days: 30, label: t('admin.accounts.expiration.presetDays', { days: 30 }) },
@@ -885,7 +877,7 @@ watch(
       if (newAccount.expires_at) {
         form.expires_at = newAccount.expires_at
         expirationEnabled.value = true
-        expirationInput.value = formatDateTimeLocal(new Date(newAccount.expires_at))
+        expirationInput.value = formatDateTimeLocalBeijing(new Date(newAccount.expires_at))
         selectedExpirationPreset.value = null
       } else {
         expirationEnabled.value = false
@@ -975,8 +967,8 @@ watch(expirationInput, (value) => {
     selectedExpirationPreset.value = null
     return
   }
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) {
+  const parsed = parseBeijingDateTimeLocal(value)
+  if (!parsed) {
     return
   }
   form.expires_at = parsed.toISOString()
@@ -1015,12 +1007,12 @@ const addPresetMapping = (from: string, to: string) => {
 
 const applyExpirationPreset = (days: number) => {
   const target = new Date()
-  target.setSeconds(0, 0)
-  target.setMinutes(target.getMinutes() + 1)
-  target.setDate(target.getDate() + days)
+  target.setUTCSeconds(0, 0)
+  target.setUTCMinutes(target.getUTCMinutes() + 1)
+  target.setUTCDate(target.getUTCDate() + days)
   expirationEnabled.value = true
   selectedExpirationPreset.value = days
-  expirationInput.value = formatDateTimeLocal(target)
+  expirationInput.value = formatDateTimeLocalBeijing(target)
   form.expires_at = target.toISOString()
 }
 

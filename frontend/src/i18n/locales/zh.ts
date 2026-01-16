@@ -1102,7 +1102,7 @@ export default {
         hint: '到期后账号会自动移出调度，不再被选用。',
         enableLabel: '启用过期时间',
         presetDays: '{days} 天',
-        inputHint: '使用本地时间（不含秒），建议至少提前 1 分钟。',
+        inputHint: '使用北京时间（不含秒），建议至少提前 1 分钟。',
         disabledHint: '未启用时账号将保持永久有效。',
         never: '长期有效',
         expired: '已过期',

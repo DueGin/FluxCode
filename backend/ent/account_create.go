@@ -1287,6 +1287,27 @@ func (u *AccountUpsertOne) ClearLastUsedAt() *AccountUpsertOne {
 	})
 }
 
+// SetExpiresAt sets the "expires_at" field.
+func (u *AccountUpsertOne) SetExpiresAt(v time.Time) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetExpiresAt(v)
+	})
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateExpiresAt() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateExpiresAt()
+	})
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *AccountUpsertOne) ClearExpiresAt() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearExpiresAt()
+	})
+}
+
 // SetSchedulable sets the "schedulable" field.
 func (u *AccountUpsertOne) SetSchedulable(v bool) *AccountUpsertOne {
 	return u.Update(func(s *AccountUpsert) {
@@ -1859,6 +1880,27 @@ func (u *AccountUpsertBulk) UpdateLastUsedAt() *AccountUpsertBulk {
 func (u *AccountUpsertBulk) ClearLastUsedAt() *AccountUpsertBulk {
 	return u.Update(func(s *AccountUpsert) {
 		s.ClearLastUsedAt()
+	})
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *AccountUpsertBulk) SetExpiresAt(v time.Time) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetExpiresAt(v)
+	})
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateExpiresAt() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateExpiresAt()
+	})
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *AccountUpsertBulk) ClearExpiresAt() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearExpiresAt()
 	})
 }
 

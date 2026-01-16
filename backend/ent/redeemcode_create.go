@@ -280,6 +280,11 @@ func (_c *RedeemCodeCreate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.WelfareNo(); ok {
+		if err := redeemcode.WelfareNoValidator(v); err != nil {
+			return &ValidationError{Name: "welfare_no", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.welfare_no": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "RedeemCode.created_at"`)}
 	}
@@ -543,6 +548,24 @@ func (u *RedeemCodeUpsert) ClearNotes() *RedeemCodeUpsert {
 	return u
 }
 
+// SetWelfareNo sets the "welfare_no" field.
+func (u *RedeemCodeUpsert) SetWelfareNo(v string) *RedeemCodeUpsert {
+	u.Set(redeemcode.FieldWelfareNo, v)
+	return u
+}
+
+// UpdateWelfareNo sets the "welfare_no" field to the value that was provided on create.
+func (u *RedeemCodeUpsert) UpdateWelfareNo() *RedeemCodeUpsert {
+	u.SetExcluded(redeemcode.FieldWelfareNo)
+	return u
+}
+
+// ClearWelfareNo clears the value of the "welfare_no" field.
+func (u *RedeemCodeUpsert) ClearWelfareNo() *RedeemCodeUpsert {
+	u.SetNull(redeemcode.FieldWelfareNo)
+	return u
+}
+
 // SetGroupID sets the "group_id" field.
 func (u *RedeemCodeUpsert) SetGroupID(v int64) *RedeemCodeUpsert {
 	u.Set(redeemcode.FieldGroupID, v)
@@ -747,6 +770,27 @@ func (u *RedeemCodeUpsertOne) UpdateNotes() *RedeemCodeUpsertOne {
 func (u *RedeemCodeUpsertOne) ClearNotes() *RedeemCodeUpsertOne {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.ClearNotes()
+	})
+}
+
+// SetWelfareNo sets the "welfare_no" field.
+func (u *RedeemCodeUpsertOne) SetWelfareNo(v string) *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetWelfareNo(v)
+	})
+}
+
+// UpdateWelfareNo sets the "welfare_no" field to the value that was provided on create.
+func (u *RedeemCodeUpsertOne) UpdateWelfareNo() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateWelfareNo()
+	})
+}
+
+// ClearWelfareNo clears the value of the "welfare_no" field.
+func (u *RedeemCodeUpsertOne) ClearWelfareNo() *RedeemCodeUpsertOne {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearWelfareNo()
 	})
 }
 
@@ -1126,6 +1170,27 @@ func (u *RedeemCodeUpsertBulk) UpdateNotes() *RedeemCodeUpsertBulk {
 func (u *RedeemCodeUpsertBulk) ClearNotes() *RedeemCodeUpsertBulk {
 	return u.Update(func(s *RedeemCodeUpsert) {
 		s.ClearNotes()
+	})
+}
+
+// SetWelfareNo sets the "welfare_no" field.
+func (u *RedeemCodeUpsertBulk) SetWelfareNo(v string) *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.SetWelfareNo(v)
+	})
+}
+
+// UpdateWelfareNo sets the "welfare_no" field to the value that was provided on create.
+func (u *RedeemCodeUpsertBulk) UpdateWelfareNo() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.UpdateWelfareNo()
+	})
+}
+
+// ClearWelfareNo clears the value of the "welfare_no" field.
+func (u *RedeemCodeUpsertBulk) ClearWelfareNo() *RedeemCodeUpsertBulk {
+	return u.Update(func(s *RedeemCodeUpsert) {
+		s.ClearWelfareNo()
 	})
 }
 
