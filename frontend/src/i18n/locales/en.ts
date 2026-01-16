@@ -513,6 +513,8 @@ export default {
     subscriptionDays: '{days} days',
     days: ' days',
     codeRedeemSuccess: 'Code redeemed successfully!',
+    codeAlreadyUsed: 'This redeem code has already been used.',
+    welfareAlreadyRedeemed: 'This welfare no. has already been redeemed.',
     failedToRedeem: 'Failed to redeem code. Please check the code and try again.',
     subscriptionRefreshFailed: 'Redeemed successfully, but failed to refresh subscription status.'
   },
@@ -668,6 +670,7 @@ export default {
       leaveEmptyToKeep: 'Leave empty to keep current password',
       generatePassword: 'Generate random password',
       copyPassword: 'Copy password',
+      passwordCopied: 'Password copied',
       creating: 'Creating...',
       updating: 'Updating...',
       columns: {
@@ -1542,6 +1545,7 @@ export default {
       testing: 'Testing...',
       retry: 'Retry',
       copyOutput: 'Copy output',
+      outputCopied: 'Output copied',
       startingTestForAccount: 'Starting test for account: {name}',
       testAccountTypeLabel: 'Account type: {type}',
       selectTestModel: 'Select Test Model',
@@ -1690,6 +1694,7 @@ export default {
       used: 'Used',
       columns: {
         code: 'Code',
+        welfare: 'Welfare No',
         type: 'Type',
         value: 'Value',
         status: 'Status',
@@ -1706,6 +1711,11 @@ export default {
       deleteAllUnusedConfirm:
         'Are you sure you want to delete all unused (active) redeem codes? This action cannot be undone.',
       deleteAll: 'Delete All',
+      isWelfare: 'Welfare No',
+      welfareNo: 'Welfare No',
+      welfareNoPlaceholder: 'Enter welfare no.',
+      welfareNoRequired: 'Welfare no. is required',
+      allWelfareNos: 'All Welfare Nos',
       generateCodesTitle: 'Generate Redeem Codes',
       generatedSuccessfully: 'Generated Successfully',
       codesCreated: '{count} redeem code(s) created',
