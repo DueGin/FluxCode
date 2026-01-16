@@ -133,6 +133,72 @@
                   ：复制下方内容（文件不存在就新建）
                 </li>
               </ol>
+
+              <div
+                class="mt-4 rounded-2xl border border-black/5 bg-white/70 p-4 text-gray-700 dark:border-white/10 dark:bg-dark-900/40 dark:text-dark-300"
+              >
+                <div class="font-medium text-gray-900 dark:text-white">Codex 中文配置（可选）</div>
+                <p class="mt-2 text-gray-600 dark:text-dark-400">
+                  让 Codex CLI 始终输出中文提示：在 <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">.codex</code>
+                  目录下创建 <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">AGENTS.md</code>，写入
+                  <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">Always respond in Chinese-simplified</code>。
+                </p>
+
+                <template v-if="activeOsTab === 'windows'">
+                  <ol class="mt-3 list-decimal space-y-2 pl-5">
+                    <li>
+                      进入配置目录：
+                      <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">cd %USERPROFILE%\.codex</code>
+                    </li>
+                    <li>
+                      创建/覆盖文件：
+                      <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10"
+                        >echo Always respond in Chinese-simplified &gt; AGENTS.md</code
+                      >
+                    </li>
+                  </ol>
+                </template>
+                <template v-else-if="activeOsTab === 'mac'">
+                  <ol class="mt-3 list-decimal space-y-2 pl-5">
+                    <li>
+                      进入配置目录：
+                      <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">cd ~/.codex</code>
+                    </li>
+                    <li>
+                      写入文件：
+                      <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10"
+                        >printf "Always respond in Chinese-simplified\n" &gt; AGENTS.md</code
+                      >
+                    </li>
+                  </ol>
+                </template>
+                <template v-else>
+                  <ol class="mt-3 list-decimal space-y-2 pl-5">
+                    <li>
+                      进入配置目录：
+                      <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">cd ~/.codex</code>
+                    </li>
+                    <li>
+                      如果系统未启用中文 locale，可先执行
+                      <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">sudo locale-gen zh_CN.UTF-8</code>
+                    </li>
+                    <li>
+                      创建文件：
+                      <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10"
+                        >printf "Always respond in Chinese-simplified\n" &gt; AGENTS.md</code
+                      >
+                    </li>
+                  </ol>
+                </template>
+
+                <div class="mt-3 rounded-2xl bg-slate-900 p-4 text-[15px] text-slate-100">
+                  <pre class="overflow-x-auto font-mono leading-relaxed"><code>Always respond in Chinese-simplified</code></pre>
+                </div>
+                <p class="mt-3 text-sm text-gray-600 dark:text-dark-400">
+                  保存后重新打开 Codex CLI 会读取该文件，始终以简体中文回应；若要恢复默认，可删除
+                  <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">AGENTS.md</code>。
+                </p>
+              </div>
             </div>
 
             <div class="mt-5 space-y-4">
