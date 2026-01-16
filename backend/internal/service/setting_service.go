@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -72,6 +73,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeySiteSubtitle,
 		SettingKeyAPIBaseURL,
 		SettingKeyContactInfo,
+		SettingKeyAfterSaleContact,
 		SettingKeyDocURL,
 	}
 
@@ -95,6 +97,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SiteSubtitle:        s.getStringOrDefault(settings, SettingKeySiteSubtitle, "Subscription to API Conversion Platform"),
 		APIBaseURL:          settings[SettingKeyAPIBaseURL],
 		ContactInfo:         settings[SettingKeyContactInfo],
+		AfterSaleContact:    s.parseKVItems(settings[SettingKeyAfterSaleContact]),
 		DocURL:              settings[SettingKeyDocURL],
 	}, nil
 }
@@ -131,6 +134,7 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeySiteSubtitle] = settings.SiteSubtitle
 	updates[SettingKeyAPIBaseURL] = settings.APIBaseURL
 	updates[SettingKeyContactInfo] = settings.ContactInfo
+	updates[SettingKeyAfterSaleContact] = s.marshalKVItems(settings.AfterSaleContact)
 	updates[SettingKeyDocURL] = settings.DocURL
 
 	// 默认配置
@@ -220,6 +224,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyEmailVerifyEnabled:  "false",
 		SettingKeySiteName:            s.webTitleDefault(),
 		SettingKeySiteLogo:            "",
+		SettingKeyAfterSaleContact:    "[]",
 		SettingKeyDefaultConcurrency:  strconv.Itoa(s.cfg.Default.UserConcurrency),
 		SettingKeyDefaultBalance:      strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
 		SettingKeySMTPPort:            "587",
@@ -257,6 +262,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		SiteSubtitle:        s.getStringOrDefault(settings, SettingKeySiteSubtitle, "Subscription to API Conversion Platform"),
 		APIBaseURL:          settings[SettingKeyAPIBaseURL],
 		ContactInfo:         settings[SettingKeyContactInfo],
+		AfterSaleContact:    s.parseKVItems(settings[SettingKeyAfterSaleContact]),
 		DocURL:              settings[SettingKeyDocURL],
 	}
 
@@ -292,6 +298,40 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	result.FallbackModelAntigravity = s.getStringOrDefault(settings, SettingKeyFallbackModelAntigravity, "gemini-2.5-pro")
 
 	return result
+}
+
+func (s *SettingService) parseKVItems(raw string) []KVItem {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return []KVItem{}
+	}
+	var items []KVItem
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return []KVItem{}
+	}
+	return s.normalizeKVItems(items)
+}
+
+func (s *SettingService) normalizeKVItems(items []KVItem) []KVItem {
+	out := make([]KVItem, 0, len(items))
+	for _, item := range items {
+		k := strings.TrimSpace(item.K)
+		v := strings.TrimSpace(item.V)
+		if k == "" && v == "" {
+			continue
+		}
+		out = append(out, KVItem{K: k, V: v})
+	}
+	return out
+}
+
+func (s *SettingService) marshalKVItems(items []KVItem) string {
+	normalized := s.normalizeKVItems(items)
+	b, err := json.Marshal(normalized)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
 }
 
 // getStringOrDefault 获取字符串值或默认值

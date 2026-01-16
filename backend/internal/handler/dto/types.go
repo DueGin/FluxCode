@@ -127,6 +127,7 @@ type RedeemCode struct {
 	UsedBy    *int64     `json:"used_by"`
 	UsedAt    *time.Time `json:"used_at"`
 	Notes     string     `json:"notes"`
+	WelfareNo *string    `json:"welfare_no"`
 	CreatedAt time.Time  `json:"created_at"`
 
 	GroupID      *int64 `json:"group_id"`

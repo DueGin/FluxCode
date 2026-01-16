@@ -1,5 +1,10 @@
 package service
 
+type KVItem struct {
+	K string `json:"k"`
+	V string `json:"v"`
+}
+
 type SystemSettings struct {
 	RegistrationEnabled bool
 	EmailVerifyEnabled  bool
@@ -21,6 +26,7 @@ type SystemSettings struct {
 	SiteSubtitle string
 	APIBaseURL   string
 	ContactInfo  string
+	AfterSaleContact []KVItem
 	DocURL       string
 
 	DefaultConcurrency int
@@ -44,6 +50,7 @@ type PublicSettings struct {
 	SiteSubtitle        string
 	APIBaseURL          string
 	ContactInfo         string
+	AfterSaleContact    []KVItem
 	DocURL              string
 	Version             string
 }

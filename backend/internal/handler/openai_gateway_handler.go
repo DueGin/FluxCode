@@ -21,6 +21,7 @@ import (
 type OpenAIGatewayHandler struct {
 	gatewayService      *service.OpenAIGatewayService
 	billingCacheService *service.BillingCacheService
+	usageQueueService   *service.UsageQueueService
 	concurrencyHelper   *ConcurrencyHelper
 }
 
@@ -29,10 +30,12 @@ func NewOpenAIGatewayHandler(
 	gatewayService *service.OpenAIGatewayService,
 	concurrencyService *service.ConcurrencyService,
 	billingCacheService *service.BillingCacheService,
+	usageQueueService *service.UsageQueueService,
 ) *OpenAIGatewayHandler {
 	return &OpenAIGatewayHandler{
 		gatewayService:      gatewayService,
 		billingCacheService: billingCacheService,
+		usageQueueService:   usageQueueService,
 		concurrencyHelper:   NewConcurrencyHelper(concurrencyService, SSEPingFormatNone),
 	}
 }
@@ -229,20 +232,42 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			return
 		}
 
-		// Async record usage
-		go func(result *service.OpenAIForwardResult, usedAccount *service.Account) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
-				Result:       result,
-				APIKey:       apiKey,
-				User:         apiKey.User,
-				Account:      usedAccount,
-				Subscription: subscription,
-			}); err != nil {
-				log.Printf("Record usage failed: %v", err)
+		// Async record usage: Redis 持久化队列（失败则回退到本地 goroutine best-effort）
+		if h.usageQueueService != nil {
+			enqueueCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			_, enqueueErr := h.usageQueueService.EnqueueOpenAIUsage(enqueueCtx, result, apiKey, account, subscription)
+			cancel()
+			if enqueueErr != nil {
+				log.Printf("Enqueue usage failed, fallback to local goroutine: %v", enqueueErr)
+				go func(result *service.OpenAIForwardResult, usedAccount *service.Account) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
+						Result:       result,
+						APIKey:       apiKey,
+						User:         apiKey.User,
+						Account:      usedAccount,
+						Subscription: subscription,
+					}); err != nil {
+						log.Printf("Record usage failed: %v", err)
+					}
+				}(result, account)
 			}
-		}(result, account)
+		} else {
+			go func(result *service.OpenAIForwardResult, usedAccount *service.Account) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
+					Result:       result,
+					APIKey:       apiKey,
+					User:         apiKey.User,
+					Account:      usedAccount,
+					Subscription: subscription,
+				}); err != nil {
+					log.Printf("Record usage failed: %v", err)
+				}
+			}(result, account)
+		}
 		return
 	}
 }

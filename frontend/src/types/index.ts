@@ -65,6 +65,11 @@ export interface VerifyCodeTaskStatus {
   updated_at: number
 }
 
+export interface KeyValueItem {
+  k: string
+  v: string
+}
+
 export interface PublicSettings {
   registration_enabled: boolean
   email_verify_enabled: boolean
@@ -75,6 +80,7 @@ export interface PublicSettings {
   site_subtitle: string
   api_base_url: string
   contact_info: string
+  after_sale_contact: KeyValueItem[]
   doc_url: string
   version: string
 }
@@ -185,6 +191,8 @@ export interface UserStats {
 export interface ApiResponse<T = unknown> {
   code: number
   message: string
+  reason?: string
+  metadata?: Record<string, string>
   data: T
 }
 
@@ -580,6 +588,7 @@ export interface RedeemCode {
   updated_at?: string
   group_id?: number | null // 订阅类型专用
   validity_days?: number // 订阅类型专用
+  welfare_no?: string | null // 福利号（同一账号同一福利号仅可兑换一次）
   user?: User
   group?: Group // 关联的分组
 }
@@ -590,6 +599,8 @@ export interface GenerateRedeemCodesRequest {
   value: number
   group_id?: number | null // 订阅类型专用
   validity_days?: number // 订阅类型专用
+  is_welfare?: boolean
+  welfare_no?: string
 }
 
 export interface RedeemCodeRequest {

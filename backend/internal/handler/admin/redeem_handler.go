@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/DueGin/FluxCode/internal/handler/dto"
 	"github.com/DueGin/FluxCode/internal/pkg/response"
@@ -32,6 +33,8 @@ type GenerateRedeemCodesRequest struct {
 	Value        float64 `json:"value" binding:"min=0"`
 	GroupID      *int64  `json:"group_id"`                                    // 订阅类型必填
 	ValidityDays int     `json:"validity_days" binding:"omitempty,max=36500"` // 订阅类型使用，默认30天，最大100年
+	IsWelfare    bool    `json:"is_welfare"`
+	WelfareNo    string  `json:"welfare_no"`
 }
 
 // List handles listing all redeem codes with pagination
@@ -41,8 +44,19 @@ func (h *RedeemHandler) List(c *gin.Context) {
 	codeType := c.Query("type")
 	status := c.Query("status")
 	search := c.Query("search")
+	welfareNo := strings.TrimSpace(c.Query("welfare_no"))
 
-	codes, total, err := h.adminService.ListRedeemCodes(c.Request.Context(), page, pageSize, codeType, status, search)
+	var isWelfare *bool
+	if v := strings.TrimSpace(c.Query("is_welfare")); v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			response.BadRequest(c, "Invalid is_welfare")
+			return
+		}
+		isWelfare = &parsed
+	}
+
+	codes, total, err := h.adminService.ListRedeemCodes(c.Request.Context(), page, pageSize, codeType, status, search, isWelfare, welfareNo)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -53,6 +67,17 @@ func (h *RedeemHandler) List(c *gin.Context) {
 		out = append(out, *dto.RedeemCodeFromService(&codes[i]))
 	}
 	response.Paginated(c, out, total, page, pageSize)
+}
+
+// ListWelfareNos returns distinct welfare numbers from existing redeem codes.
+// GET /api/v1/admin/redeem-codes/welfare-nos
+func (h *RedeemHandler) ListWelfareNos(c *gin.Context) {
+	nos, err := h.adminService.ListRedeemWelfareNos(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, nos)
 }
 
 // GetByID handles getting a redeem code by ID
@@ -82,12 +107,27 @@ func (h *RedeemHandler) Generate(c *gin.Context) {
 		return
 	}
 
+	var welfareNo *string
+	if req.IsWelfare {
+		trimmed := strings.TrimSpace(req.WelfareNo)
+		if trimmed == "" {
+			response.BadRequest(c, "welfare_no is required when is_welfare is true")
+			return
+		}
+		if len(trimmed) > 64 {
+			response.BadRequest(c, "welfare_no must be at most 64 characters")
+			return
+		}
+		welfareNo = &trimmed
+	}
+
 	codes, err := h.adminService.GenerateRedeemCodes(c.Request.Context(), &service.GenerateRedeemCodesInput{
 		Count:        req.Count,
 		Type:         req.Type,
 		Value:        req.Value,
 		GroupID:      req.GroupID,
 		ValidityDays: req.ValidityDays,
+		WelfareNo:    welfareNo,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -185,7 +225,7 @@ func (h *RedeemHandler) Export(c *gin.Context) {
 	status := c.Query("status")
 
 	// Get all codes without pagination (use large page size)
-	codes, _, err := h.adminService.ListRedeemCodes(c.Request.Context(), 1, 10000, codeType, status, "")
+	codes, _, err := h.adminService.ListRedeemCodes(c.Request.Context(), 1, 10000, codeType, status, "", nil, "")
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

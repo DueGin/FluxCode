@@ -314,7 +314,9 @@ export default {
     viewUsage: '查看使用记录',
     checkDetailedLogs: '查看详细的使用日志',
     redeemCode: '兑换码',
-    addBalanceWithCode: '使用兑换码充值'
+    addBalanceWithCode: '使用兑换码充值',
+    afterSaleContact: '售后联系',
+    afterSaleContactEmpty: '暂未配置售后联系方式'
   },
 
   // Groups (shared)
@@ -1927,6 +1929,12 @@ export default {
         contactInfo: '客服联系方式',
         contactInfoPlaceholder: '例如：QQ: 123456789',
         contactInfoHint: '填写客服联系方式，将展示在兑换页面、个人资料等位置',
+        afterSaleContact: '售后联系',
+        afterSaleContactHint: '按“名称-内容”的方式配置，将展示在用户端仪表盘底部',
+        afterSaleContactKeyPlaceholder: '例如：微信',
+        afterSaleContactValuePlaceholder: '例如：your_wechat_id',
+        afterSaleContactAddRow: '添加一行',
+        afterSaleContactRemoveRow: '删除',
         docUrl: '文档链接',
         docUrlHint: '文档网站的链接。留空则隐藏文档链接。',
         docUrlPlaceholder: 'https://docs.example.com',

@@ -316,7 +316,9 @@ export default {
     viewUsage: 'View Usage',
     checkDetailedLogs: 'Check detailed usage logs',
     redeemCode: 'Redeem Code',
-    addBalanceWithCode: 'Add balance with a code'
+    addBalanceWithCode: 'Add balance with a code',
+    afterSaleContact: 'After-sale Contact',
+    afterSaleContactEmpty: 'After-sale contact is not configured'
   },
 
   // Groups (shared)
@@ -1732,6 +1734,12 @@ export default {
         contactInfo: 'Contact Info',
         contactInfoPlaceholder: 'e.g., QQ: 123456789',
         contactInfoHint: 'Customer support contact info, displayed on redeem page, profile, etc.',
+        afterSaleContact: 'After-sale Contact',
+        afterSaleContactHint: 'Configured as name/value pairs and displayed at the bottom of the user dashboard',
+        afterSaleContactKeyPlaceholder: 'e.g., WeChat',
+        afterSaleContactValuePlaceholder: 'e.g., your_wechat_id',
+        afterSaleContactAddRow: 'Add row',
+        afterSaleContactRemoveRow: 'Remove',
         docUrl: 'Documentation URL',
         docUrlPlaceholder: 'https://docs.example.com',
         docUrlHint: 'Link to your documentation site. Leave empty to hide the documentation link.',

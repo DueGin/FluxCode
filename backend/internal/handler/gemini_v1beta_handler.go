@@ -293,20 +293,42 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			return
 		}
 
-		// 6) record usage async
-		go func(result *service.ForwardResult, usedAccount *service.Account) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
-				Result:       result,
-				APIKey:       apiKey,
-				User:         apiKey.User,
-				Account:      usedAccount,
-				Subscription: subscription,
-			}); err != nil {
-				log.Printf("Record usage failed: %v", err)
+		// 6) record usage async: Redis 持久化队列（失败则回退到本地 goroutine best-effort）
+		if h.usageQueueService != nil {
+			enqueueCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			_, enqueueErr := h.usageQueueService.EnqueueClaudeUsage(enqueueCtx, result, apiKey, account, subscription)
+			cancel()
+			if enqueueErr != nil {
+				log.Printf("Enqueue usage failed, fallback to local goroutine: %v", enqueueErr)
+				go func(result *service.ForwardResult, usedAccount *service.Account) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+						Result:       result,
+						APIKey:       apiKey,
+						User:         apiKey.User,
+						Account:      usedAccount,
+						Subscription: subscription,
+					}); err != nil {
+						log.Printf("Record usage failed: %v", err)
+					}
+				}(result, account)
 			}
-		}(result, account)
+		} else {
+			go func(result *service.ForwardResult, usedAccount *service.Account) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+					Result:       result,
+					APIKey:       apiKey,
+					User:         apiKey.User,
+					Account:      usedAccount,
+					Subscription: subscription,
+				}); err != nil {
+					log.Printf("Record usage failed: %v", err)
+				}
+			}(result, account)
+		}
 		return
 	}
 }

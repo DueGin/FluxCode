@@ -27,6 +27,7 @@ type GatewayHandler struct {
 	antigravityGatewayService *service.AntigravityGatewayService
 	userService               *service.UserService
 	billingCacheService       *service.BillingCacheService
+	usageQueueService         *service.UsageQueueService
 	concurrencyHelper         *ConcurrencyHelper
 }
 
@@ -38,6 +39,7 @@ func NewGatewayHandler(
 	userService *service.UserService,
 	concurrencyService *service.ConcurrencyService,
 	billingCacheService *service.BillingCacheService,
+	usageQueueService *service.UsageQueueService,
 ) *GatewayHandler {
 	return &GatewayHandler{
 		gatewayService:            gatewayService,
@@ -45,6 +47,7 @@ func NewGatewayHandler(
 		antigravityGatewayService: antigravityGatewayService,
 		userService:               userService,
 		billingCacheService:       billingCacheService,
+		usageQueueService:         usageQueueService,
 		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude),
 	}
 }
@@ -253,20 +256,42 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				return
 			}
 
-			// 异步记录使用量（subscription已在函数开头获取）
-			go func(result *service.ForwardResult, usedAccount *service.Account) {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
-					Result:       result,
-					APIKey:       apiKey,
-					User:         apiKey.User,
-					Account:      usedAccount,
-					Subscription: subscription,
-				}); err != nil {
-					log.Printf("Record usage failed: %v", err)
+			// 异步记账：Redis 持久化队列（失败则回退到本地 goroutine best-effort）
+			if h.usageQueueService != nil {
+				enqueueCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				_, enqueueErr := h.usageQueueService.EnqueueClaudeUsage(enqueueCtx, result, apiKey, account, subscription)
+				cancel()
+				if enqueueErr != nil {
+					log.Printf("Enqueue usage failed, fallback to local goroutine: %v", enqueueErr)
+					go func(result *service.ForwardResult, usedAccount *service.Account) {
+						ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+						defer cancel()
+						if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+							Result:       result,
+							APIKey:       apiKey,
+							User:         apiKey.User,
+							Account:      usedAccount,
+							Subscription: subscription,
+						}); err != nil {
+							log.Printf("Record usage failed: %v", err)
+						}
+					}(result, account)
 				}
-			}(result, account)
+			} else {
+				go func(result *service.ForwardResult, usedAccount *service.Account) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+						Result:       result,
+						APIKey:       apiKey,
+						User:         apiKey.User,
+						Account:      usedAccount,
+						Subscription: subscription,
+					}); err != nil {
+						log.Printf("Record usage failed: %v", err)
+					}
+				}(result, account)
+			}
 			return
 		}
 	}
@@ -377,20 +402,42 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			return
 		}
 
-		// 异步记录使用量（subscription已在函数开头获取）
-		go func(result *service.ForwardResult, usedAccount *service.Account) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
-				Result:       result,
-				APIKey:       apiKey,
-				User:         apiKey.User,
-				Account:      usedAccount,
-				Subscription: subscription,
-			}); err != nil {
-				log.Printf("Record usage failed: %v", err)
+		// 异步记账：Redis 持久化队列（失败则回退到本地 goroutine best-effort）
+		if h.usageQueueService != nil {
+			enqueueCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			_, enqueueErr := h.usageQueueService.EnqueueClaudeUsage(enqueueCtx, result, apiKey, account, subscription)
+			cancel()
+			if enqueueErr != nil {
+				log.Printf("Enqueue usage failed, fallback to local goroutine: %v", enqueueErr)
+				go func(result *service.ForwardResult, usedAccount *service.Account) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+						Result:       result,
+						APIKey:       apiKey,
+						User:         apiKey.User,
+						Account:      usedAccount,
+						Subscription: subscription,
+					}); err != nil {
+						log.Printf("Record usage failed: %v", err)
+					}
+				}(result, account)
 			}
-		}(result, account)
+		} else {
+			go func(result *service.ForwardResult, usedAccount *service.Account) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+					Result:       result,
+					APIKey:       apiKey,
+					User:         apiKey.User,
+					Account:      usedAccount,
+					Subscription: subscription,
+				}); err != nil {
+					log.Printf("Record usage failed: %v", err)
+				}
+			}(result, account)
+		}
 		return
 	}
 }

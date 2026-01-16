@@ -49,7 +49,9 @@ apiClient.interceptors.response.use(
         return Promise.reject({
           status: response.status,
           code: apiResponse.code,
-          message: apiResponse.message || 'Unknown error'
+          message: apiResponse.message || 'Unknown error',
+          reason: apiResponse.reason,
+          metadata: apiResponse.metadata
         })
       }
     }
@@ -74,7 +76,9 @@ apiClient.interceptors.response.use(
       return Promise.reject({
         status,
         code: data?.code,
-        message: data?.message || error.message
+        message: data?.message || error.message,
+        reason: data?.reason,
+        metadata: data?.metadata
       })
     }
 

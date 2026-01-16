@@ -33,6 +33,11 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		return
 	}
 
+	afterSaleContact := make([]dto.KVItem, 0, len(settings.AfterSaleContact))
+	for _, item := range settings.AfterSaleContact {
+		afterSaleContact = append(afterSaleContact, dto.KVItem{K: item.K, V: item.V})
+	}
+
 	response.Success(c, dto.SystemSettings{
 		RegistrationEnabled:      settings.RegistrationEnabled,
 		EmailVerifyEnabled:       settings.EmailVerifyEnabled,
@@ -51,6 +56,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		SiteSubtitle:             settings.SiteSubtitle,
 		APIBaseURL:               settings.APIBaseURL,
 		ContactInfo:              settings.ContactInfo,
+		AfterSaleContact:         afterSaleContact,
 		DocURL:                   settings.DocURL,
 		DefaultConcurrency:       settings.DefaultConcurrency,
 		DefaultBalance:           settings.DefaultBalance,
@@ -88,6 +94,7 @@ type UpdateSettingsRequest struct {
 	SiteSubtitle string `json:"site_subtitle"`
 	APIBaseURL   string `json:"api_base_url"`
 	ContactInfo  string `json:"contact_info"`
+	AfterSaleContact []dto.KVItem `json:"after_sale_contact"`
 	DocURL       string `json:"doc_url"`
 
 	// 默认配置
@@ -170,6 +177,13 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SiteSubtitle:             req.SiteSubtitle,
 		APIBaseURL:               req.APIBaseURL,
 		ContactInfo:              req.ContactInfo,
+		AfterSaleContact: func() []service.KVItem {
+			out := make([]service.KVItem, 0, len(req.AfterSaleContact))
+			for _, item := range req.AfterSaleContact {
+				out = append(out, service.KVItem{K: item.K, V: item.V})
+			}
+			return out
+		}(),
 		DocURL:                   req.DocURL,
 		DefaultConcurrency:       req.DefaultConcurrency,
 		DefaultBalance:           req.DefaultBalance,
@@ -192,6 +206,11 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
+	updatedAfterSaleContact := make([]dto.KVItem, 0, len(updatedSettings.AfterSaleContact))
+	for _, item := range updatedSettings.AfterSaleContact {
+		updatedAfterSaleContact = append(updatedAfterSaleContact, dto.KVItem{K: item.K, V: item.V})
+	}
+
 	response.Success(c, dto.SystemSettings{
 		RegistrationEnabled:      updatedSettings.RegistrationEnabled,
 		EmailVerifyEnabled:       updatedSettings.EmailVerifyEnabled,
@@ -210,6 +229,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SiteSubtitle:             updatedSettings.SiteSubtitle,
 		APIBaseURL:               updatedSettings.APIBaseURL,
 		ContactInfo:              updatedSettings.ContactInfo,
+		AfterSaleContact:         updatedAfterSaleContact,
 		DocURL:                   updatedSettings.DocURL,
 		DefaultConcurrency:       updatedSettings.DefaultConcurrency,
 		DefaultBalance:           updatedSettings.DefaultBalance,

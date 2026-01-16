@@ -1,61 +1,68 @@
 <template>
   <AppLayout>
     <TablePageLayout>
-      <template #actions>
-        <div class="flex justify-end gap-3">
-          <button
-          @click="loadCodes"
-          :disabled="loading"
-          class="btn btn-secondary"
-          :title="t('common.refresh')"
-        >
-          <svg
-            :class="['h-5 w-5', loading ? 'animate-spin' : '']"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="1.5"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
-            />
-          </svg>
-        </button>
-        <button @click="showGenerateDialog = true" class="btn btn-primary">
-          {{ t('admin.redeem.generateCodes') }}
-        </button>
-        </div>
-      </template>
-
       <template #filters>
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div class="max-w-md flex-1">
-          <input
-            v-model="searchQuery"
-            type="text"
-            :placeholder="t('admin.redeem.searchCodes')"
-            class="input"
-            @input="handleSearch"
-          />
+        <div class="flex flex-col gap-4">
+          <div class="flex items-center justify-end gap-2">
+            <button
+              @click="loadCodes"
+              :disabled="loading"
+              class="btn btn-secondary"
+              :title="t('common.refresh')"
+            >
+              <svg
+                :class="['h-5 w-5', loading ? 'animate-spin' : '']"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+                />
+              </svg>
+            </button>
+            <button @click="showGenerateDialog = true" class="btn btn-primary">
+              {{ t('admin.redeem.generateCodes') }}
+            </button>
           </div>
-          <div class="flex gap-2">
-          <Select
-            v-model="filters.type"
-            :options="filterTypeOptions"
-            class="w-36"
-            @change="loadCodes"
-          />
-          <Select
-            v-model="filters.status"
-            :options="filterStatusOptions"
-            class="w-36"
-            @change="loadCodes"
-          />
-          <button @click="handleExportCodes" class="btn btn-secondary">
-            {{ t('admin.redeem.exportCsv') }}
-          </button>
+
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="w-full sm:w-72">
+              <input
+                v-model="searchQuery"
+                type="text"
+                :placeholder="t('admin.redeem.searchCodes')"
+                class="input"
+                @input="handleSearch"
+              />
+            </div>
+            <div class="flex gap-2">
+              <Select
+                v-model="filters.type"
+                :options="filterTypeOptions"
+                class="w-36"
+                @change="loadCodes"
+              />
+              <Select
+                v-model="filters.welfare_no"
+                :options="filterWelfareNoOptions"
+                class="w-44"
+                searchable
+                @change="loadCodes"
+              />
+              <Select
+                v-model="filters.status"
+                :options="filterStatusOptions"
+                class="w-36"
+                @change="loadCodes"
+              />
+              <button @click="handleExportCodes" class="btn btn-secondary">
+                {{ t('admin.redeem.exportCsv') }}
+              </button>
+            </div>
           </div>
         </div>
       </template>
@@ -98,6 +105,19 @@
                   />
                 </svg>
               </button>
+            </div>
+          </template>
+
+          <template #cell-welfare_no="{ value }">
+            <div class="flex items-center justify-center">
+              <code
+                v-if="value"
+                class="font-mono text-sm text-gray-900 dark:text-gray-100"
+                :title="String(value)"
+              >
+                {{ value }}
+              </code>
+              <span v-else class="text-gray-400 dark:text-dark-500">-</span>
             </div>
           </template>
 
@@ -236,6 +256,22 @@
             <div>
               <label class="input-label">{{ t('admin.redeem.codeType') }}</label>
               <Select v-model="generateForm.type" :options="typeOptions" />
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('admin.redeem.isWelfare') }}
+              </span>
+              <Toggle v-model="generateForm.is_welfare" />
+            </div>
+            <div v-if="generateForm.is_welfare">
+              <label class="input-label">{{ t('admin.redeem.welfareNo') }}</label>
+              <input
+                v-model="generateForm.welfare_no"
+                type="text"
+                :placeholder="t('admin.redeem.welfareNoPlaceholder')"
+                required
+                class="input"
+              />
             </div>
             <!-- 余额/并发类型：显示数值输入 -->
             <div v-if="generateForm.type !== 'subscription'">
@@ -430,6 +466,7 @@ import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
+import Toggle from '@/components/common/Toggle.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -501,6 +538,7 @@ const downloadGeneratedCodes = () => {
 
 const columns = computed<Column[]>(() => [
   { key: 'code', label: t('admin.redeem.columns.code') },
+  { key: 'welfare_no', label: t('admin.redeem.columns.welfare') },
   { key: 'type', label: t('admin.redeem.columns.type'), sortable: true },
   { key: 'value', label: t('admin.redeem.columns.value'), sortable: true },
   { key: 'status', label: t('admin.redeem.columns.status'), sortable: true },
@@ -528,13 +566,20 @@ const filterStatusOptions = computed(() => [
   { value: 'used', label: t('admin.redeem.used') }
 ])
 
+const welfareNos = ref<string[]>([])
+const filterWelfareNoOptions = computed(() => [
+  { value: '', label: t('admin.redeem.allWelfareNos') },
+  ...welfareNos.value.map((n) => ({ value: n, label: n }))
+])
+
 const codes = ref<RedeemCode[]>([])
 const loading = ref(false)
 const generating = ref(false)
 const searchQuery = ref('')
 const filters = reactive({
   type: '',
-  status: ''
+  status: '',
+  welfare_no: ''
 })
 const pagination = reactive({
   page: 1,
@@ -555,7 +600,9 @@ const generateForm = reactive({
   value: 10,
   count: 1,
   group_id: null as number | null,
-  validity_days: 30
+  validity_days: 30,
+  is_welfare: false,
+  welfare_no: ''
 })
 
 const loadCodes = async () => {
@@ -572,6 +619,7 @@ const loadCodes = async () => {
       {
         type: filters.type as RedeemCodeType,
         status: filters.status as any,
+        welfare_no: filters.welfare_no || undefined,
         search: searchQuery.value || undefined
       },
       {
@@ -611,6 +659,14 @@ const handleSearch = () => {
   }, 300)
 }
 
+const loadWelfareNos = async () => {
+  try {
+    welfareNos.value = await adminAPI.redeem.listWelfareNos()
+  } catch (error) {
+    console.error('Error loading welfare numbers:', error)
+  }
+}
+
 const handlePageChange = (page: number) => {
   pagination.page = page
   loadCodes()
@@ -629,6 +685,12 @@ const handleGenerateCodes = async () => {
     return
   }
 
+  const welfareNo = generateForm.welfare_no.trim()
+  if (generateForm.is_welfare && !welfareNo) {
+    appStore.showError(t('admin.redeem.welfareNoRequired'))
+    return
+  }
+
   generating.value = true
   try {
     const result = await adminAPI.redeem.generate(
@@ -636,7 +698,9 @@ const handleGenerateCodes = async () => {
       generateForm.type,
       generateForm.value,
       generateForm.type === 'subscription' ? generateForm.group_id : undefined,
-      generateForm.type === 'subscription' ? generateForm.validity_days : undefined
+      generateForm.type === 'subscription' ? generateForm.validity_days : undefined,
+      generateForm.is_welfare,
+      generateForm.is_welfare ? welfareNo : undefined
     )
     showGenerateDialog.value = false
     generatedCodes.value = result
@@ -644,7 +708,10 @@ const handleGenerateCodes = async () => {
     // 重置表单
     generateForm.group_id = null
     generateForm.validity_days = 30
+    generateForm.is_welfare = false
+    generateForm.welfare_no = ''
     loadCodes()
+    loadWelfareNos()
   } catch (error: any) {
     appStore.showError(error.response?.data?.detail || t('admin.redeem.failedToGenerate'))
     console.error('Error generating codes:', error)
@@ -742,5 +809,6 @@ const loadSubscriptionGroups = async () => {
 onMounted(() => {
   loadCodes()
   loadSubscriptionGroups()
+  loadWelfareNos()
 })
 </script>

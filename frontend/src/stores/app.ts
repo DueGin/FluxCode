@@ -5,7 +5,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Toast, ToastType, PublicSettings } from '@/types'
+import type { Toast, ToastType, PublicSettings, KeyValueItem } from '@/types'
 import {
   checkUpdates as checkUpdatesAPI,
   type VersionInfo,
@@ -28,6 +28,7 @@ export const useAppStore = defineStore('app', () => {
   const siteLogo = ref<string>('')
   const siteVersion = ref<string>('')
   const contactInfo = ref<string>('')
+  const afterSaleContact = ref<KeyValueItem[]>([])
   const apiBaseUrl = ref<string>('')
   const docUrl = ref<string>('')
 
@@ -295,6 +296,7 @@ export const useAppStore = defineStore('app', () => {
         site_subtitle: '',
         api_base_url: apiBaseUrl.value,
         contact_info: contactInfo.value,
+        after_sale_contact: afterSaleContact.value,
         doc_url: docUrl.value,
         version: siteVersion.value
       }
@@ -312,6 +314,7 @@ export const useAppStore = defineStore('app', () => {
       siteLogo.value = data.site_logo || ''
       siteVersion.value = data.version || ''
       contactInfo.value = data.contact_info || ''
+      afterSaleContact.value = Array.isArray(data.after_sale_contact) ? data.after_sale_contact : []
       apiBaseUrl.value = data.api_base_url || ''
       docUrl.value = data.doc_url || ''
       publicSettingsLoaded.value = true
@@ -346,6 +349,7 @@ export const useAppStore = defineStore('app', () => {
     siteLogo,
     siteVersion,
     contactInfo,
+    afterSaleContact,
     apiBaseUrl,
     docUrl,
 

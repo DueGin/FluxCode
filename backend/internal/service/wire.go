@@ -5,6 +5,7 @@ import (
 
 	"github.com/DueGin/FluxCode/internal/config"
 	"github.com/google/wire"
+	"github.com/DueGin/FluxCode/ent"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -34,6 +35,32 @@ func ProvideEmailQueueService(rdb *redis.Client, emailService *EmailService) *Em
 	return NewEmailQueueService(rdb, emailService, 3)
 }
 
+// ProvideUsageQueueService creates UsageQueueService with default worker count
+func ProvideUsageQueueService(
+	rdb *redis.Client,
+	entClient *ent.Client,
+	cfg *config.Config,
+	billingService *BillingService,
+	usageLogRepo UsageLogRepository,
+	userRepo UserRepository,
+	userSubRepo UserSubscriptionRepository,
+	billingCacheService *BillingCacheService,
+	deferredService *DeferredService,
+) *UsageQueueService {
+	return NewUsageQueueService(
+		rdb,
+		entClient,
+		cfg,
+		billingService,
+		usageLogRepo,
+		userRepo,
+		userSubRepo,
+		billingCacheService,
+		deferredService,
+		6,
+	)
+}
+
 // ProvideTokenRefreshService creates and starts TokenRefreshService
 func ProvideTokenRefreshService(
 	accountRepo AccountRepository,
@@ -41,9 +68,10 @@ func ProvideTokenRefreshService(
 	openaiOAuthService *OpenAIOAuthService,
 	geminiOAuthService *GeminiOAuthService,
 	antigravityOAuthService *AntigravityOAuthService,
+	rdb *redis.Client,
 	cfg *config.Config,
 ) *TokenRefreshService {
-	svc := NewTokenRefreshService(accountRepo, oauthService, openaiOAuthService, geminiOAuthService, antigravityOAuthService, cfg)
+	svc := NewTokenRefreshService(accountRepo, oauthService, openaiOAuthService, geminiOAuthService, antigravityOAuthService, rdb, cfg)
 	svc.Start()
 	return svc
 }
@@ -104,6 +132,7 @@ var ProviderSet = wire.NewSet(
 	NewSettingService,
 	NewEmailService,
 	ProvideEmailQueueService,
+	ProvideUsageQueueService,
 	NewTurnstileService,
 	NewSubscriptionService,
 	ProvideConcurrencyService,

@@ -83,6 +83,7 @@ const (
 	SettingKeySiteSubtitle = "site_subtitle" // 网站副标题
 	SettingKeyAPIBaseURL   = "api_base_url"  // API端点地址（用于客户端配置和导入）
 	SettingKeyContactInfo  = "contact_info"  // 客服联系方式
+	SettingKeyAfterSaleContact = "after_sale_contact" // 售后联系方式（KV JSON 数组）
 	SettingKeyDocURL       = "doc_url"       // 文档链接
 
 	// 默认配置

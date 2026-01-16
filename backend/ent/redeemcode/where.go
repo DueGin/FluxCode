@@ -495,6 +495,16 @@ func NotesContainsFold(v string) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldContainsFold(FieldNotes, v))
 }
 
+// WelfareNoIsNil applies the IsNil predicate on the "welfare_no" field.
+func WelfareNoIsNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldIsNull(FieldWelfareNo))
+}
+
+// WelfareNoNotNil applies the NotNil predicate on the "welfare_no" field.
+func WelfareNoNotNil() predicate.RedeemCode {
+	return predicate.RedeemCode(sql.FieldNotNull(FieldWelfareNo))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.RedeemCode {
 	return predicate.RedeemCode(sql.FieldEQ(FieldCreatedAt, v))

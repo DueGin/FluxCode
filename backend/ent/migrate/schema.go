@@ -294,6 +294,7 @@ var (
 		{Name: "validity_days", Type: field.TypeInt, Default: 30},
 		{Name: "group_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "used_by", Type: field.TypeInt64, Nullable: true},
+		{Name: "welfare_no", Type: field.TypeString, Nullable: true, Size: 64},
 	}
 	// RedeemCodesTable holds the schema information for the "redeem_codes" table.
 	RedeemCodesTable = &schema.Table{
@@ -324,6 +325,11 @@ var (
 				Name:    "redeemcode_used_by",
 				Unique:  false,
 				Columns: []*schema.Column{RedeemCodesColumns[10]},
+			},
+			{
+				Name:    "redeemcode_used_by_welfare_no",
+				Unique:  true,
+				Columns: []*schema.Column{RedeemCodesColumns[10], RedeemCodesColumns[11]},
 			},
 			{
 				Name:    "redeemcode_group_id",

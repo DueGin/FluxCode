@@ -403,7 +403,7 @@
           </div>
 
           <!-- Quick Actions - Takes 1 column -->
-          <div class="lg:col-span-1">
+          <div class="space-y-6 lg:col-span-1">
             <div class="card">
               <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -500,6 +500,36 @@
                 </button>
               </div>
             </div>
+
+            <!-- After-sale Contact -->
+            <div class="card">
+              <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                  {{ t('dashboard.afterSaleContact') }}
+                </h2>
+              </div>
+              <div class="p-4">
+                <div v-if="afterSaleContactItems.length > 0" class="grid grid-cols-1 gap-3">
+                  <div
+                    v-for="(item, index) in afterSaleContactItems"
+                    :key="`${item.k}-${index}`"
+                    class="mx-auto grid w-[92%] max-w-[360px] grid-cols-[72px,1fr] items-center gap-3 rounded-xl bg-gray-50 px-4 py-2.5 dark:bg-dark-800/50"
+                  >
+                    <span
+                      class="truncate text-base font-semibold text-gray-700 dark:text-gray-300"
+                      :title="item.k"
+                      >{{ item.k }}</span
+                    >
+                    <span class="min-w-0 truncate text-sm text-gray-600 dark:text-dark-300" :title="item.v">{{
+                      item.v
+                    }}</span>
+                  </div>
+                </div>
+                <p v-else class="text-sm text-gray-500 dark:text-dark-400">
+                  {{ t('dashboard.afterSaleContactEmpty') }}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </template>
@@ -511,6 +541,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores'
 import { useAuthStore } from '@/stores/auth'
 import { useSubscriptionStore } from '@/stores/subscriptions'
 import { formatDateTime } from '@/utils/format'
@@ -550,10 +581,12 @@ ChartJS.register(
 )
 
 const router = useRouter()
+const appStore = useAppStore()
 const authStore = useAuthStore()
 const subscriptionStore = useSubscriptionStore()
 
 const user = computed(() => authStore.user)
+const afterSaleContactItems = computed(() => appStore.afterSaleContact || [])
 const stats = ref<UserDashboardStats | null>(null)
 const loading = ref(false)
 const loadingUsage = ref(false)
@@ -965,7 +998,7 @@ onMounted(async () => {
   })
 
   // Load chart data and recent usage in parallel (non-critical)
-  Promise.all([loadChartData(), loadRecentUsage()]).catch((error) => {
+  Promise.all([loadChartData(), loadRecentUsage(), appStore.fetchPublicSettings()]).catch((error) => {
     console.error('Error loading secondary data:', error)
   })
 })

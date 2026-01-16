@@ -1,19 +1,19 @@
 <template>
-  <div class="card p-4">
+  <div class="card overflow-hidden p-4">
     <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
       {{ t('admin.dashboard.tokenUsageTrend') }}
     </h3>
-    <div v-if="loading" class="flex h-48 items-center justify-center">
-      <LoadingSpinner />
-    </div>
-    <div v-else-if="trendData.length > 0 && chartData" class="h-48">
-      <Line :data="chartData" :options="lineOptions" />
-    </div>
-    <div
-      v-else
-      class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
-    >
-      {{ t('admin.dashboard.noDataAvailable') }}
+    <div class="h-64 lg:h-72">
+      <div v-if="loading" class="flex h-full items-center justify-center">
+        <LoadingSpinner />
+      </div>
+      <Line v-else-if="trendData.length > 0 && chartData" :data="chartData" :options="lineOptions" />
+      <div
+        v-else
+        class="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+      >
+        {{ t('admin.dashboard.noDataAvailable') }}
+      </div>
     </div>
   </div>
 </template>

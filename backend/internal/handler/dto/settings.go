@@ -1,5 +1,10 @@
 package dto
 
+type KVItem struct {
+	K string `json:"k"`
+	V string `json:"v"`
+}
+
 // SystemSettings represents the admin settings API response payload.
 type SystemSettings struct {
 	RegistrationEnabled bool `json:"registration_enabled"`
@@ -22,6 +27,7 @@ type SystemSettings struct {
 	SiteSubtitle string `json:"site_subtitle"`
 	APIBaseURL   string `json:"api_base_url"`
 	ContactInfo  string `json:"contact_info"`
+	AfterSaleContact []KVItem `json:"after_sale_contact"`
 	DocURL       string `json:"doc_url"`
 
 	DefaultConcurrency int     `json:"default_concurrency"`
@@ -45,6 +51,7 @@ type PublicSettings struct {
 	SiteSubtitle        string `json:"site_subtitle"`
 	APIBaseURL          string `json:"api_base_url"`
 	ContactInfo         string `json:"contact_info"`
+	AfterSaleContact    []KVItem `json:"after_sale_contact"`
 	DocURL              string `json:"doc_url"`
 	Version             string `json:"version"`
 }

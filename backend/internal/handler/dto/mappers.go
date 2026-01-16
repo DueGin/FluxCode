@@ -208,6 +208,7 @@ func RedeemCodeFromService(rc *service.RedeemCode) *RedeemCode {
 		UsedBy:       rc.UsedBy,
 		UsedAt:       rc.UsedAt,
 		Notes:        rc.Notes,
+		WelfareNo:    rc.WelfareNo,
 		CreatedAt:    rc.CreatedAt,
 		GroupID:      rc.GroupID,
 		ValidityDays: rc.ValidityDays,

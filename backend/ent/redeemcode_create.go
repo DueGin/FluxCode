@@ -114,6 +114,20 @@ func (_c *RedeemCodeCreate) SetNillableNotes(v *string) *RedeemCodeCreate {
 	return _c
 }
 
+// SetWelfareNo sets the "welfare_no" field.
+func (_c *RedeemCodeCreate) SetWelfareNo(v string) *RedeemCodeCreate {
+	_c.mutation.SetWelfareNo(v)
+	return _c
+}
+
+// SetNillableWelfareNo sets the "welfare_no" field if the given value is not nil.
+func (_c *RedeemCodeCreate) SetNillableWelfareNo(v *string) *RedeemCodeCreate {
+	if v != nil {
+		_c.SetWelfareNo(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *RedeemCodeCreate) SetCreatedAt(v time.Time) *RedeemCodeCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -322,6 +336,10 @@ func (_c *RedeemCodeCreate) createSpec() (*RedeemCode, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Notes(); ok {
 		_spec.SetField(redeemcode.FieldNotes, field.TypeString, value)
 		_node.Notes = &value
+	}
+	if value, ok := _c.mutation.WelfareNo(); ok {
+		_spec.SetField(redeemcode.FieldWelfareNo, field.TypeString, value)
+		_node.WelfareNo = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(redeemcode.FieldCreatedAt, field.TypeTime, value)

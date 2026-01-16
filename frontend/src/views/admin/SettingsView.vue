@@ -384,6 +384,50 @@
               </p>
             </div>
 
+            <!-- After-sale Contact (KV) -->
+            <div>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('admin.settings.site.afterSaleContact') }}
+              </label>
+              <div class="space-y-3">
+                <div
+                  v-for="(item, index) in form.after_sale_contact"
+                  :key="index"
+                  class="flex flex-col gap-3 md:flex-row md:items-center"
+                >
+                  <input
+                    v-model="item.k"
+                    type="text"
+                    class="input md:w-48"
+                    :placeholder="t('admin.settings.site.afterSaleContactKeyPlaceholder')"
+                  />
+                  <input
+                    v-model="item.v"
+                    type="text"
+                    class="input flex-1"
+                    :placeholder="t('admin.settings.site.afterSaleContactValuePlaceholder')"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm self-end md:self-auto"
+                    @click="removeAfterSaleContactRow(index)"
+                  >
+                    {{ t('admin.settings.site.afterSaleContactRemoveRow') }}
+                  </button>
+                </div>
+
+                <div>
+                  <button type="button" class="btn btn-secondary btn-sm" @click="addAfterSaleContactRow">
+                    {{ t('admin.settings.site.afterSaleContactAddRow') }}
+                  </button>
+                </div>
+
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.site.afterSaleContactHint') }}
+                </p>
+              </div>
+            </div>
+
             <!-- Doc URL -->
             <div>
               <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -745,6 +789,7 @@ const form = reactive<SystemSettings>({
   site_subtitle: 'Subscription to API Conversion Platform',
   api_base_url: '',
   contact_info: '',
+  after_sale_contact: [],
   doc_url: '',
   smtp_host: '',
   smtp_port: 587,
@@ -758,6 +803,14 @@ const form = reactive<SystemSettings>({
   turnstile_site_key: '',
   turnstile_secret_key: ''
 })
+
+function addAfterSaleContactRow() {
+  form.after_sale_contact.push({ k: '', v: '' })
+}
+
+function removeAfterSaleContactRow(index: number) {
+  form.after_sale_contact.splice(index, 1)
+}
 
 function handleLogoUpload(event: Event) {
   const input = event.target as HTMLInputElement
@@ -802,6 +855,7 @@ async function loadSettings() {
   try {
     const settings = await adminAPI.settings.getSettings()
     Object.assign(form, settings)
+    form.after_sale_contact = Array.isArray(settings.after_sale_contact) ? settings.after_sale_contact : []
   } catch (error: any) {
     appStore.showError(
       t('admin.settings.failedToLoad') + ': ' + (error.message || t('common.unknownError'))

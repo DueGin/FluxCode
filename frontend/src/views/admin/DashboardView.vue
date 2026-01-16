@@ -483,12 +483,13 @@ const selectRollingHours = (hours: number) => {
 
 // Initialize date range immediately
 const now = new Date()
-const weekAgo = new Date(now)
-weekAgo.setDate(weekAgo.getDate() - 6)
+const start24HoursAgo = new Date(now)
+start24HoursAgo.setHours(start24HoursAgo.getHours() - 24)
 
 // Date range
-const granularity = ref<'day' | 'hour'>('day')
-const startDate = ref(formatLocalDate(weekAgo))
+const granularity = ref<'day' | 'hour'>('hour')
+useRollingHourly.value = true
+const startDate = ref(formatLocalDate(start24HoursAgo))
 const endDate = ref(formatLocalDate(now))
 
 // Granularity options for Select component
@@ -578,10 +579,8 @@ const userTrendChartData = computed(() => {
 
   // Group by user
   const userGroups = new Map<string, { name: string; data: Map<string, number> }>()
-  const allDates = new Set<string>()
 
   userTrend.value.forEach((point) => {
-    allDates.add(point.date)
     const key = getDisplayName(point.email, point.user_id)
     if (!userGroups.has(key)) {
       userGroups.set(key, { name: key, data: new Map() })
@@ -589,7 +588,10 @@ const userTrendChartData = computed(() => {
     userGroups.get(key)!.data.set(point.date, point.tokens)
   })
 
-  const sortedDates = Array.from(allDates).sort()
+  const labels =
+    trendData.value?.length > 0
+      ? trendData.value.map((d) => d.date)
+      : Array.from(new Set(userTrend.value.map((p) => p.date))).sort()
   const colors = [
     '#3b82f6',
     '#10b981',
@@ -607,7 +609,7 @@ const userTrendChartData = computed(() => {
 
   const datasets = Array.from(userGroups.values()).map((group, idx) => ({
     label: group.name,
-    data: sortedDates.map((date) => group.data.get(date) || 0),
+    data: labels.map((date) => group.data.get(date) || 0),
     borderColor: colors[idx % colors.length],
     backgroundColor: `${colors[idx % colors.length]}20`,
     fill: false,
@@ -615,7 +617,7 @@ const userTrendChartData = computed(() => {
   }))
 
   return {
-    labels: sortedDates,
+    labels,
     datasets
   }
 })

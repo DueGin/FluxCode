@@ -15,6 +15,7 @@ type RedeemCode struct {
 	UsedBy    *int64
 	UsedAt    *time.Time
 	Notes     string
+	WelfareNo *string
 	CreatedAt time.Time
 
 	GroupID      *int64

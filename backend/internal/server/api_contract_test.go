@@ -307,6 +307,7 @@ func TestAPIContracts(t *testing.T) {
 					"site_subtitle": "Subtitle",
 					"api_base_url": "https://api.example.com",
 					"contact_info": "support",
+					"after_sale_contact": [],
 					"doc_url": "https://docs.example.com",
 					"default_concurrency": 5,
 					"default_balance": 1.25,

@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from '../client'
+import type { KeyValueItem } from '@/types'
 
 /**
  * System settings interface
@@ -21,6 +22,7 @@ export interface SystemSettings {
   site_subtitle: string
   api_base_url: string
   contact_info: string
+  after_sale_contact: KeyValueItem[]
   doc_url: string
   // SMTP settings
   smtp_host: string

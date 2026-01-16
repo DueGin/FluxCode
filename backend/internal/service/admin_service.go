@@ -58,12 +58,13 @@ type AdminService interface {
 	TestProxy(ctx context.Context, id int64) (*ProxyTestResult, error)
 
 	// Redeem code management
-	ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string) ([]RedeemCode, int64, error)
+	ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error)
 	GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
 	GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error)
 	DeleteRedeemCode(ctx context.Context, id int64) error
 	BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error)
 	ExpireRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
+	ListRedeemWelfareNos(ctx context.Context) ([]string, error)
 }
 
 // CreateUserInput represents input for creating a new user via admin operations.
@@ -198,6 +199,7 @@ type GenerateRedeemCodesInput struct {
 	Value        float64
 	GroupID      *int64 // 订阅类型专用：关联的分组ID
 	ValidityDays int    // 订阅类型专用：有效天数
+	WelfareNo    *string
 }
 
 // ProxyTestResult represents the result of testing a proxy
@@ -963,9 +965,9 @@ func (s *adminServiceImpl) CheckProxyExists(ctx context.Context, host string, po
 }
 
 // Redeem code management implementations
-func (s *adminServiceImpl) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string) ([]RedeemCode, int64, error) {
+func (s *adminServiceImpl) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
-	codes, result, err := s.redeemCodeRepo.ListWithFilters(ctx, params, codeType, status, search)
+	codes, result, err := s.redeemCodeRepo.ListWithFilters(ctx, params, codeType, status, search, isWelfare, welfareNo)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -992,6 +994,14 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 		}
 	}
 
+	if input.WelfareNo != nil {
+		trimmed := strings.TrimSpace(*input.WelfareNo)
+		if trimmed == "" {
+			return nil, errors.New("welfare_no cannot be empty")
+		}
+		input.WelfareNo = &trimmed
+	}
+
 	codes := make([]RedeemCode, 0, input.Count)
 	for i := 0; i < input.Count; i++ {
 		codeValue, err := GenerateRedeemCode()
@@ -999,10 +1009,11 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 			return nil, err
 		}
 		code := RedeemCode{
-			Code:   codeValue,
-			Type:   input.Type,
-			Value:  input.Value,
-			Status: StatusUnused,
+			Code:      codeValue,
+			Type:      input.Type,
+			Value:     input.Value,
+			Status:    StatusUnused,
+			WelfareNo: input.WelfareNo,
 		}
 		// 订阅类型专用字段
 		if input.Type == RedeemTypeSubscription {
@@ -1044,6 +1055,10 @@ func (s *adminServiceImpl) ExpireRedeemCode(ctx context.Context, id int64) (*Red
 		return nil, err
 	}
 	return code, nil
+}
+
+func (s *adminServiceImpl) ListRedeemWelfareNos(ctx context.Context) ([]string, error) {
+	return s.redeemCodeRepo.ListWelfareNos(ctx)
 }
 
 func (s *adminServiceImpl) TestProxy(ctx context.Context, id int64) (*ProxyTestResult, error) {
