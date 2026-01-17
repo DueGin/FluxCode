@@ -413,12 +413,19 @@ const currencyOptions = computed(() => [
 ])
 
 const periodOptions = computed(() => [
+  { value: 'day', label: t('common.period.day') },
+  { value: 'week', label: t('common.period.week') },
   { value: 'month', label: t('common.period.month') },
   { value: 'year', label: t('common.period.year') },
-  { value: 'day', label: t('common.period.day') },
-  { value: 'once', label: t('common.period.once') },
-  { value: 'one_time', label: t('common.period.once') }
+  { value: 'once', label: t('common.period.once') }
 ])
+
+const normalizePricePeriod = (value?: string): string => {
+  const period = (value || '').trim().toLowerCase()
+  if (!period) return 'month'
+  if (period === 'one_time') return 'once'
+  return period
+}
 
 const groupOptions = computed(() => groups.value.map((g) => ({ value: g.id, label: g.name })))
 
@@ -670,7 +677,7 @@ function openEditPlan(group: PricingPlanGroup, plan: PricingPlan) {
   planForm.price_text = plan.price_text || ''
   planForm.price_amount = plan.price_amount === null || plan.price_amount === undefined ? '' : String(plan.price_amount)
   planForm.price_currency = plan.price_currency || 'CNY'
-  planForm.price_period = plan.price_period || 'month'
+  planForm.price_period = normalizePricePeriod(plan.price_period)
   planForm.featuresText = (plan.features || []).join('\n')
   planForm.purchaseEntries = (plan.contact_methods || []).map((m) => ({
     id: createUID(),

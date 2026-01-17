@@ -250,6 +250,7 @@ function formatPeriod(period: string): string {
     month: '月',
     year: '年',
     day: '天',
+    week: '周',
     once: '一次',
     one_time: '一次'
   }
@@ -257,6 +258,7 @@ function formatPeriod(period: string): string {
     month: 'mo',
     year: 'yr',
     day: 'day',
+    week: 'wk',
     once: 'once',
     one_time: 'once'
   }

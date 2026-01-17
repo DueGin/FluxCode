@@ -507,7 +507,7 @@ async function handleVerify(): Promise<void> {
     appStore.showSuccess('Account created successfully! Welcome to ' + siteName.value + '.')
 
     // Redirect to dashboard
-    await router.push('/dashboard')
+    await router.push(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
   } catch (error: unknown) {
     const err = error as { message?: string; response?: { data?: { detail?: string } } }
 

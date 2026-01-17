@@ -199,6 +199,7 @@ export default {
     },
     period: {
       day: 'Daily',
+      week: 'Weekly',
       month: 'Monthly',
       year: 'Yearly',
       once: 'One-time'

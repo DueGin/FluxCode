@@ -711,6 +711,13 @@ const doughnutOptions = computed(() => ({
 const lineOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
+  elements: {
+    point: {
+      radius: 0,
+      hoverRadius: 4,
+      hitRadius: 6
+    }
+  },
   interaction: {
     intersect: false,
     mode: 'index' as const

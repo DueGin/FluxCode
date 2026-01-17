@@ -197,6 +197,7 @@ export default {
     },
     period: {
       day: '每天',
+      week: '每周',
       month: '每月',
       year: '每年',
       once: '一次性'
