@@ -9,11 +9,14 @@ import (
 
 	_ "github.com/DueGin/FluxCode/ent/runtime"
 	"github.com/DueGin/FluxCode/internal/config"
+	"github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/repository"
 	"github.com/DueGin/FluxCode/internal/service"
 )
 
 func main() {
+	logger.Setup()
+
 	email := flag.String("email", "", "Admin email to issue a JWT for (defaults to first active admin)")
 	flag.Parse()
 

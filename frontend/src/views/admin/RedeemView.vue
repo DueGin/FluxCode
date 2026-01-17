@@ -341,7 +341,7 @@
     <Teleport to="body">
       <div v-if="showResultDialog" class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="fixed inset-0 bg-black/50" @click="closeResultDialog"></div>
-        <div class="relative z-10 w-full max-w-lg rounded-xl bg-white shadow-xl dark:bg-dark-800">
+        <div class="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl bg-white shadow-xl dark:bg-dark-800">
           <!-- Header -->
           <div
             class="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-dark-600"
@@ -388,7 +388,7 @@
             </button>
           </div>
           <!-- Content -->
-          <div class="p-5">
+          <div class="flex-1 overflow-y-auto p-5">
             <div class="relative">
               <textarea
                 readonly
@@ -496,11 +496,7 @@ const textareaHeight = computed(() => {
   const lineHeight = 24 // approximate line height in px
   const padding = 24 // top + bottom padding
   const minHeight = 60
-  const maxHeight = 240
-  const calculatedHeight = Math.min(
-    Math.max(lineCount * lineHeight + padding, minHeight),
-    maxHeight
-  )
+  const calculatedHeight = Math.max(lineCount * lineHeight + padding, minHeight)
   return `${calculatedHeight}px`
 })
 

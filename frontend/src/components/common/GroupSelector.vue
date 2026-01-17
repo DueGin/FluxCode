@@ -5,7 +5,7 @@
       <span class="font-normal text-gray-400">({{ modelValue.length }} selected)</span>
     </label>
     <div
-      class="grid max-h-32 grid-cols-2 gap-1 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-dark-600 dark:bg-dark-800"
+      class="grid grid-cols-2 gap-1 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-dark-600 dark:bg-dark-800"
     >
       <label
         v-for="group in filteredGroups"

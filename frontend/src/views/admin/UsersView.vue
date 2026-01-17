@@ -233,7 +233,7 @@
               <!-- Dropdown menu -->
               <div
                 v-if="showColumnDropdown"
-                class="absolute right-0 top-full z-50 mt-1 max-h-80 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
+                class="absolute right-0 top-full z-50 mt-1 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
               >
                 <button
                   v-for="col in toggleableColumns"
@@ -973,7 +973,7 @@
             {{ t('admin.users.noApiKeys') }}
           </p>
         </div>
-        <div v-else class="max-h-96 space-y-3 overflow-y-auto">
+        <div v-else class="space-y-3 overflow-y-auto">
           <div
             v-for="key in userApiKeys"
             :key="key.id"
@@ -1117,7 +1117,7 @@
           </div>
 
           <!-- Groups List -->
-          <div v-else class="max-h-64 space-y-2 overflow-y-auto">
+          <div v-else class="space-y-2 overflow-y-auto">
             <label
               v-for="group in standardGroups"
               :key="group.id"

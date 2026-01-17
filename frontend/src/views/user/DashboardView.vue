@@ -236,7 +236,7 @@
 	                <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
 	                  {{ t('dashboard.modelDistribution') }} · {{ t('dashboard.model') }}
 	                </h3>
-	                <div v-if="modelStats.length > 0" class="max-h-48 overflow-y-auto">
+                <div v-if="modelStats.length > 0" class="overflow-y-auto">
 	                  <table class="w-full text-xs">
 	                    <thead>
 	                      <tr class="text-gray-500 dark:text-gray-400">

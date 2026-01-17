@@ -18,6 +18,7 @@ import (
 	_ "github.com/DueGin/FluxCode/ent/runtime"
 	"github.com/DueGin/FluxCode/internal/config"
 	"github.com/DueGin/FluxCode/internal/handler"
+	"github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/server/middleware"
 	"github.com/DueGin/FluxCode/internal/setup"
 	"github.com/DueGin/FluxCode/internal/web"
@@ -45,6 +46,8 @@ func init() {
 }
 
 func main() {
+	logger.Setup()
+
 	// Parse command line flags
 	setupMode := flag.Bool("setup", false, "Run setup wizard in CLI mode")
 	showVersion := flag.Bool("version", false, "Show version information")

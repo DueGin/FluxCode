@@ -49,7 +49,7 @@ func Printf(format string, args ...any) {
 
 // Println logs with an inferred level (keeps legacy log.Println call sites).
 func Println(args ...any) {
-	msg := fmt.Sprint(args...)
+	msg := strings.TrimSuffix(fmt.Sprintln(args...), "\n")
 	logWithLevel(inferLevel(msg), msg)
 }
 

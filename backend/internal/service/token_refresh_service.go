@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/config"
+	"github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
@@ -203,7 +204,7 @@ func (s *TokenRefreshService) processRefresh() {
 	}
 
 	// 始终打印周期日志，便于跟踪服务运行状态
-	log.Printf("[TokenRefresh] Cycle complete: total=%d, oauth=%d, needs_refresh=%d, refreshed=%d, failed=%d",
+	logger.Infof("[TokenRefresh] Cycle complete: total=%d, oauth=%d, needs_refresh=%d, refreshed=%d, failed=%d",
 		totalAccounts, oauthAccounts, needsRefresh, refreshed, failed)
 }
 

@@ -50,7 +50,7 @@
           </p>
         </div>
 
-        <div class="max-h-64 overflow-y-auto">
+        <div class="overflow-y-auto">
           <div
             v-for="subscription in displaySubscriptions"
             :key="subscription.id"

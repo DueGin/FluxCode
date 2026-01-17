@@ -28,7 +28,7 @@
       </template>
 
       <template #table>
-        <div class="h-full overflow-y-auto p-6">
+        <div class="p-6">
           <div v-if="loading" class="space-y-4">
             <div v-for="i in 3" :key="i" class="h-24 animate-pulse rounded-2xl bg-gray-100 dark:bg-dark-700"></div>
           </div>

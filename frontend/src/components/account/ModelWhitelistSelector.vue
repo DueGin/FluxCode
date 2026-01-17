@@ -48,7 +48,7 @@
             @click.stop
           />
         </div>
-        <div class="max-h-52 overflow-auto">
+        <div class="overflow-auto">
           <button
             v-for="model in filteredModels"
             :key="model.value"
