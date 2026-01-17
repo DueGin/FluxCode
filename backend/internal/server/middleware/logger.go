@@ -34,9 +34,8 @@ func Logger() gin.HandlerFunc {
 		// 客户端IP
 		clientIP := c.ClientIP()
 
-		// 日志格式: [时间] 状态码 | 延迟 | IP | 方法 路径
-		log.Printf("[GIN] %v | %3d | %13v | %15s | %-7s %s",
-			endTime.Format("2006/01/02 - 15:04:05"),
+		// 日志格式: 状态码 | 延迟 | IP | 方法 路径（时间由全局 logger 输出）
+		log.Printf("%3d | %13v | %15s | %-7s %s",
 			statusCode,
 			latency,
 			clientIP,
@@ -46,7 +45,7 @@ func Logger() gin.HandlerFunc {
 
 		// 如果有错误，额外记录错误信息
 		if len(c.Errors) > 0 {
-			log.Printf("[GIN] Errors: %v", c.Errors.String())
+			log.Printf("Errors: %v", c.Errors.String())
 		}
 	}
 }

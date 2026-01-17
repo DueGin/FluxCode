@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 type captureHandler struct {
@@ -66,3 +67,18 @@ func TestPrintln_NoArgs_DoesNotLog(t *testing.T) {
 	}
 }
 
+func TestReplaceTimeAttr_FormatsTime(t *testing.T) {
+	tm := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	out := replaceTimeAttr(nil, slog.Time(slog.TimeKey, tm))
+	if out.Key != slog.TimeKey {
+		t.Fatalf("expected time attr key=%q, got %q", slog.TimeKey, out.Key)
+	}
+	if out.Value.String() != "2026-01-02 03:04:05" {
+		t.Fatalf("unexpected formatted time: %q", out.Value.String())
+	}
+
+	kept := replaceTimeAttr(nil, slog.String("msg", "x"))
+	if kept.Key != "msg" || kept.Value.String() != "x" {
+		t.Fatalf("expected non-time attr to be kept, got %+v", kept)
+	}
+}
