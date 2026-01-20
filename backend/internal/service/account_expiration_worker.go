@@ -3,7 +3,8 @@ package service
 import (
 	"context"
 	"database/sql"
-	"log"
+
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"time"
 )
 
@@ -33,7 +34,7 @@ func (w *AccountExpirationWorker) Start() {
 		return
 	}
 	w.timingWheel.ScheduleRecurring("worker:account_expiration", w.interval, w.runOnce)
-	log.Printf("[AccountExpirationWorker] Started (interval: %v)", w.interval)
+	applog.Printf("[AccountExpirationWorker] Started (interval: %v)", w.interval)
 }
 
 func (w *AccountExpirationWorker) Stop() {
@@ -41,7 +42,7 @@ func (w *AccountExpirationWorker) Stop() {
 		return
 	}
 	w.timingWheel.Cancel("worker:account_expiration")
-	log.Printf("[AccountExpirationWorker] Stopped")
+	applog.Printf("[AccountExpirationWorker] Stopped")
 }
 
 func (w *AccountExpirationWorker) runOnce() {
@@ -54,14 +55,14 @@ func (w *AccountExpirationWorker) runOnce() {
 
 	conn, err := w.db.Conn(ctx)
 	if err != nil {
-		log.Printf("[AccountExpirationWorker] db conn failed: %v", err)
+		applog.Printf("[AccountExpirationWorker] db conn failed: %v", err)
 		return
 	}
 	defer func() { _ = conn.Close() }()
 
 	var locked bool
 	if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", accountExpirationAdvisoryLockID).Scan(&locked); err != nil {
-		log.Printf("[AccountExpirationWorker] acquire lock failed: %v", err)
+		applog.Printf("[AccountExpirationWorker] acquire lock failed: %v", err)
 		return
 	}
 	if !locked {
@@ -81,11 +82,11 @@ func (w *AccountExpirationWorker) runOnce() {
 			AND expires_at <= NOW()
 	`)
 	if err != nil {
-		log.Printf("[AccountExpirationWorker] disable expired schedulable failed: %v", err)
+		applog.Printf("[AccountExpirationWorker] disable expired schedulable failed: %v", err)
 		return
 	}
 	affected, _ := res.RowsAffected()
 	if affected > 0 {
-		log.Printf("[AccountExpirationWorker] Disabled schedulable for %d expired accounts", affected)
+		applog.Printf("[AccountExpirationWorker] Disabled schedulable for %d expired accounts", affected)
 	}
 }

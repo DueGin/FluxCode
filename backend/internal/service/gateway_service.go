@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+
 	"net/http"
 	"regexp"
 	"sort"
@@ -23,6 +23,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -522,6 +523,13 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 				if a.account.Priority != b.account.Priority {
 					return a.account.Priority < b.account.Priority
 				}
+				// 同优先级下：优先选择当前并发占用更少的账号（分布式环境下从 Redis 汇总）。
+				if a.loadInfo.CurrentConcurrency != b.loadInfo.CurrentConcurrency {
+					return a.loadInfo.CurrentConcurrency < b.loadInfo.CurrentConcurrency
+				}
+				if a.loadInfo.WaitingCount != b.loadInfo.WaitingCount {
+					return a.loadInfo.WaitingCount < b.loadInfo.WaitingCount
+				}
 				if a.loadInfo.LoadRate != b.loadInfo.LoadRate {
 					return a.loadInfo.LoadRate < b.loadInfo.LoadRate
 				}
@@ -718,7 +726,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 				// 检查账号平台是否匹配（确保粘性会话不会跨平台）
 				if err == nil && account.Platform == platform && account.IsSchedulable() && (requestedModel == "" || s.isModelSupportedByAccount(account, requestedModel)) {
 					if err := s.cache.RefreshSessionTTL(ctx, sessionHash, stickySessionTTL); err != nil {
-						log.Printf("refresh session ttl failed: session=%s err=%v", sessionHash, err)
+						applog.Printf("refresh session ttl failed: session=%s err=%v", sessionHash, err)
 					}
 					return account, nil
 				}
@@ -785,7 +793,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	// 4. 建立粘性绑定
 	if sessionHash != "" && s.cache != nil {
 		if err := s.cache.SetSessionAccountID(ctx, sessionHash, selected.ID, stickySessionTTL); err != nil {
-			log.Printf("set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
+			applog.Printf("set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 		}
 	}
 
@@ -808,7 +816,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 				if err == nil && account.IsSchedulable() && (requestedModel == "" || s.isModelSupportedByAccount(account, requestedModel)) {
 					if account.Platform == nativePlatform || (account.Platform == PlatformAntigravity && account.IsMixedSchedulingEnabled()) {
 						if err := s.cache.RefreshSessionTTL(ctx, sessionHash, stickySessionTTL); err != nil {
-							log.Printf("refresh session ttl failed: session=%s err=%v", sessionHash, err)
+							applog.Printf("refresh session ttl failed: session=%s err=%v", sessionHash, err)
 						}
 						return account, nil
 					}
@@ -877,7 +885,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	// 4. 建立粘性绑定
 	if sessionHash != "" && s.cache != nil {
 		if err := s.cache.SetSessionAccountID(ctx, sessionHash, selected.ID, stickySessionTTL); err != nil {
-			log.Printf("set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
+			applog.Printf("set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 		}
 	}
 
@@ -1017,7 +1025,7 @@ func injectClaudeCodePrompt(body []byte, system any) []byte {
 
 	result, err := sjson.SetBytes(body, "system", newSystem)
 	if err != nil {
-		log.Printf("Warning: failed to inject Claude Code prompt: %v", err)
+		applog.Printf("Warning: failed to inject Claude Code prompt: %v", err)
 		return body
 	}
 	return result
@@ -1051,7 +1059,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			// 替换请求体中的模型名
 			body = s.replaceModelInBody(body, mappedModel)
 			reqModel = mappedModel
-			log.Printf("Model mapping applied: %s -> %s (account: %s)", originalModel, mappedModel, account.Name)
+			applog.Printf("Model mapping applied: %s -> %s (account: %s)", originalModel, mappedModel, account.Name)
 		}
 	}
 
@@ -1089,7 +1097,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				_ = resp.Body.Close()
 
 				if s.isThinkingBlockSignatureError(respBody) {
-					log.Printf("Account %d: detected thinking block signature error, retrying with filtered thinking blocks", account.ID)
+					applog.Printf("Account %d: detected thinking block signature error, retrying with filtered thinking blocks", account.ID)
 
 					// 过滤thinking blocks并重试（使用更激进的过滤）
 					filteredBody := FilterThinkingBlocksForRetry(body)
@@ -1099,16 +1107,16 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 						if retryErr == nil {
 							// 使用重试后的响应，继续后续处理
 							if retryResp.StatusCode < 400 {
-								log.Printf("Account %d: signature error retry succeeded", account.ID)
+								applog.Printf("Account %d: signature error retry succeeded", account.ID)
 							} else {
-								log.Printf("Account %d: signature error retry returned status %d", account.ID, retryResp.StatusCode)
+								applog.Printf("Account %d: signature error retry returned status %d", account.ID, retryResp.StatusCode)
 							}
 							resp = retryResp
 							break
 						}
-						log.Printf("Account %d: signature error retry failed: %v", account.ID, retryErr)
+						applog.Printf("Account %d: signature error retry failed: %v", account.ID, retryErr)
 					} else {
-						log.Printf("Account %d: signature error retry build request failed: %v", account.ID, buildErr)
+						applog.Printf("Account %d: signature error retry build request failed: %v", account.ID, buildErr)
 					}
 					// 重试失败，恢复原始响应体继续处理
 					resp.Body = io.NopCloser(bytes.NewReader(respBody))
@@ -1122,7 +1130,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		// 检查是否需要通用重试（排除400，因为400已经在上面特殊处理过了）
 		if resp.StatusCode >= 400 && resp.StatusCode != 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) {
 			if attempt < maxRetries {
-				log.Printf("Account %d: upstream error %d, retry %d/%d after %v",
+				applog.Printf("Account %d: upstream error %d, retry %d/%d after %v",
 					account.ID, resp.StatusCode, attempt, maxRetries, retryDelay)
 				_ = resp.Body.Close()
 				time.Sleep(retryDelay)
@@ -1135,9 +1143,9 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		// 不需要重试（成功或不可重试的错误），跳出循环
 		// DEBUG: 输出响应 headers（用于检测 rate limit 信息）
 		if account.Platform == PlatformGemini && resp.StatusCode < 400 {
-			log.Printf("[DEBUG] Gemini API Response Headers for account %d:", account.ID)
+			applog.Printf("[DEBUG] Gemini API Response Headers for account %d:", account.ID)
 			for k, v := range resp.Header {
-				log.Printf("[DEBUG]   %s: %v", k, v)
+				applog.Printf("[DEBUG]   %s: %v", k, v)
 			}
 		}
 		break
@@ -1173,13 +1181,13 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 
 			if s.shouldFailoverOn400(respBody) {
 				if s.cfg.Gateway.LogUpstreamErrorBody {
-					log.Printf(
+					applog.Printf(
 						"Account %d: 400 error, attempting failover: %s",
 						account.ID,
 						truncateForLog(respBody, s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes),
 					)
 				} else {
-					log.Printf("Account %d: 400 error, attempting failover", account.ID)
+					applog.Printf("Account %d: 400 error, attempting failover", account.ID)
 				}
 				s.handleFailoverSideEffects(ctx, resp, account)
 				return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
@@ -1234,7 +1242,7 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		// 1. 获取或创建指纹（包含随机生成的ClientID）
 		fp, err := s.identityService.GetOrCreateFingerprint(ctx, account.ID, c.Request.Header)
 		if err != nil {
-			log.Printf("Warning: failed to get fingerprint for account %d: %v", account.ID, err)
+			applog.Printf("Warning: failed to get fingerprint for account %d: %v", account.ID, err)
 			// 失败时降级为透传原始headers
 		} else {
 			fingerprint = fp
@@ -1388,26 +1396,26 @@ func (s *GatewayService) isThinkingBlockSignatureError(respBody []byte) bool {
 	}
 
 	// Log for debugging
-	log.Printf("[SignatureCheck] Checking error message: %s", msg)
+	applog.Printf("[SignatureCheck] Checking error message: %s", msg)
 
 	// 检测signature相关的错误（更宽松的匹配）
 	// 例如: "Invalid `signature` in `thinking` block", "***.signature" 等
 	if strings.Contains(msg, "signature") {
-		log.Printf("[SignatureCheck] Detected signature error")
+		applog.Printf("[SignatureCheck] Detected signature error")
 		return true
 	}
 
 	// 检测 thinking block 顺序/类型错误
 	// 例如: "Expected `thinking` or `redacted_thinking`, but found `text`"
 	if strings.Contains(msg, "expected") && (strings.Contains(msg, "thinking") || strings.Contains(msg, "redacted_thinking")) {
-		log.Printf("[SignatureCheck] Detected thinking block type error")
+		applog.Printf("[SignatureCheck] Detected thinking block type error")
 		return true
 	}
 
 	// 检测空消息内容错误（可能是过滤 thinking blocks 后导致的）
 	// 例如: "all messages must have non-empty content"
 	if strings.Contains(msg, "non-empty content") || strings.Contains(msg, "empty content") {
-		log.Printf("[SignatureCheck] Detected empty content error")
+		applog.Printf("[SignatureCheck] Detected empty content error")
 		return true
 	}
 
@@ -1478,7 +1486,7 @@ func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Res
 	case 400:
 		// 仅记录上游错误摘要（避免输出请求内容）；需要时可通过配置打开
 		if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
-			log.Printf(
+			applog.Printf(
 				"Upstream 400 error (account=%d platform=%s type=%s): %s",
 				account.ID,
 				account.Platform,
@@ -1533,10 +1541,10 @@ func (s *GatewayService) handleRetryExhaustedSideEffects(ctx context.Context, re
 	// OAuth/Setup Token 账号的 403：标记账号异常
 	if account.IsOAuth() && statusCode == 403 {
 		s.rateLimitService.HandleUpstreamError(ctx, account, statusCode, resp.Header, body)
-		log.Printf("Account %d: marked as error after %d retries for status %d", account.ID, maxRetries, statusCode)
+		applog.Printf("Account %d: marked as error after %d retries for status %d", account.ID, maxRetries, statusCode)
 	} else {
 		// API Key 未配置错误码：不标记账号状态
-		log.Printf("Account %d: upstream error %d after %d retries (not marking account)", account.ID, statusCode, maxRetries)
+		applog.Printf("Account %d: upstream error %d after %d retries (not marking account)", account.ID, statusCode, maxRetries)
 	}
 }
 
@@ -1810,7 +1818,7 @@ func (s *GatewayService) RecordUsage(ctx context.Context, input *RecordUsageInpu
 
 	cost, err := s.billingService.CalculateCost(result.Model, tokens, multiplier)
 	if err != nil {
-		log.Printf("Calculate cost failed: %v", err)
+		applog.Printf("Calculate cost failed: %v", err)
 		// 使用默认费用继续
 		cost = &CostBreakdown{ActualCost: 0}
 	}
@@ -1858,11 +1866,11 @@ func (s *GatewayService) RecordUsage(ctx context.Context, input *RecordUsageInpu
 
 	inserted, err := s.usageLogRepo.Create(ctx, usageLog)
 	if err != nil {
-		log.Printf("Create usage log failed: %v", err)
+		applog.Printf("Create usage log failed: %v", err)
 	}
 
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-		log.Printf("[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
+		applog.Printf("[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
 		s.deferredService.ScheduleLastUsedUpdate(account.ID)
 		return nil
 	}
@@ -1874,7 +1882,7 @@ func (s *GatewayService) RecordUsage(ctx context.Context, input *RecordUsageInpu
 		// 订阅模式：更新订阅用量（使用 TotalCost 原始费用，不考虑倍率）
 		if shouldBill && cost.TotalCost > 0 {
 			if err := s.userSubRepo.IncrementUsage(ctx, subscription.ID, cost.TotalCost); err != nil {
-				log.Printf("Increment subscription usage failed: %v", err)
+				applog.Printf("Increment subscription usage failed: %v", err)
 			}
 			// 异步更新订阅缓存
 			s.billingCacheService.QueueUpdateSubscriptionUsage(user.ID, *apiKey.GroupID, cost.TotalCost)
@@ -1883,7 +1891,7 @@ func (s *GatewayService) RecordUsage(ctx context.Context, input *RecordUsageInpu
 		// 余额模式：扣除用户余额（使用 ActualCost 考虑倍率后的费用）
 		if shouldBill && cost.ActualCost > 0 {
 			if err := s.userRepo.DeductBalance(ctx, user.ID, cost.ActualCost); err != nil {
-				log.Printf("Deduct balance failed: %v", err)
+				applog.Printf("Deduct balance failed: %v", err)
 			}
 			// 异步更新余额缓存
 			s.billingCacheService.QueueDeductBalance(user.ID, cost.ActualCost)
@@ -1920,7 +1928,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 			if mappedModel != reqModel {
 				body = s.replaceModelInBody(body, mappedModel)
 				reqModel = mappedModel
-				log.Printf("CountTokens model mapping applied: %s -> %s (account: %s)", parsed.Model, mappedModel, account.Name)
+				applog.Printf("CountTokens model mapping applied: %s -> %s (account: %s)", parsed.Model, mappedModel, account.Name)
 			}
 		}
 	}
@@ -1962,7 +1970,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 
 	// 检测 thinking block 签名错误（400）并重试一次（过滤 thinking blocks）
 	if resp.StatusCode == 400 && s.isThinkingBlockSignatureError(respBody) {
-		log.Printf("Account %d: detected thinking block signature error on count_tokens, retrying with filtered thinking blocks", account.ID)
+		applog.Printf("Account %d: detected thinking block signature error on count_tokens, retrying with filtered thinking blocks", account.ID)
 
 		filteredBody := FilterThinkingBlocks(body)
 		retryReq, buildErr := s.buildCountTokensRequest(ctx, c, account, filteredBody, token, tokenType, reqModel)
@@ -1987,7 +1995,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 
 		// 记录上游错误摘要便于排障（不回显请求内容）
 		if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
-			log.Printf(
+			applog.Printf(
 				"count_tokens upstream error %d (account=%d platform=%s type=%s): %s",
 				resp.StatusCode,
 				account.ID,

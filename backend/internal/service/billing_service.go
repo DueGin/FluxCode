@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"log"
 	"strings"
 
 	"github.com/DueGin/FluxCode/internal/config"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 )
 
 // BillingCache defines cache operations for billing service
@@ -185,7 +185,7 @@ func (s *BillingService) GetModelPricing(model string) (*ModelPricing, error) {
 	// 2. 使用硬编码回退价格
 	fallback := s.getFallbackPricing(model)
 	if fallback != nil {
-		log.Printf("[Billing] Using fallback pricing for model: %s", model)
+		applog.Printf("[Billing] Using fallback pricing for model: %s", model)
 		return fallback, nil
 	}
 

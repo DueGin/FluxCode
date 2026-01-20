@@ -150,7 +150,7 @@ const statusClass = computed(() => {
   if (isTempUnschedulable.value) {
     return 'badge-warning'
   }
-  if (!props.account.schedulable || isRateLimited.value || isOverloaded.value) {
+  if (isRateLimited.value || isOverloaded.value) {
     return 'badge-gray'
   }
   switch (props.account.status) {
@@ -175,9 +175,6 @@ const statusText = computed(() => {
   }
   if (isTempUnschedulable.value) {
     return t('admin.accounts.status.tempUnschedulable')
-  }
-  if (!props.account.schedulable) {
-    return t('admin.accounts.status.paused')
   }
   if (isRateLimited.value || isOverloaded.value) {
     return t('admin.accounts.status.limited')

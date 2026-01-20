@@ -5,7 +5,8 @@ package timezone
 
 import (
 	"fmt"
-	"log"
+
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"time"
 )
 
@@ -35,7 +36,7 @@ func Init(tz string) error {
 	location = loc
 	tzName = tz
 
-	log.Printf("Timezone initialized: %s (UTC offset: %s)", tz, getUTCOffset(loc))
+	applog.Printf("Timezone initialized: %s (UTC offset: %s)", tz, getUTCOffset(loc))
 	return nil
 }
 

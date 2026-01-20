@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
@@ -111,12 +112,12 @@ func (s *EmailQueueService) setTaskStatus(ctx context.Context, status EmailTaskS
 
 	raw, err := json.Marshal(status)
 	if err != nil {
-		log.Printf("[EmailQueue] Failed to marshal task status (task_id=%s): %v", status.TaskID, err)
+		applog.Printf("[EmailQueue] Failed to marshal task status (task_id=%s): %v", status.TaskID, err)
 		return
 	}
 
 	if err := s.rdb.Set(ctx, emailTaskStatusKey(status.TaskID), raw, emailQueueStatusTTL).Err(); err != nil {
-		log.Printf("[EmailQueue] Failed to persist task status (task_id=%s): %v", status.TaskID, err)
+		applog.Printf("[EmailQueue] Failed to persist task status (task_id=%s): %v", status.TaskID, err)
 	}
 }
 
@@ -178,7 +179,7 @@ func (s *EmailQueueService) start() {
 		s.wg.Add(1)
 		go s.worker(i)
 	}
-	log.Printf("[EmailQueue] Started %d workers", s.workers)
+	applog.Printf("[EmailQueue] Started %d workers", s.workers)
 }
 
 func (s *EmailQueueService) worker(id int) {
@@ -190,7 +191,7 @@ func (s *EmailQueueService) worker(id int) {
 	for {
 		select {
 		case <-s.stopChan:
-			log.Printf("[EmailQueue] Worker %d stopping", id)
+			applog.Printf("[EmailQueue] Worker %d stopping", id)
 			return
 		default:
 		}
@@ -209,7 +210,7 @@ func (s *EmailQueueService) worker(id int) {
 			if errors.Is(err, redis.Nil) {
 				continue
 			}
-			log.Printf("[EmailQueue] Worker %d XREADGROUP error: %v", id, err)
+			applog.Printf("[EmailQueue] Worker %d XREADGROUP error: %v", id, err)
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
@@ -240,7 +241,7 @@ func (s *EmailQueueService) claimAndProcess(ctx context.Context, workerID int, c
 			s.claimAndProcessFallback(ctx, workerID, consumer)
 			return
 		}
-		log.Printf("[EmailQueue] Worker %d XAUTOCLAIM error: %v", workerID, err)
+		applog.Printf("[EmailQueue] Worker %d XAUTOCLAIM error: %v", workerID, err)
 		return
 	}
 	for _, msg := range messages {
@@ -261,7 +262,7 @@ func (s *EmailQueueService) claimAndProcessFallback(ctx context.Context, workerI
 		if errors.Is(err, redis.Nil) {
 			return
 		}
-		log.Printf("[EmailQueue] Worker %d XPENDING error: %v", workerID, err)
+		applog.Printf("[EmailQueue] Worker %d XPENDING error: %v", workerID, err)
 		return
 	}
 	if len(pending) == 0 {
@@ -284,7 +285,7 @@ func (s *EmailQueueService) claimAndProcessFallback(ctx context.Context, workerI
 		if errors.Is(err, redis.Nil) {
 			return
 		}
-		log.Printf("[EmailQueue] Worker %d XCLAIM error: %v", workerID, err)
+		applog.Printf("[EmailQueue] Worker %d XCLAIM error: %v", workerID, err)
 		return
 	}
 
@@ -336,7 +337,7 @@ func (s *EmailQueueService) EnqueueVerifyCode(ctx context.Context, email, siteNa
 		Worker:         "",
 	})
 
-	log.Printf("[EmailQueue] Enqueued verify code task (task_id=%s, msg_id=%s) for %s", payload.ID, queueMessageID, email)
+	applog.Printf("[EmailQueue] Enqueued verify code task (task_id=%s, msg_id=%s) for %s", payload.ID, queueMessageID, email)
 	return &EnqueueEmailResult{
 		TaskID:         payload.ID,
 		QueueMessageID: queueMessageID,
@@ -357,7 +358,7 @@ func (s *EmailQueueService) ensureConsumerGroup() {
 	if err := s.rdb.XGroupCreateMkStream(ctx, emailQueueStreamKey, emailQueueGroupName, "0").Err(); err != nil {
 		// BUSYGROUP: group already exists
 		if !strings.Contains(err.Error(), "BUSYGROUP") {
-			log.Printf("[EmailQueue] Failed to create consumer group: %v", err)
+			applog.Printf("[EmailQueue] Failed to create consumer group: %v", err)
 		}
 	}
 }
@@ -372,7 +373,7 @@ func (s *EmailQueueService) delayedDispatcher() {
 	for {
 		select {
 		case <-s.stopChan:
-			log.Printf("[EmailQueue] Delayed dispatcher stopping")
+			applog.Printf("[EmailQueue] Delayed dispatcher stopping")
 			return
 		case <-ticker.C:
 		}
@@ -383,7 +384,7 @@ func (s *EmailQueueService) delayedDispatcher() {
 			if errors.Is(err, redis.Nil) {
 				continue
 			}
-			log.Printf("[EmailQueue] Delayed dispatcher script error: %v", err)
+			applog.Printf("[EmailQueue] Delayed dispatcher script error: %v", err)
 			continue
 		}
 
@@ -391,14 +392,14 @@ func (s *EmailQueueService) delayedDispatcher() {
 		if !ok || len(items) == 0 {
 			continue
 		}
-		log.Printf("[EmailQueue] Moved %d delayed tasks back to stream", len(items))
+		applog.Printf("[EmailQueue] Moved %d delayed tasks back to stream", len(items))
 	}
 }
 
 func (s *EmailQueueService) handleMessage(ctx context.Context, workerID int, consumer string, msg redis.XMessage) {
 	payload, err := s.parsePayload(msg)
 	if err != nil {
-		log.Printf("[EmailQueue] Worker %d invalid payload (id=%s): %v", workerID, msg.ID, err)
+		applog.Printf("[EmailQueue] Worker %d invalid payload (id=%s): %v", workerID, msg.ID, err)
 		s.ackAndDelete(ctx, workerID, msg.ID)
 		return
 	}
@@ -447,7 +448,7 @@ func (s *EmailQueueService) handleMessage(ctx context.Context, workerID int, con
 
 	// 冷却限制：认为是“可预期的拒绝”，不做重试（避免队列堆积/邮件轰炸）
 	if errors.Is(procErr, ErrVerifyCodeTooFrequent) {
-		log.Printf("[EmailQueue] Worker %d drop task(type=%s,email=%s) due to cooldown", workerID, payload.TaskType, payload.Email)
+		applog.Printf("[EmailQueue] Worker %d drop task(type=%s,email=%s) due to cooldown", workerID, payload.TaskType, payload.Email)
 		s.setTaskStatus(ctx, EmailTaskStatus{
 			TaskID:         payload.ID,
 			TaskType:       payload.TaskType,
@@ -468,7 +469,7 @@ func (s *EmailQueueService) handleMessage(ctx context.Context, workerID int, con
 
 	// 达到最大重试次数：发送告警并丢弃任务
 	if payload.Attempt >= payload.MaxAttempts {
-		log.Printf("[EmailQueue] Worker %d giving up task(type=%s,email=%s) after %d attempts: %v",
+		applog.Printf("[EmailQueue] Worker %d giving up task(type=%s,email=%s) after %d attempts: %v",
 			workerID, payload.TaskType, payload.Email, payload.Attempt, procErr)
 		s.sendAlert(taskCtx, payload, procErr)
 		s.setTaskStatus(ctx, EmailTaskStatus{
@@ -492,7 +493,7 @@ func (s *EmailQueueService) handleMessage(ctx context.Context, workerID int, con
 	// 进入重试：先调度，再 ACK（调度失败则不 ACK，保持 pending 以便后续自动回收）
 	nextPayload, nextAt, _, err := s.scheduleRetry(ctx, payload, procErr)
 	if err != nil {
-		log.Printf("[EmailQueue] Worker %d schedule retry failed (task id=%s): %v", workerID, payload.ID, err)
+		applog.Printf("[EmailQueue] Worker %d schedule retry failed (task id=%s): %v", workerID, payload.ID, err)
 		return
 	}
 	s.setTaskStatus(ctx, EmailTaskStatus{
@@ -544,7 +545,7 @@ func (s *EmailQueueService) processTask(ctx context.Context, payload emailTaskPa
 		}
 		return s.emailService.ResendVerifyCode(ctx, payload.Email, payload.SiteName)
 	default:
-		log.Printf("[EmailQueue] Unknown task type: %s", payload.TaskType)
+		applog.Printf("[EmailQueue] Unknown task type: %s", payload.TaskType)
 		return nil
 	}
 }
@@ -573,7 +574,7 @@ func (s *EmailQueueService) scheduleRetry(
 		return emailTaskPayload{}, 0, 0, fmt.Errorf("zadd delayed task: %w", err)
 	}
 
-	log.Printf("[EmailQueue] Scheduled retry (attempt=%d) for %s in %s", nextPayload.Attempt, payload.Email, delay)
+	applog.Printf("[EmailQueue] Scheduled retry (attempt=%d) for %s in %s", nextPayload.Attempt, payload.Email, delay)
 	return nextPayload, nextAt, delay, nil
 }
 
@@ -599,10 +600,10 @@ func emailQueueRetryDelay(attempt int) time.Duration {
 
 func (s *EmailQueueService) ackAndDelete(ctx context.Context, workerID int, messageID string) {
 	if err := s.rdb.XAck(ctx, emailQueueStreamKey, emailQueueGroupName, messageID).Err(); err != nil {
-		log.Printf("[EmailQueue] Worker %d XACK failed (id=%s): %v", workerID, messageID, err)
+		applog.Printf("[EmailQueue] Worker %d XACK failed (id=%s): %v", workerID, messageID, err)
 	}
 	if err := s.rdb.XDel(ctx, emailQueueStreamKey, messageID).Err(); err != nil {
-		log.Printf("[EmailQueue] Worker %d XDEL failed (id=%s): %v", workerID, messageID, err)
+		applog.Printf("[EmailQueue] Worker %d XDEL failed (id=%s): %v", workerID, messageID, err)
 	}
 }
 
@@ -636,6 +637,6 @@ func (s *EmailQueueService) sendAlert(ctx context.Context, payload emailTaskPayl
 	)
 
 	if err := s.emailService.SendEmail(alertCtx, emailQueueAlertEmail, subject, body); err != nil {
-		log.Printf("[EmailQueue] Failed to send alert email: %v", err)
+		applog.Printf("[EmailQueue] Failed to send alert email: %v", err)
 	}
 }

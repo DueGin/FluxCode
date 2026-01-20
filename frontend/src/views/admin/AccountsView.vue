@@ -129,6 +129,46 @@
               </button>
             </div>
             <div class="flex items-center gap-2">
+              <button
+                @click="handleBulkSetSchedulable(true)"
+                :disabled="bulkSettingSchedulable"
+                class="btn btn-secondary btn-sm"
+              >
+                <svg
+                  class="mr-1.5 h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 6v12m6-6H6"
+                  />
+                </svg>
+                {{ t('admin.accounts.bulkActions.enableSchedulable') }}
+              </button>
+              <button
+                @click="handleBulkSetSchedulable(false)"
+                :disabled="bulkSettingSchedulable"
+                class="btn btn-secondary btn-sm"
+              >
+                <svg
+                  class="mr-1.5 h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M18 12H6"
+                  />
+                </svg>
+                {{ t('admin.accounts.bulkActions.disableSchedulable') }}
+              </button>
               <button @click="handleBulkDelete" class="btn btn-danger btn-sm">
                 <svg
                   class="mr-1.5 h-4 w-4"
@@ -460,6 +500,24 @@
       @confirm="confirmBulkDelete"
       @cancel="showBulkDeleteDialog = false"
     />
+    <ConfirmDialog
+      :show="showBulkSchedulableDialog"
+      :title="t('admin.accounts.bulkSchedulableTitle')"
+      :message="
+        bulkSchedulableTarget
+          ? t('admin.accounts.bulkSchedulableConfirmEnable', { count: selectedAccountIds.length })
+          : t('admin.accounts.bulkSchedulableConfirmDisable', { count: selectedAccountIds.length })
+      "
+      :confirm-text="
+        bulkSchedulableTarget
+          ? t('admin.accounts.bulkActions.enableSchedulable')
+          : t('admin.accounts.bulkActions.disableSchedulable')
+      "
+      :cancel-text="t('common.cancel')"
+      :danger="!bulkSchedulableTarget"
+      @confirm="confirmBulkSetSchedulable"
+      @cancel="showBulkSchedulableDialog = false"
+    />
 
     <SyncFromCrsModal
       :show="showCrsSyncModal"
@@ -643,6 +701,7 @@ const showEditModal = ref(false)
 const showReAuthModal = ref(false)
 const showDeleteDialog = ref(false)
 const showBulkDeleteDialog = ref(false)
+const showBulkSchedulableDialog = ref(false)
 const showTestModal = ref(false)
 const showStatsModal = ref(false)
 const showTempUnschedModal = ref(false)
@@ -651,6 +710,8 @@ const showBulkEditModal = ref(false)
 const editingAccount = ref<Account | null>(null)
 const reAuthAccount = ref<Account | null>(null)
 const deletingAccount = ref<Account | null>(null)
+const bulkSchedulableTarget = ref(true)
+const bulkSettingSchedulable = ref(false)
 const testingAccount = ref<Account | null>(null)
 const statsAccount = ref<Account | null>(null)
 const tempUnschedAccount = ref<Account | null>(null)
@@ -955,6 +1016,44 @@ const confirmDelete = async () => {
 const handleBulkDelete = () => {
   if (selectedAccountIds.value.length === 0) return
   showBulkDeleteDialog.value = true
+}
+
+const handleBulkSetSchedulable = (schedulable: boolean) => {
+  if (selectedAccountIds.value.length === 0) return
+  bulkSchedulableTarget.value = schedulable
+  showBulkSchedulableDialog.value = true
+}
+
+const confirmBulkSetSchedulable = async () => {
+  if (bulkSettingSchedulable.value || selectedAccountIds.value.length === 0) return
+
+  bulkSettingSchedulable.value = true
+  const ids = [...selectedAccountIds.value]
+  const target = bulkSchedulableTarget.value
+  try {
+    const result = await adminAPI.accounts.bulkSetSchedulable(ids, target)
+    const success = result.success || 0
+    const failed = result.failed || 0
+
+    if (failed === 0) {
+      appStore.showSuccess(
+        target
+          ? t('admin.accounts.bulkSchedulableSuccessEnable', { count: success })
+          : t('admin.accounts.bulkSchedulableSuccessDisable', { count: success })
+      )
+    } else {
+      appStore.showError(t('admin.accounts.bulkSchedulablePartial', { success, failed }))
+    }
+
+    showBulkSchedulableDialog.value = false
+    selectedAccountIds.value = []
+    loadAccounts()
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('admin.accounts.bulkSchedulableFailed'))
+    console.error('Error bulk setting schedulable:', error)
+  } finally {
+    bulkSettingSchedulable.value = false
+  }
 }
 
 const confirmBulkDelete = async () => {

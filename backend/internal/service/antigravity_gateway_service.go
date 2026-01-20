@@ -8,12 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/pkg/antigravity"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -402,11 +403,11 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 		resp, err = s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 		if err != nil {
 			if attempt < antigravityMaxRetries {
-				log.Printf("%s status=request_failed retry=%d/%d error=%v", prefix, attempt, antigravityMaxRetries, err)
+				applog.Printf("%s status=request_failed retry=%d/%d error=%v", prefix, attempt, antigravityMaxRetries, err)
 				sleepAntigravityBackoff(attempt)
 				continue
 			}
-			log.Printf("%s status=request_failed retries_exhausted error=%v", prefix, err)
+			applog.Printf("%s status=request_failed retries_exhausted error=%v", prefix, err)
 			return nil, s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed after retries")
 		}
 
@@ -415,7 +416,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 			_ = resp.Body.Close()
 
 			if attempt < antigravityMaxRetries {
-				log.Printf("%s status=%d retry=%d/%d", prefix, resp.StatusCode, attempt, antigravityMaxRetries)
+				applog.Printf("%s status=%d retry=%d/%d", prefix, resp.StatusCode, attempt, antigravityMaxRetries)
 				sleepAntigravityBackoff(attempt)
 				continue
 			}
@@ -448,7 +449,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 
 			stripped, stripErr := stripThinkingFromClaudeRequest(&retryClaudeReq)
 			if stripErr == nil && stripped {
-				log.Printf("Antigravity account %d: detected signature-related 400, retrying once without thinking blocks", account.ID)
+				applog.Printf("Antigravity account %d: detected signature-related 400, retrying once without thinking blocks", account.ID)
 
 				retryGeminiBody, txErr := antigravity.TransformClaudeToGemini(&retryClaudeReq, projectID, mappedModel)
 				if txErr == nil {
@@ -469,7 +470,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 								resp = retryResp
 							}
 						} else {
-							log.Printf("Antigravity account %d: signature retry request failed: %v", account.ID, retryErr)
+							applog.Printf("Antigravity account %d: signature retry request failed: %v", account.ID, retryErr)
 						}
 					}
 				}
@@ -498,7 +499,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 	if claudeReq.Stream {
 		streamRes, err := s.handleClaudeStreamingResponse(c, resp, startTime, originalModel)
 		if err != nil {
-			log.Printf("%s status=stream_error error=%v", prefix, err)
+			applog.Printf("%s status=stream_error error=%v", prefix, err)
 			return nil, err
 		}
 		usage = streamRes.usage
@@ -716,11 +717,11 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		resp, err = s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 		if err != nil {
 			if attempt < antigravityMaxRetries {
-				log.Printf("%s status=request_failed retry=%d/%d error=%v", prefix, attempt, antigravityMaxRetries, err)
+				applog.Printf("%s status=request_failed retry=%d/%d error=%v", prefix, attempt, antigravityMaxRetries, err)
 				sleepAntigravityBackoff(attempt)
 				continue
 			}
-			log.Printf("%s status=request_failed retries_exhausted error=%v", prefix, err)
+			applog.Printf("%s status=request_failed retries_exhausted error=%v", prefix, err)
 			return nil, s.writeGoogleError(c, http.StatusBadGateway, "Upstream request failed after retries")
 		}
 
@@ -729,7 +730,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 			_ = resp.Body.Close()
 
 			if attempt < antigravityMaxRetries {
-				log.Printf("%s status=%d retry=%d/%d", prefix, resp.StatusCode, attempt, antigravityMaxRetries)
+				applog.Printf("%s status=%d retry=%d/%d", prefix, resp.StatusCode, attempt, antigravityMaxRetries)
 				sleepAntigravityBackoff(attempt)
 				continue
 			}
@@ -758,7 +759,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 			isModelNotFoundError(resp.StatusCode, respBody) {
 			fallbackModel := s.settingService.GetFallbackModel(ctx, PlatformAntigravity)
 			if fallbackModel != "" && fallbackModel != mappedModel {
-				log.Printf("[Antigravity] Model not found (%s), retrying with fallback model %s (account: %s)", mappedModel, fallbackModel, account.Name)
+				applog.Printf("[Antigravity] Model not found (%s), retrying with fallback model %s (account: %s)", mappedModel, fallbackModel, account.Name)
 
 				// 关闭原始响应，释放连接（respBody 已读取到内存）
 				_ = resp.Body.Close()
@@ -815,7 +816,7 @@ handleSuccess:
 	if stream || upstreamAction == "streamGenerateContent" {
 		streamRes, err := s.handleGeminiStreamingResponse(c, resp, startTime)
 		if err != nil {
-			log.Printf("%s status=stream_error error=%v", prefix, err)
+			applog.Printf("%s status=stream_error error=%v", prefix, err)
 			return nil, err
 		}
 		usage = streamRes.usage
@@ -875,12 +876,12 @@ func (s *AntigravityGatewayService) handleUpstreamError(ctx context.Context, pre
 				defaultDur = 5 * time.Minute
 			}
 			ra := time.Now().Add(defaultDur)
-			log.Printf("%s status=429 rate_limited reset_in=%v (fallback)", prefix, defaultDur)
+			applog.Printf("%s status=429 rate_limited reset_in=%v (fallback)", prefix, defaultDur)
 			_ = s.accountRepo.SetRateLimited(ctx, account.ID, ra)
 			return
 		}
 		resetTime := time.Unix(*resetAt, 0)
-		log.Printf("%s status=429 rate_limited reset_at=%v reset_in=%v", prefix, resetTime.Format("15:04:05"), time.Until(resetTime).Truncate(time.Second))
+		applog.Printf("%s status=429 rate_limited reset_at=%v reset_in=%v", prefix, resetTime.Format("15:04:05"), time.Until(resetTime).Truncate(time.Second))
 		_ = s.accountRepo.SetRateLimited(ctx, account.ID, resetTime)
 		return
 	}
@@ -890,7 +891,7 @@ func (s *AntigravityGatewayService) handleUpstreamError(ctx context.Context, pre
 	}
 	shouldDisable := s.rateLimitService.HandleUpstreamError(ctx, account, statusCode, headers, body)
 	if shouldDisable {
-		log.Printf("%s status=%d marked_error", prefix, statusCode)
+		applog.Printf("%s status=%d marked_error", prefix, statusCode)
 	}
 }
 
@@ -1000,7 +1001,7 @@ func (s *AntigravityGatewayService) writeClaudeError(c *gin.Context, status int,
 
 func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, upstreamStatus int, body []byte) error {
 	// 记录上游错误详情便于调试
-	log.Printf("[antigravity-Forward] upstream_error status=%d body=%s", upstreamStatus, string(body))
+	applog.Printf("[antigravity-Forward] upstream_error status=%d body=%s", upstreamStatus, string(body))
 
 	var statusCode int
 	var errType, errMsg string
@@ -1074,7 +1075,7 @@ func (s *AntigravityGatewayService) handleClaudeNonStreamingResponse(c *gin.Cont
 	// 转换 Gemini 响应为 Claude 格式
 	claudeResp, agUsage, err := antigravity.TransformGeminiToClaude(body, originalModel)
 	if err != nil {
-		log.Printf("[antigravity-Forward] transform_error error=%v body=%s", err, string(body))
+		applog.Printf("[antigravity-Forward] transform_error error=%v body=%s", err, string(body))
 		return nil, s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
 	}
 

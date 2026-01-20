@@ -3,7 +3,8 @@ package service
 import (
 	"context"
 	"errors"
-	"log"
+
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"strconv"
 	"strings"
 	"time"
@@ -89,7 +90,7 @@ func (p *AntigravityTokenProvider) GetAccessToken(ctx context.Context, account *
 				}
 				account.Credentials = newCredentials
 				if updateErr := p.accountRepo.Update(ctx, account); updateErr != nil {
-					log.Printf("[AntigravityTokenProvider] Failed to update account credentials: %v", updateErr)
+					applog.Printf("[AntigravityTokenProvider] Failed to update account credentials: %v", updateErr)
 				}
 				expiresAt = account.GetCredentialAsTime("expires_at")
 			}

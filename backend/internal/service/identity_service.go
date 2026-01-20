@@ -7,7 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -75,7 +76,7 @@ func (s *IdentityService) GetOrCreateFingerprint(ctx context.Context, accountID 
 			cached.UserAgent = clientUA
 			// 保存更新后的指纹
 			_ = s.cache.SetFingerprint(ctx, accountID, cached)
-			log.Printf("Updated fingerprint user-agent for account %d: %s", accountID, clientUA)
+			applog.Printf("Updated fingerprint user-agent for account %d: %s", accountID, clientUA)
 		}
 		return cached, nil
 	}
@@ -88,10 +89,10 @@ func (s *IdentityService) GetOrCreateFingerprint(ctx context.Context, accountID 
 
 	// 保存到缓存（永不过期）
 	if err := s.cache.SetFingerprint(ctx, accountID, fp); err != nil {
-		log.Printf("Warning: failed to cache fingerprint for account %d: %v", accountID, err)
+		applog.Printf("Warning: failed to cache fingerprint for account %d: %v", accountID, err)
 	}
 
-	log.Printf("Created new fingerprint for account %d with client_id: %s", accountID, fp.ClientID)
+	applog.Printf("Created new fingerprint for account %d with client_id: %s", accountID, fp.ClientID)
 	return fp, nil
 }
 
@@ -208,7 +209,7 @@ func generateClientID() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		// 极罕见的情况，使用时间戳+固定值作为fallback
-		log.Printf("Warning: crypto/rand.Read failed: %v, using fallback", err)
+		applog.Printf("Warning: crypto/rand.Read failed: %v, using fallback", err)
 		// 使用SHA256(当前纳秒时间)作为fallback
 		h := sha256.Sum256([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
 		return hex.EncodeToString(h[:])

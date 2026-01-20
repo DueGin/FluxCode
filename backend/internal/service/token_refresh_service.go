@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/config"
-	"github.com/DueGin/FluxCode/internal/pkg/logger"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
@@ -83,7 +83,7 @@ func (s *TokenRefreshService) Start() {
 	s.wg.Add(1)
 	go s.refreshLoop()
 
-	log.Printf("[TokenRefresh] Service started (check every %d minutes, refresh %v hours before expiry)",
+	applog.Printf("[TokenRefresh] Service started (check every %d minutes, refresh %v hours before expiry)",
 		s.cfg.CheckIntervalMinutes, s.cfg.RefreshBeforeExpiryHours)
 }
 
@@ -155,7 +155,7 @@ func (s *TokenRefreshService) processRefresh() {
 	// 获取所有active状态的账号
 	accounts, err := s.listActiveAccounts(ctx)
 	if err != nil {
-		log.Printf("[TokenRefresh] Failed to list accounts: %v", err)
+		applog.Printf("[TokenRefresh] Failed to list accounts: %v", err)
 		return
 	}
 
@@ -166,7 +166,7 @@ func (s *TokenRefreshService) processRefresh() {
 
 	for i := range accounts {
 		if err := ctx.Err(); err != nil {
-			log.Printf("[TokenRefresh] Refresh cycle cancelled: %v", err)
+			applog.Printf("[TokenRefresh] Refresh cycle cancelled: %v", err)
 			break
 		}
 		account := &accounts[i]
@@ -191,10 +191,10 @@ func (s *TokenRefreshService) processRefresh() {
 
 			// 执行刷新
 			if err := s.refreshWithRetry(ctx, account, refresher); err != nil {
-				log.Printf("[TokenRefresh] Account %d (%s) failed: %v", account.ID, account.Name, err)
+				applog.Printf("[TokenRefresh] Account %d (%s) failed: %v", account.ID, account.Name, err)
 				failed++
 			} else {
-				log.Printf("[TokenRefresh] Account %d (%s) refreshed successfully", account.ID, account.Name)
+				applog.Printf("[TokenRefresh] Account %d (%s) refreshed successfully", account.ID, account.Name)
 				refreshed++
 			}
 
@@ -204,7 +204,7 @@ func (s *TokenRefreshService) processRefresh() {
 	}
 
 	// 始终打印周期日志，便于跟踪服务运行状态
-	logger.Infof("[TokenRefresh] Cycle complete: total=%d, oauth=%d, needs_refresh=%d, refreshed=%d, failed=%d",
+	applog.Infof("[TokenRefresh] Cycle complete: total=%d, oauth=%d, needs_refresh=%d, refreshed=%d, failed=%d",
 		totalAccounts, oauthAccounts, needsRefresh, refreshed, failed)
 }
 
@@ -218,11 +218,11 @@ func (s *TokenRefreshService) acquireDistributedLock(ctx context.Context, cancel
 
 	ok, err := s.rdb.SetNX(ctx, tokenRefreshLockKey, token, ttl).Result()
 	if err != nil {
-		log.Printf("[TokenRefresh] Acquire redis lock failed (degraded, will run without lock): %v", err)
+		applog.Printf("[TokenRefresh] Acquire redis lock failed (degraded, will run without lock): %v", err)
 		return func() {}, true
 	}
 	if !ok {
-		log.Printf("[TokenRefresh] Skip refresh cycle: another instance holds lock")
+		applog.Printf("[TokenRefresh] Skip refresh cycle: another instance holds lock")
 		return func() {}, false
 	}
 
@@ -261,11 +261,11 @@ func (s *TokenRefreshService) acquireDistributedLock(ctx context.Context, cancel
 
 			res, err := tokenRefreshLockExtendScript.Run(ctx, s.rdb, []string{tokenRefreshLockKey}, token, ttlMs).Int64()
 			if err != nil {
-				log.Printf("[TokenRefresh] Renew redis lock failed: %v", err)
+				applog.Printf("[TokenRefresh] Renew redis lock failed: %v", err)
 				continue
 			}
 			if res == 0 {
-				log.Printf("[TokenRefresh] Lost redis lock, cancelling refresh cycle")
+				applog.Printf("[TokenRefresh] Lost redis lock, cancelling refresh cycle")
 				cancel()
 				return
 			}
@@ -325,13 +325,13 @@ func (s *TokenRefreshService) refreshWithRetry(ctx context.Context, account *Acc
 		if account.Platform == PlatformAntigravity && isNonRetryableRefreshError(err) {
 			errorMsg := fmt.Sprintf("Token refresh failed (non-retryable): %v", err)
 			if setErr := s.accountRepo.SetError(ctx, account.ID, errorMsg); setErr != nil {
-				log.Printf("[TokenRefresh] Failed to set error status for account %d: %v", account.ID, setErr)
+				applog.Printf("[TokenRefresh] Failed to set error status for account %d: %v", account.ID, setErr)
 			}
 			return err
 		}
 
 		lastErr = err
-		log.Printf("[TokenRefresh] Account %d attempt %d/%d failed: %v",
+		applog.Printf("[TokenRefresh] Account %d attempt %d/%d failed: %v",
 			account.ID, attempt, s.cfg.MaxRetries, err)
 
 		// 如果还有重试机会，等待后重试
@@ -351,11 +351,11 @@ func (s *TokenRefreshService) refreshWithRetry(ctx context.Context, account *Acc
 	// Antigravity 账户：其他错误仅记录日志，不标记 error（可能是临时网络问题）
 	// 其他平台账户：重试失败后标记 error
 	if account.Platform == PlatformAntigravity {
-		log.Printf("[TokenRefresh] Account %d: refresh failed after %d retries: %v", account.ID, s.cfg.MaxRetries, lastErr)
+		applog.Printf("[TokenRefresh] Account %d: refresh failed after %d retries: %v", account.ID, s.cfg.MaxRetries, lastErr)
 	} else {
 		errorMsg := fmt.Sprintf("Token refresh failed after %d retries: %v", s.cfg.MaxRetries, lastErr)
 		if err := s.accountRepo.SetError(ctx, account.ID, errorMsg); err != nil {
-			log.Printf("[TokenRefresh] Failed to set error status for account %d: %v", account.ID, err)
+			applog.Printf("[TokenRefresh] Failed to set error status for account %d: %v", account.ID, err)
 		}
 	}
 

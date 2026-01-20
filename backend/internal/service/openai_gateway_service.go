@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+
 	"net/http"
 	"regexp"
 	"sort"
@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/config"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -392,6 +393,13 @@ func (s *OpenAIGatewayService) SelectAccountWithLoadAwareness(ctx context.Contex
 				a, b := available[i], available[j]
 				if a.account.Priority != b.account.Priority {
 					return a.account.Priority < b.account.Priority
+				}
+				// 同优先级下：优先选择当前并发占用更少的账号（分布式环境下从 Redis 汇总）。
+				if a.loadInfo.CurrentConcurrency != b.loadInfo.CurrentConcurrency {
+					return a.loadInfo.CurrentConcurrency < b.loadInfo.CurrentConcurrency
+				}
+				if a.loadInfo.WaitingCount != b.loadInfo.WaitingCount {
+					return a.loadInfo.WaitingCount < b.loadInfo.WaitingCount
 				}
 				if a.loadInfo.LoadRate != b.loadInfo.LoadRate {
 					return a.loadInfo.LoadRate < b.loadInfo.LoadRate
@@ -1028,7 +1036,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 
 	inserted, err := s.usageLogRepo.Create(ctx, usageLog)
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-		log.Printf("[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
+		applog.Printf("[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
 		s.deferredService.ScheduleLastUsedUpdate(account.ID)
 		return nil
 	}
@@ -1212,13 +1220,26 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 		}
 	}
 
+	// Track canonical window values for enforcement (disable scheduling when a window is exhausted).
+	type windowLimit struct {
+		name              string
+		usedPercent       *float64
+		resetAfterSeconds *int
+	}
+	var limit5h windowLimit
+	var limit7d windowLimit
+	limit5h.name = "5h"
+	limit7d.name = "7d"
+
 	// Write canonical 5h fields
 	if use5hFromPrimary {
 		if snapshot.PrimaryUsedPercent != nil {
 			updates["codex_5h_used_percent"] = *snapshot.PrimaryUsedPercent
+			limit5h.usedPercent = snapshot.PrimaryUsedPercent
 		}
 		if snapshot.PrimaryResetAfterSeconds != nil {
 			updates["codex_5h_reset_after_seconds"] = *snapshot.PrimaryResetAfterSeconds
+			limit5h.resetAfterSeconds = snapshot.PrimaryResetAfterSeconds
 		}
 		if snapshot.PrimaryWindowMinutes != nil {
 			updates["codex_5h_window_minutes"] = *snapshot.PrimaryWindowMinutes
@@ -1226,9 +1247,11 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 	} else if use5hFromSecondary {
 		if snapshot.SecondaryUsedPercent != nil {
 			updates["codex_5h_used_percent"] = *snapshot.SecondaryUsedPercent
+			limit5h.usedPercent = snapshot.SecondaryUsedPercent
 		}
 		if snapshot.SecondaryResetAfterSeconds != nil {
 			updates["codex_5h_reset_after_seconds"] = *snapshot.SecondaryResetAfterSeconds
+			limit5h.resetAfterSeconds = snapshot.SecondaryResetAfterSeconds
 		}
 		if snapshot.SecondaryWindowMinutes != nil {
 			updates["codex_5h_window_minutes"] = *snapshot.SecondaryWindowMinutes
@@ -1239,9 +1262,11 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 	if use7dFromPrimary {
 		if snapshot.PrimaryUsedPercent != nil {
 			updates["codex_7d_used_percent"] = *snapshot.PrimaryUsedPercent
+			limit7d.usedPercent = snapshot.PrimaryUsedPercent
 		}
 		if snapshot.PrimaryResetAfterSeconds != nil {
 			updates["codex_7d_reset_after_seconds"] = *snapshot.PrimaryResetAfterSeconds
+			limit7d.resetAfterSeconds = snapshot.PrimaryResetAfterSeconds
 		}
 		if snapshot.PrimaryWindowMinutes != nil {
 			updates["codex_7d_window_minutes"] = *snapshot.PrimaryWindowMinutes
@@ -1249,9 +1274,11 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 	} else if use7dFromSecondary {
 		if snapshot.SecondaryUsedPercent != nil {
 			updates["codex_7d_used_percent"] = *snapshot.SecondaryUsedPercent
+			limit7d.usedPercent = snapshot.SecondaryUsedPercent
 		}
 		if snapshot.SecondaryResetAfterSeconds != nil {
 			updates["codex_7d_reset_after_seconds"] = *snapshot.SecondaryResetAfterSeconds
+			limit7d.resetAfterSeconds = snapshot.SecondaryResetAfterSeconds
 		}
 		if snapshot.SecondaryWindowMinutes != nil {
 			updates["codex_7d_window_minutes"] = *snapshot.SecondaryWindowMinutes
@@ -1263,5 +1290,69 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 		updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = s.accountRepo.UpdateExtra(updateCtx, accountID, updates)
+
+		// Enforce Codex quota windows: if 5h/7d is exhausted, temporarily remove the account from scheduling
+		// and surface a human-readable reason in temp_unschedulable_reason.
+		if s.rateLimitService == nil {
+			return
+		}
+		now := time.Now()
+		type exceeded struct {
+			name    string
+			used    float64
+			resetAt time.Time
+		}
+		var exceededWindows []exceeded
+		addIfExceeded := func(w windowLimit) {
+			if w.usedPercent == nil || w.resetAfterSeconds == nil {
+				return
+			}
+			if *w.resetAfterSeconds <= 0 {
+				return
+			}
+			if *w.usedPercent < 100 {
+				return
+			}
+			resetAt := now.Add(time.Duration(*w.resetAfterSeconds) * time.Second)
+			if !resetAt.After(now) {
+				return
+			}
+			exceededWindows = append(exceededWindows, exceeded{
+				name:    w.name,
+				used:    *w.usedPercent,
+				resetAt: resetAt,
+			})
+		}
+		addIfExceeded(limit5h)
+		addIfExceeded(limit7d)
+
+		if len(exceededWindows) == 0 {
+			return
+		}
+
+		until := exceededWindows[0].resetAt
+		for i := 1; i < len(exceededWindows); i++ {
+			if exceededWindows[i].resetAt.After(until) {
+				until = exceededWindows[i].resetAt
+			}
+		}
+
+		var b strings.Builder
+		b.WriteString("OpenAI Codex 额度已超限：")
+		for i, w := range exceededWindows {
+			if i > 0 {
+				b.WriteString("；")
+			}
+			b.WriteString(w.name)
+			b.WriteString(" 已用 ")
+			b.WriteString(fmt.Sprintf("%.1f%%", w.used))
+			b.WriteString("，预计 ")
+			b.WriteString(w.resetAt.Format(time.RFC3339))
+			b.WriteString(" 恢复")
+		}
+
+		if err := s.rateLimitService.SetTempUnschedulableWithReason(updateCtx, accountID, until, b.String()); err != nil {
+			applog.Printf("[CodexQuota] SetTempUnschedulable failed for account %d: %v", accountID, err)
+		}
 	}()
 }

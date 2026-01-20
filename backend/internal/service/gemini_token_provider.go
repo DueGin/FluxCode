@@ -3,7 +3,8 @@ package service
 import (
 	"context"
 	"errors"
-	"log"
+
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"strconv"
 	"strings"
 	"time"
@@ -114,7 +115,7 @@ func (p *GeminiTokenProvider) GetAccessToken(ctx context.Context, account *Accou
 
 		detected, tierID, err := p.geminiOAuthService.fetchProjectID(ctx, accessToken, proxyURL)
 		if err != nil {
-			log.Printf("[GeminiTokenProvider] Auto-detect project_id failed: %v, fallback to AI Studio API mode", err)
+			applog.Printf("[GeminiTokenProvider] Auto-detect project_id failed: %v, fallback to AI Studio API mode", err)
 			return accessToken, nil
 		}
 		detected = strings.TrimSpace(detected)

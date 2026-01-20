@@ -14,6 +14,7 @@ import (
 	"github.com/DueGin/FluxCode/internal/repository"
 	"github.com/DueGin/FluxCode/internal/service"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 	"gopkg.in/yaml.v3"
@@ -102,7 +103,7 @@ func TestDatabaseConnection(cfg *DatabaseConfig) error {
 			return
 		}
 		if err := db.Close(); err != nil {
-			log.Printf("failed to close postgres connection: %v", err)
+			applog.Printf("failed to close postgres connection: %v", err)
 		}
 	}()
 
@@ -129,12 +130,12 @@ func TestDatabaseConnection(cfg *DatabaseConfig) error {
 		if err != nil {
 			return fmt.Errorf("failed to create database '%s': %w", cfg.DBName, err)
 		}
-		log.Printf("Database '%s' created successfully", cfg.DBName)
+		applog.Printf("Database '%s' created successfully", cfg.DBName)
 	}
 
 	// Now connect to the target database to verify
 	if err := db.Close(); err != nil {
-		log.Printf("failed to close postgres connection: %v", err)
+		applog.Printf("failed to close postgres connection: %v", err)
 	}
 	db = nil
 
@@ -150,7 +151,7 @@ func TestDatabaseConnection(cfg *DatabaseConfig) error {
 
 	defer func() {
 		if err := targetDB.Close(); err != nil {
-			log.Printf("failed to close postgres connection: %v", err)
+			applog.Printf("failed to close postgres connection: %v", err)
 		}
 	}()
 
@@ -173,7 +174,7 @@ func TestRedisConnection(cfg *RedisConfig) error {
 	})
 	defer func() {
 		if err := rdb.Close(); err != nil {
-			log.Printf("failed to close redis client: %v", err)
+			applog.Printf("failed to close redis client: %v", err)
 		}
 	}()
 
@@ -256,7 +257,7 @@ func initializeDatabase(cfg *SetupConfig) error {
 
 	defer func() {
 		if err := db.Close(); err != nil {
-			log.Printf("failed to close postgres connection: %v", err)
+			applog.Printf("failed to close postgres connection: %v", err)
 		}
 	}()
 
@@ -279,7 +280,7 @@ func createAdminUser(cfg *SetupConfig) error {
 
 	defer func() {
 		if err := db.Close(); err != nil {
-			log.Printf("failed to close postgres connection: %v", err)
+			applog.Printf("failed to close postgres connection: %v", err)
 		}
 	}()
 
@@ -489,7 +490,7 @@ func AutoSetupFromEnv() error {
 			return fmt.Errorf("failed to generate admin password: %w", err)
 		}
 		cfg.Admin.Password = password
-		log.Printf("Generated admin password: %s", cfg.Admin.Password)
+		applog.Printf("Generated admin password: %s", cfg.Admin.Password)
 		log.Println("IMPORTANT: Save this password! It will not be shown again.")
 	}
 
@@ -519,7 +520,7 @@ func AutoSetupFromEnv() error {
 	if err := createAdminUser(cfg); err != nil {
 		return fmt.Errorf("admin user creation failed: %w", err)
 	}
-	log.Printf("Admin user created: %s", cfg.Admin.Email)
+	applog.Printf("Admin user created: %s", cfg.Admin.Email)
 
 	// Write config file
 	log.Println("Writing configuration file...")

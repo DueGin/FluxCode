@@ -5,7 +5,7 @@ package main
 
 import (
 	"context"
-	"log"
+
 	"net/http"
 	"time"
 
@@ -17,6 +17,7 @@ import (
 	"github.com/DueGin/FluxCode/internal/server/middleware"
 	"github.com/DueGin/FluxCode/internal/service"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
 )
@@ -132,19 +133,19 @@ func provideCleanup(
 
 		for _, step := range cleanupSteps {
 			if err := step.fn(); err != nil {
-				log.Printf("[Cleanup] %s failed: %v", step.name, err)
+				applog.Printf("[Cleanup] %s failed: %v", step.name, err)
 				// Continue with remaining cleanup steps even if one fails
 			} else {
-				log.Printf("[Cleanup] %s succeeded", step.name)
+				applog.Printf("[Cleanup] %s succeeded", step.name)
 			}
 		}
 
 		// Check if context timed out
 		select {
 		case <-ctx.Done():
-			log.Printf("[Cleanup] Warning: cleanup timed out after 10 seconds")
+			applog.Printf("[Cleanup] Warning: cleanup timed out after 10 seconds")
 		default:
-			log.Printf("[Cleanup] All cleanup steps completed")
+			applog.Printf("[Cleanup] All cleanup steps completed")
 		}
 	}
 }

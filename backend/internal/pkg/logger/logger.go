@@ -21,10 +21,7 @@ var (
 func Setup() {
 	setupOnce.Do(func() {
 		level := parseLevel(os.Getenv("LOG_LEVEL"))
-		handler := slog.NewTextHandler(levelStrippingWriter{w: os.Stdout}, &slog.HandlerOptions{
-			Level:       level,
-			ReplaceAttr: replaceTimeAttr,
-		})
+		handler := newHandler(os.Stdout, level, os.Getenv("LOG_FORMAT"))
 		base = slog.New(handler)
 		slog.SetDefault(base)
 
@@ -32,6 +29,21 @@ func Setup() {
 		log.SetPrefix("")
 		log.SetOutput(stdWriter{})
 	})
+}
+
+func newHandler(w io.Writer, level slog.Level, rawFormat string) slog.Handler {
+	switch strings.ToLower(strings.TrimSpace(rawFormat)) {
+	case "json", "datadog":
+		return slog.NewJSONHandler(w, &slog.HandlerOptions{
+			Level:       level,
+			ReplaceAttr: replaceDatadogAttr,
+		})
+	default:
+		return slog.NewTextHandler(levelStrippingWriter{w: w}, &slog.HandlerOptions{
+			Level:       level,
+			ReplaceAttr: replaceTimeAttr,
+		})
+	}
 }
 
 func logger() *slog.Logger {
@@ -44,6 +56,8 @@ func logger() *slog.Logger {
 // Printf logs with an inferred level (keeps legacy log.Printf call sites).
 func Printf(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
+	msg = strings.TrimSuffix(msg, "\n")
+	msg = strings.TrimSuffix(msg, "\r")
 	logWithLevel(inferLevel(msg), msg)
 }
 
@@ -225,6 +239,17 @@ func splitTokensPreserveQuotes(s string) []string {
 func replaceTimeAttr(_ []string, attr slog.Attr) slog.Attr {
 	if attr.Key == slog.TimeKey {
 		attr.Value = slog.StringValue(attr.Value.Time().Format("2006-01-02 15:04:05"))
+	}
+	return attr
+}
+
+func replaceDatadogAttr(_ []string, attr slog.Attr) slog.Attr {
+	switch attr.Key {
+	case slog.LevelKey:
+		attr.Key = "status"
+		attr.Value = slog.StringValue(strings.ToLower(attr.Value.String()))
+	case slog.MessageKey:
+		attr.Key = "message"
 	}
 	return attr
 }

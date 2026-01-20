@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
+
 	"time"
 
 	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 )
 
@@ -161,7 +162,7 @@ func (s *SubscriptionService) AssignOrExtendSubscription(ctx context.Context, in
 			}
 			newNotes += input.Notes
 			if err := s.userSubRepo.UpdateNotes(ctx, existingSub.ID, newNotes); err != nil {
-				log.Printf("update subscription notes failed: sub_id=%d err=%v", existingSub.ID, err)
+				applog.Printf("update subscription notes failed: sub_id=%d err=%v", existingSub.ID, err)
 			}
 		}
 

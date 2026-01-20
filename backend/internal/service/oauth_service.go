@@ -3,9 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
+
 	"time"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/pkg/oauth"
 	"github.com/DueGin/FluxCode/internal/pkg/openai"
 	"github.com/redis/go-redis/v9"
@@ -166,7 +167,7 @@ func (s *OAuthService) ExchangeCode(ctx context.Context, input *ExchangeCodeInpu
 
 	// Delete session after successful exchange
 	if err := s.sessionStore.Delete(ctx, input.SessionID); err != nil {
-		log.Printf("[OAuth] failed to delete oauth session %q: %v", input.SessionID, err)
+		applog.Printf("[OAuth] failed to delete oauth session %q: %v", input.SessionID, err)
 	}
 
 	return tokenInfo, nil
@@ -231,7 +232,7 @@ func (s *OAuthService) CookieAuth(ctx context.Context, input *CookieAuthInput) (
 	// Ensure org_uuid is set (from step 1 if not from token response)
 	if tokenInfo.OrgUUID == "" && orgUUID != "" {
 		tokenInfo.OrgUUID = orgUUID
-		log.Printf("[OAuth] Set org_uuid from cookie auth: %s", orgUUID)
+		applog.Printf("[OAuth] Set org_uuid from cookie auth: %s", orgUUID)
 	}
 
 	return tokenInfo, nil
@@ -265,11 +266,11 @@ func (s *OAuthService) exchangeCodeForToken(ctx context.Context, code, codeVerif
 
 	if tokenResp.Organization != nil && tokenResp.Organization.UUID != "" {
 		tokenInfo.OrgUUID = tokenResp.Organization.UUID
-		log.Printf("[OAuth] Got org_uuid: %s", tokenInfo.OrgUUID)
+		applog.Printf("[OAuth] Got org_uuid: %s", tokenInfo.OrgUUID)
 	}
 	if tokenResp.Account != nil && tokenResp.Account.UUID != "" {
 		tokenInfo.AccountUUID = tokenResp.Account.UUID
-		log.Printf("[OAuth] Got account_uuid: %s", tokenInfo.AccountUUID)
+		applog.Printf("[OAuth] Got account_uuid: %s", tokenInfo.AccountUUID)
 	}
 
 	return tokenInfo, nil

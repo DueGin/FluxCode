@@ -2,12 +2,13 @@ package middleware
 
 import (
 	"errors"
-	"log"
+
 	"strings"
 
 	"github.com/DueGin/FluxCode/internal/config"
 	"github.com/DueGin/FluxCode/internal/service"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -121,12 +122,12 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 			// 激活滑动窗口（首次使用时）
 			if err := subscriptionService.CheckAndActivateWindow(c.Request.Context(), subscription); err != nil {
-				log.Printf("Failed to activate subscription windows: %v", err)
+				applog.Printf("Failed to activate subscription windows: %v", err)
 			}
 
 			// 检查并重置过期窗口
 			if err := subscriptionService.CheckAndResetWindows(c.Request.Context(), subscription); err != nil {
-				log.Printf("Failed to reset subscription windows: %v", err)
+				applog.Printf("Failed to reset subscription windows: %v", err)
 			}
 
 			// 预检查用量限制（使用0作为额外费用进行预检查）

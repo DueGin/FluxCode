@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"log"
 	"time"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,7 +35,7 @@ func Logger() gin.HandlerFunc {
 		clientIP := c.ClientIP()
 
 		// 日志格式: 状态码 | 延迟 | IP | 方法 路径（时间由全局 logger 输出）
-		log.Printf("%3d | %13v | %15s | %-7s %s",
+		applog.Printf("%3d | %13v | %15s | %-7s %s",
 			statusCode,
 			latency,
 			clientIP,
@@ -45,7 +45,7 @@ func Logger() gin.HandlerFunc {
 
 		// 如果有错误，额外记录错误信息
 		if len(c.Errors) > 0 {
-			log.Printf("Errors: %v", c.Errors.String())
+			applog.Printf("Errors: %v", c.Errors.String())
 		}
 	}
 }

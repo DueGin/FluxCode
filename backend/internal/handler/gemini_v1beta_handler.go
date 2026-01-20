@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
+
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +15,7 @@ import (
 	"github.com/DueGin/FluxCode/internal/server/middleware"
 	"github.com/DueGin/FluxCode/internal/service"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -171,7 +172,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	maxWait := service.CalculateMaxWait(authSubject.Concurrency)
 	canWait, err := geminiConcurrency.IncrementWaitCount(c.Request.Context(), authSubject.UserID, maxWait)
 	if err != nil {
-		log.Printf("Increment wait count failed: %v", err)
+		applog.Printf("Increment wait count failed: %v", err)
 	} else if !canWait {
 		googleError(c, http.StatusTooManyRequests, "Too many pending requests, please retry later")
 		return
@@ -229,9 +230,9 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			}
 			canWait, err := geminiConcurrency.IncrementAccountWaitCount(c.Request.Context(), account.ID, selection.WaitPlan.MaxWaiting)
 			if err != nil {
-				log.Printf("Increment account wait count failed: %v", err)
+				applog.Printf("Increment account wait count failed: %v", err)
 			} else if !canWait {
-				log.Printf("Account wait queue full: account=%d", account.ID)
+				applog.Printf("Account wait queue full: account=%d", account.ID)
 				googleError(c, http.StatusTooManyRequests, "Too many pending requests, please retry later")
 				return
 			} else {
@@ -257,7 +258,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				return
 			}
 			if err := h.gatewayService.BindStickySession(c.Request.Context(), sessionKey, account.ID); err != nil {
-				log.Printf("Bind sticky session failed: %v", err)
+				applog.Printf("Bind sticky session failed: %v", err)
 			}
 		}
 
@@ -285,11 +286,11 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				}
 				lastFailoverStatus = failoverErr.StatusCode
 				switchCount++
-				log.Printf("Gemini account %d: upstream error %d, switching account %d/%d", account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches)
+				applog.Printf("Gemini account %d: upstream error %d, switching account %d/%d", account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches)
 				continue
 			}
 			// ForwardNative already wrote the response
-			log.Printf("Gemini native forward failed: %v", err)
+			applog.Printf("Gemini native forward failed: %v", err)
 			return
 		}
 
@@ -299,7 +300,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			_, enqueueErr := h.usageQueueService.EnqueueClaudeUsage(enqueueCtx, result, apiKey, account, subscription)
 			cancel()
 			if enqueueErr != nil {
-				log.Printf("Enqueue usage failed, fallback to local goroutine: %v", enqueueErr)
+				applog.Printf("Enqueue usage failed, fallback to local goroutine: %v", enqueueErr)
 				go func(result *service.ForwardResult, usedAccount *service.Account) {
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
@@ -310,7 +311,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 						Account:      usedAccount,
 						Subscription: subscription,
 					}); err != nil {
-						log.Printf("Record usage failed: %v", err)
+						applog.Printf("Record usage failed: %v", err)
 					}
 				}(result, account)
 			}
@@ -325,7 +326,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 					Account:      usedAccount,
 					Subscription: subscription,
 				}); err != nil {
-					log.Printf("Record usage failed: %v", err)
+					applog.Printf("Record usage failed: %v", err)
 				}
 			}(result, account)
 		}

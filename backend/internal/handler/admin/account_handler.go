@@ -980,6 +980,30 @@ func (h *AccountHandler) SetSchedulable(c *gin.Context) {
 	response.Success(c, dto.AccountFromService(account))
 }
 
+// BulkSetSchedulableRequest represents the request body for bulk setting schedulable status
+type BulkSetSchedulableRequest struct {
+	AccountIDs  []int64 `json:"account_ids" binding:"required,min=1"`
+	Schedulable bool    `json:"schedulable"`
+}
+
+// BulkSetSchedulable handles bulk setting account schedulable status
+// POST /api/v1/admin/accounts/bulk-schedulable
+func (h *AccountHandler) BulkSetSchedulable(c *gin.Context) {
+	var req BulkSetSchedulableRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.adminService.BulkSetAccountSchedulable(c.Request.Context(), req.AccountIDs, req.Schedulable)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, result)
+}
+
 // GetAvailableModels handles getting available models for an account
 // GET /api/v1/admin/accounts/:id/models
 func (h *AccountHandler) GetAvailableModels(c *gin.Context) {

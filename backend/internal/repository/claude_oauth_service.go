@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+
 	"net/http"
 	"net/url"
 	"strings"
@@ -13,6 +13,7 @@ import (
 	"github.com/DueGin/FluxCode/internal/pkg/oauth"
 	"github.com/DueGin/FluxCode/internal/service"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/imroc/req/v3"
 )
 
@@ -38,7 +39,7 @@ func (s *claudeOAuthService) GetOrganizationUUID(ctx context.Context, sessionKey
 	}
 
 	targetURL := s.baseURL + "/api/organizations"
-	log.Printf("[OAuth] Step 1: Getting organization UUID from %s", targetURL)
+	applog.Printf("[OAuth] Step 1: Getting organization UUID from %s", targetURL)
 
 	resp, err := client.R().
 		SetContext(ctx).
@@ -50,11 +51,11 @@ func (s *claudeOAuthService) GetOrganizationUUID(ctx context.Context, sessionKey
 		Get(targetURL)
 
 	if err != nil {
-		log.Printf("[OAuth] Step 1 FAILED - Request error: %v", err)
+		applog.Printf("[OAuth] Step 1 FAILED - Request error: %v", err)
 		return "", fmt.Errorf("request failed: %w", err)
 	}
 
-	log.Printf("[OAuth] Step 1 Response - Status: %d, Body: %s", resp.StatusCode, resp.String())
+	applog.Printf("[OAuth] Step 1 Response - Status: %d, Body: %s", resp.StatusCode, resp.String())
 
 	if !resp.IsSuccessState() {
 		return "", fmt.Errorf("failed to get organizations: status %d, body: %s", resp.StatusCode, resp.String())
@@ -64,7 +65,7 @@ func (s *claudeOAuthService) GetOrganizationUUID(ctx context.Context, sessionKey
 		return "", fmt.Errorf("no organizations found")
 	}
 
-	log.Printf("[OAuth] Step 1 SUCCESS - Got org UUID: %s", orgs[0].UUID)
+	applog.Printf("[OAuth] Step 1 SUCCESS - Got org UUID: %s", orgs[0].UUID)
 	return orgs[0].UUID, nil
 }
 
@@ -85,8 +86,8 @@ func (s *claudeOAuthService) GetAuthorizationCode(ctx context.Context, sessionKe
 	}
 
 	reqBodyJSON, _ := json.Marshal(reqBody)
-	log.Printf("[OAuth] Step 2: Getting authorization code from %s", authURL)
-	log.Printf("[OAuth] Step 2 Request Body: %s", string(reqBodyJSON))
+	applog.Printf("[OAuth] Step 2: Getting authorization code from %s", authURL)
+	applog.Printf("[OAuth] Step 2 Request Body: %s", string(reqBodyJSON))
 
 	var result struct {
 		RedirectURI string `json:"redirect_uri"`
@@ -109,11 +110,11 @@ func (s *claudeOAuthService) GetAuthorizationCode(ctx context.Context, sessionKe
 		Post(authURL)
 
 	if err != nil {
-		log.Printf("[OAuth] Step 2 FAILED - Request error: %v", err)
+		applog.Printf("[OAuth] Step 2 FAILED - Request error: %v", err)
 		return "", fmt.Errorf("request failed: %w", err)
 	}
 
-	log.Printf("[OAuth] Step 2 Response - Status: %d, Body: %s", resp.StatusCode, resp.String())
+	applog.Printf("[OAuth] Step 2 Response - Status: %d, Body: %s", resp.StatusCode, resp.String())
 
 	if !resp.IsSuccessState() {
 		return "", fmt.Errorf("failed to get authorization code: status %d, body: %s", resp.StatusCode, resp.String())
@@ -141,7 +142,7 @@ func (s *claudeOAuthService) GetAuthorizationCode(ctx context.Context, sessionKe
 		fullCode = authCode + "#" + responseState
 	}
 
-	log.Printf("[OAuth] Step 2 SUCCESS - Got authorization code: %s...", prefix(authCode, 20))
+	applog.Printf("[OAuth] Step 2 SUCCESS - Got authorization code: %s...", prefix(authCode, 20))
 	return fullCode, nil
 }
 
@@ -174,8 +175,8 @@ func (s *claudeOAuthService) ExchangeCodeForToken(ctx context.Context, code, cod
 	}
 
 	reqBodyJSON, _ := json.Marshal(reqBody)
-	log.Printf("[OAuth] Step 3: Exchanging code for token at %s", s.tokenURL)
-	log.Printf("[OAuth] Step 3 Request Body: %s", string(reqBodyJSON))
+	applog.Printf("[OAuth] Step 3: Exchanging code for token at %s", s.tokenURL)
+	applog.Printf("[OAuth] Step 3 Request Body: %s", string(reqBodyJSON))
 
 	var tokenResp oauth.TokenResponse
 
@@ -187,17 +188,17 @@ func (s *claudeOAuthService) ExchangeCodeForToken(ctx context.Context, code, cod
 		Post(s.tokenURL)
 
 	if err != nil {
-		log.Printf("[OAuth] Step 3 FAILED - Request error: %v", err)
+		applog.Printf("[OAuth] Step 3 FAILED - Request error: %v", err)
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 
-	log.Printf("[OAuth] Step 3 Response - Status: %d, Body: %s", resp.StatusCode, resp.String())
+	applog.Printf("[OAuth] Step 3 Response - Status: %d, Body: %s", resp.StatusCode, resp.String())
 
 	if !resp.IsSuccessState() {
 		return nil, fmt.Errorf("token exchange failed: status %d, body: %s", resp.StatusCode, resp.String())
 	}
 
-	log.Printf("[OAuth] Step 3 SUCCESS - Got access token")
+	applog.Printf("[OAuth] Step 3 SUCCESS - Got access token")
 	return &tokenResp, nil
 }
 

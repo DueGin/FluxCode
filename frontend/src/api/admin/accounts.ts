@@ -312,6 +312,31 @@ export async function setSchedulable(id: number, schedulable: boolean): Promise<
 }
 
 /**
+ * Bulk set schedulable status for multiple accounts
+ * @param accountIds - Array of account IDs
+ * @param schedulable - Whether the accounts should participate in scheduling
+ * @returns Results of bulk operation
+ */
+export async function bulkSetSchedulable(
+  accountIds: number[],
+  schedulable: boolean
+): Promise<{
+  success: number
+  failed: number
+  results: Array<{ account_id: number; success: boolean; error?: string }>
+}> {
+  const { data } = await apiClient.post<{
+    success: number
+    failed: number
+    results: Array<{ account_id: number; success: boolean; error?: string }>
+  }>('/admin/accounts/bulk-schedulable', {
+    account_ids: accountIds,
+    schedulable
+  })
+  return data
+}
+
+/**
  * Get available models for an account
  * @param id - Account ID
  * @returns List of available models for this account
@@ -360,6 +385,7 @@ export const accountsAPI = {
   getTempUnschedulableStatus,
   resetTempUnschedulable,
   setSchedulable,
+  bulkSetSchedulable,
   getAvailableModels,
   generateAuthUrl,
   exchangeCode,

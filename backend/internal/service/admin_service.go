@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+
 	"strings"
 	"time"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 )
 
@@ -43,6 +44,7 @@ type AdminService interface {
 	RefreshAccountCredentials(ctx context.Context, id int64) (*Account, error)
 	ClearAccountError(ctx context.Context, id int64) (*Account, error)
 	SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error)
+	BulkSetAccountSchedulable(ctx context.Context, ids []int64, schedulable bool) (*BulkUpdateAccountsResult, error)
 	BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error)
 
 	// Proxy management
@@ -349,7 +351,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if concurrencyDiff != 0 {
 		code, err := GenerateRedeemCode()
 		if err != nil {
-			log.Printf("failed to generate adjustment redeem code: %v", err)
+			applog.Printf("failed to generate adjustment redeem code: %v", err)
 			return user, nil
 		}
 		adjustmentRecord := &RedeemCode{
@@ -362,7 +364,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		now := time.Now()
 		adjustmentRecord.UsedAt = &now
 		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
-			log.Printf("failed to create concurrency adjustment redeem code: %v", err)
+			applog.Printf("failed to create concurrency adjustment redeem code: %v", err)
 		}
 	}
 
@@ -379,7 +381,7 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 		return errors.New("cannot delete admin user")
 	}
 	if err := s.userRepo.Delete(ctx, id); err != nil {
-		log.Printf("delete user failed: user_id=%d err=%v", id, err)
+		applog.Printf("delete user failed: user_id=%d err=%v", id, err)
 		return err
 	}
 	return nil
@@ -415,7 +417,7 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := s.billingCacheService.InvalidateUserBalance(cacheCtx, userID); err != nil {
-				log.Printf("invalidate user balance cache failed: user_id=%d err=%v", userID, err)
+				applog.Printf("invalidate user balance cache failed: user_id=%d err=%v", userID, err)
 			}
 		}()
 	}
@@ -424,7 +426,7 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 	if balanceDiff != 0 {
 		code, err := GenerateRedeemCode()
 		if err != nil {
-			log.Printf("failed to generate adjustment redeem code: %v", err)
+			applog.Printf("failed to generate adjustment redeem code: %v", err)
 			return user, nil
 		}
 
@@ -440,7 +442,7 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 		adjustmentRecord.UsedAt = &now
 
 		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
-			log.Printf("failed to create balance adjustment redeem code: %v", err)
+			applog.Printf("failed to create balance adjustment redeem code: %v", err)
 		}
 	}
 
@@ -591,7 +593,7 @@ func (s *adminServiceImpl) DeleteGroup(ctx context.Context, id int64) error {
 			defer cancel()
 			for _, userID := range affectedUserIDs {
 				if err := s.billingCacheService.InvalidateSubscription(cacheCtx, userID, groupID); err != nil {
-					log.Printf("invalidate subscription cache failed: user_id=%d group_id=%d err=%v", userID, groupID, err)
+					applog.Printf("invalidate subscription cache failed: user_id=%d group_id=%d err=%v", userID, groupID, err)
 				}
 			}
 		}()
@@ -893,6 +895,39 @@ func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, 
 		return nil, err
 	}
 	return s.accountRepo.GetByID(ctx, id)
+}
+
+func (s *adminServiceImpl) BulkSetAccountSchedulable(ctx context.Context, ids []int64, schedulable bool) (*BulkUpdateAccountsResult, error) {
+	result := &BulkUpdateAccountsResult{
+		Results: make([]BulkUpdateAccountResult, 0, len(ids)),
+	}
+	if len(ids) == 0 {
+		return result, nil
+	}
+
+	seen := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+
+		entry := BulkUpdateAccountResult{AccountID: id}
+		if err := s.accountRepo.SetSchedulable(ctx, id, schedulable); err != nil {
+			entry.Success = false
+			entry.Error = err.Error()
+			result.Failed++
+		} else {
+			entry.Success = true
+			result.Success++
+		}
+		result.Results = append(result.Results, entry)
+	}
+
+	return result, nil
 }
 
 // Proxy management implementations

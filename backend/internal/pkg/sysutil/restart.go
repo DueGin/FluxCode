@@ -2,6 +2,7 @@
 package sysutil
 
 import (
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"log"
 	"os"
 	"runtime"
@@ -42,7 +43,7 @@ func RestartService() error {
 // It logs errors instead of returning them, suitable for goroutine usage.
 func RestartServiceAsync() {
 	if err := RestartService(); err != nil {
-		log.Printf("Service restart failed: %v", err)
+		applog.Printf("Service restart failed: %v", err)
 		log.Println("Please restart the service manually: sudo systemctl restart fluxcode")
 	}
 }

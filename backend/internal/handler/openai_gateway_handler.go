@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+
 	"net/http"
 	"time"
 
@@ -14,6 +14,7 @@ import (
 	middleware2 "github.com/DueGin/FluxCode/internal/server/middleware"
 	"github.com/DueGin/FluxCode/internal/service"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -111,7 +112,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	maxWait := service.CalculateMaxWait(subject.Concurrency)
 	canWait, err := h.concurrencyHelper.IncrementWaitCount(c.Request.Context(), subject.UserID, maxWait)
 	if err != nil {
-		log.Printf("Increment wait count failed: %v", err)
+		applog.Printf("Increment wait count failed: %v", err)
 		// On error, allow request to proceed
 	} else if !canWait {
 		h.errorResponse(c, http.StatusTooManyRequests, "rate_limit_error", "Too many pending requests, please retry later")
@@ -123,7 +124,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// 1. First acquire user concurrency slot
 	userReleaseFunc, err := h.concurrencyHelper.AcquireUserSlotWithWait(c, subject.UserID, subject.Concurrency, reqStream, &streamStarted)
 	if err != nil {
-		log.Printf("User concurrency acquire failed: %v", err)
+		applog.Printf("User concurrency acquire failed: %v", err)
 		h.handleConcurrencyError(c, err, "user", streamStarted)
 		return
 	}
@@ -133,7 +134,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 
 	// 2. Re-check billing eligibility after wait
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
-		log.Printf("Billing eligibility check failed after wait: %v", err)
+		applog.Printf("Billing eligibility check failed after wait: %v", err)
 		h.handleStreamingAwareError(c, http.StatusForbidden, "billing_error", err.Error(), streamStarted)
 		return
 	}
@@ -148,10 +149,10 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 
 	for {
 		// Select account supporting the requested model
-		log.Printf("[OpenAI Handler] Selecting account: groupID=%v model=%s", apiKey.GroupID, reqModel)
+		applog.Printf("[OpenAI Handler] Selecting account: groupID=%v model=%s", apiKey.GroupID, reqModel)
 		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionHash, reqModel, failedAccountIDs)
 		if err != nil {
-			log.Printf("[OpenAI Handler] SelectAccount failed: %v", err)
+			applog.Printf("[OpenAI Handler] SelectAccount failed: %v", err)
 			if len(failedAccountIDs) == 0 {
 				h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
 				return
@@ -160,7 +161,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			return
 		}
 		account := selection.Account
-		log.Printf("[OpenAI Handler] Selected account: id=%d name=%s", account.ID, account.Name)
+		applog.Printf("[OpenAI Handler] Selected account: id=%d name=%s", account.ID, account.Name)
 
 		// 3. Acquire account concurrency slot
 		accountReleaseFunc := selection.ReleaseFunc
@@ -172,9 +173,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			}
 			canWait, err := h.concurrencyHelper.IncrementAccountWaitCount(c.Request.Context(), account.ID, selection.WaitPlan.MaxWaiting)
 			if err != nil {
-				log.Printf("Increment account wait count failed: %v", err)
+				applog.Printf("Increment account wait count failed: %v", err)
 			} else if !canWait {
-				log.Printf("Account wait queue full: account=%d", account.ID)
+				applog.Printf("Account wait queue full: account=%d", account.ID)
 				h.handleStreamingAwareError(c, http.StatusTooManyRequests, "rate_limit_error", "Too many pending requests, please retry later", streamStarted)
 				return
 			} else {
@@ -196,12 +197,12 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				if accountWaitRelease != nil {
 					accountWaitRelease()
 				}
-				log.Printf("Account concurrency acquire failed: %v", err)
+				applog.Printf("Account concurrency acquire failed: %v", err)
 				h.handleConcurrencyError(c, err, "account", streamStarted)
 				return
 			}
 			if err := h.gatewayService.BindStickySession(c.Request.Context(), sessionHash, account.ID); err != nil {
-				log.Printf("Bind sticky session failed: %v", err)
+				applog.Printf("Bind sticky session failed: %v", err)
 			}
 		}
 
@@ -224,11 +225,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				}
 				lastFailoverStatus = failoverErr.StatusCode
 				switchCount++
-				log.Printf("Account %d: upstream error %d, switching account %d/%d", account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches)
+				applog.Printf("Account %d: upstream error %d, switching account %d/%d", account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches)
 				continue
 			}
 			// Error response already handled in Forward, just log
-			log.Printf("Account %d: Forward request failed: %v", account.ID, err)
+			applog.Printf("Account %d: Forward request failed: %v", account.ID, err)
 			return
 		}
 
@@ -238,7 +239,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			_, enqueueErr := h.usageQueueService.EnqueueOpenAIUsage(enqueueCtx, result, apiKey, account, subscription)
 			cancel()
 			if enqueueErr != nil {
-				log.Printf("Enqueue usage failed, fallback to local goroutine: %v", enqueueErr)
+				applog.Printf("Enqueue usage failed, fallback to local goroutine: %v", enqueueErr)
 				go func(result *service.OpenAIForwardResult, usedAccount *service.Account) {
 					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 					defer cancel()
@@ -249,7 +250,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						Account:      usedAccount,
 						Subscription: subscription,
 					}); err != nil {
-						log.Printf("Record usage failed: %v", err)
+						applog.Printf("Record usage failed: %v", err)
 					}
 				}(result, account)
 			}
@@ -264,7 +265,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					Account:      usedAccount,
 					Subscription: subscription,
 				}); err != nil {
-					log.Printf("Record usage failed: %v", err)
+					applog.Printf("Record usage failed: %v", err)
 				}
 			}(result, account)
 		}

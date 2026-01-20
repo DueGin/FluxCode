@@ -82,3 +82,26 @@ func TestReplaceTimeAttr_FormatsTime(t *testing.T) {
 		t.Fatalf("expected non-time attr to be kept, got %+v", kept)
 	}
 }
+
+func TestReplaceDatadogAttr_MapsLevelAndMessageKeys(t *testing.T) {
+	level := replaceDatadogAttr(nil, slog.Any(slog.LevelKey, slog.LevelError))
+	if level.Key != "status" {
+		t.Fatalf("expected level key to be %q, got %q", "status", level.Key)
+	}
+	if level.Value.String() != "error" {
+		t.Fatalf("expected status value to be %q, got %q", "error", level.Value.String())
+	}
+
+	msg := replaceDatadogAttr(nil, slog.String(slog.MessageKey, "hello"))
+	if msg.Key != "message" {
+		t.Fatalf("expected message key to be %q, got %q", "message", msg.Key)
+	}
+	if msg.Value.String() != "hello" {
+		t.Fatalf("expected message value to be %q, got %q", "hello", msg.Value.String())
+	}
+
+	kept := replaceDatadogAttr(nil, slog.String("foo", "bar"))
+	if kept.Key != "foo" || kept.Value.String() != "bar" {
+		t.Fatalf("expected non-special attr to be kept, got %+v", kept)
+	}
+}

@@ -13,6 +13,7 @@ import (
 
 	dbent "github.com/DueGin/FluxCode/ent"
 	"github.com/DueGin/FluxCode/internal/config"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
@@ -102,17 +103,17 @@ func NewUsageQueueService(
 	}
 
 	s := &UsageQueueService{
-		rdb:                rdb,
-		entClient:          entClient,
-		cfg:                cfg,
-		billingService:     billingService,
-		usageLogRepo:       usageLogRepo,
-		userRepo:           userRepo,
-		userSubRepo:        userSubRepo,
+		rdb:                 rdb,
+		entClient:           entClient,
+		cfg:                 cfg,
+		billingService:      billingService,
+		usageLogRepo:        usageLogRepo,
+		userRepo:            userRepo,
+		userSubRepo:         userSubRepo,
 		billingCacheService: billingCacheService,
-		deferredService:    deferredService,
-		stopChan:           make(chan struct{}),
-		workers:            workers,
+		deferredService:     deferredService,
+		stopChan:            make(chan struct{}),
+		workers:             workers,
 	}
 
 	host, _ := os.Hostname()
@@ -129,7 +130,7 @@ func (s *UsageQueueService) start() {
 		s.wg.Add(1)
 		go s.worker(i)
 	}
-	log.Printf("[UsageQueue] Started %d workers", s.workers)
+	applog.Printf("[UsageQueue] Started %d workers", s.workers)
 }
 
 func (s *UsageQueueService) Stop() {
@@ -147,7 +148,7 @@ func (s *UsageQueueService) ensureConsumerGroup() {
 	ctx := context.Background()
 	if err := s.rdb.XGroupCreateMkStream(ctx, usageQueueStreamKey, usageQueueGroupName, "0").Err(); err != nil {
 		if !strings.Contains(err.Error(), "BUSYGROUP") {
-			log.Printf("[UsageQueue] Failed to create consumer group: %v", err)
+			applog.Printf("[UsageQueue] Failed to create consumer group: %v", err)
 		}
 	}
 }
@@ -156,7 +157,7 @@ func (s *UsageQueueService) worker(id int) {
 	defer s.wg.Done()
 
 	if s.rdb == nil {
-		log.Printf("[UsageQueue] Worker %d disabled: redis client is nil", id)
+		applog.Printf("[UsageQueue] Worker %d disabled: redis client is nil", id)
 		return
 	}
 
@@ -166,7 +167,7 @@ func (s *UsageQueueService) worker(id int) {
 	for {
 		select {
 		case <-s.stopChan:
-			log.Printf("[UsageQueue] Worker %d stopping", id)
+			applog.Printf("[UsageQueue] Worker %d stopping", id)
 			return
 		default:
 		}
@@ -184,7 +185,7 @@ func (s *UsageQueueService) worker(id int) {
 			if errors.Is(err, redis.Nil) {
 				continue
 			}
-			log.Printf("[UsageQueue] Worker %d XREADGROUP error: %v", id, err)
+			applog.Printf("[UsageQueue] Worker %d XREADGROUP error: %v", id, err)
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
@@ -214,7 +215,7 @@ func (s *UsageQueueService) claimAndProcess(ctx context.Context, workerID int, c
 		if strings.Contains(err.Error(), "unknown command") || strings.Contains(err.Error(), "ERR unknown command") {
 			return
 		}
-		log.Printf("[UsageQueue] Worker %d XAUTOCLAIM error: %v", workerID, err)
+		applog.Printf("[UsageQueue] Worker %d XAUTOCLAIM error: %v", workerID, err)
 		return
 	}
 
@@ -226,7 +227,7 @@ func (s *UsageQueueService) claimAndProcess(ctx context.Context, workerID int, c
 func (s *UsageQueueService) handleMessage(ctx context.Context, workerID int, consumer string, msg redis.XMessage) {
 	payload, err := parseUsageQueuePayload(msg)
 	if err != nil {
-		log.Printf("[UsageQueue] Worker %d invalid payload (id=%s): %v", workerID, msg.ID, err)
+		applog.Printf("[UsageQueue] Worker %d invalid payload (id=%s): %v", workerID, msg.ID, err)
 		s.ackAndDelete(ctx, workerID, msg.ID)
 		return
 	}
@@ -235,7 +236,7 @@ func (s *UsageQueueService) handleMessage(ctx context.Context, workerID int, con
 	defer cancel()
 
 	if err := s.processPayload(taskCtx, payload); err != nil {
-		log.Printf("[UsageQueue] Worker %d process failed (msg_id=%s task_id=%s kind=%s): %v", workerID, msg.ID, payload.ID, payload.Kind, err)
+		applog.Printf("[UsageQueue] Worker %d process failed (msg_id=%s task_id=%s kind=%s): %v", workerID, msg.ID, payload.ID, payload.Kind, err)
 		// 不 ACK：保留 pending，等待 XAUTOCLAIM 重试
 		return
 	}
@@ -281,10 +282,10 @@ func parseUsageQueuePayload(msg redis.XMessage) (*usageQueuePayload, error) {
 
 func (s *UsageQueueService) ackAndDelete(ctx context.Context, workerID int, msgID string) {
 	if err := s.rdb.XAck(ctx, usageQueueStreamKey, usageQueueGroupName, msgID).Err(); err != nil {
-		log.Printf("[UsageQueue] Worker %d XACK failed (id=%s): %v", workerID, msgID, err)
+		applog.Printf("[UsageQueue] Worker %d XACK failed (id=%s): %v", workerID, msgID, err)
 	}
 	if err := s.rdb.XDel(ctx, usageQueueStreamKey, msgID).Err(); err != nil {
-		log.Printf("[UsageQueue] Worker %d XDEL failed (id=%s): %v", workerID, msgID, err)
+		applog.Printf("[UsageQueue] Worker %d XDEL failed (id=%s): %v", workerID, msgID, err)
 	}
 }
 
@@ -329,7 +330,7 @@ func (s *UsageQueueService) processPayload(ctx context.Context, payload *usageQu
 
 	cost, err := s.billingService.CalculateCost(payload.Model, tokens, multiplier)
 	if err != nil {
-		log.Printf("[UsageQueue] CalculateCost failed (task_id=%s model=%s): %v", payload.ID, payload.Model, err)
+		applog.Printf("[UsageQueue] CalculateCost failed (task_id=%s model=%s): %v", payload.ID, payload.Model, err)
 		cost = &CostBreakdown{ActualCost: 0}
 	}
 
@@ -406,23 +407,36 @@ func (s *UsageQueueService) processPayload(ctx context.Context, payload *usageQu
 	}
 
 	// 已存在 usage_log（幂等重试）：不重复扣费/不重复更新订阅用量
+	subscriptionUsageUpdated := false
+	invalidateSubscriptionCache := false
 	if inserted {
 		switch payload.BillingType {
 		case BillingTypeSubscription:
 			if payload.SubscriptionID == nil {
-				return errors.New("subscription billing but subscription_id is nil")
+				// 这类消息属于“不可重试”的数据问题：继续提交 usage_log，避免队列被毒消息阻塞。
+				applog.Printf("[UsageQueue] Subscription billing but subscription_id is nil, skip increment (user=%d request_id=%s)", payload.UserID, payload.RequestID)
+				invalidateSubscriptionCache = true
+				break
 			}
 			if cost.TotalCost > 0 {
 				if err := s.userSubRepo.IncrementUsage(txCtx, subscriptionIDValue, cost.TotalCost); err != nil {
+					// 订阅已被软删除/分组被删除等导致 update 影响行数为 0：
+					// 这类错误重试不会成功，直接保留 usage_log 并 ACK，避免消费组持续重试同一条消息。
+					if errors.Is(err, ErrSubscriptionNotFound) {
+						applog.Printf("[UsageQueue] Subscription not found, skip increment (subscription_id=%d user=%d group=%v request_id=%s)", subscriptionIDValue, payload.UserID, payload.GroupID, payload.RequestID)
+						invalidateSubscriptionCache = true
+						break
+					}
 					return fmt.Errorf("increment subscription usage: %w", err)
 				}
+				subscriptionUsageUpdated = true
 			}
 		case BillingTypeBalance:
 			if cost.ActualCost > 0 {
 				if err := s.userRepo.DeductBalance(txCtx, payload.UserID, cost.ActualCost); err != nil {
 					// 余额不足：不重试（避免队列阻塞），只保留 usage log
 					if errors.Is(err, ErrInsufficientBalance) {
-						log.Printf("[UsageQueue] Insufficient balance, skip deduct (user=%d cost=%.6f request_id=%s)", payload.UserID, cost.ActualCost, payload.RequestID)
+						applog.Printf("[UsageQueue] Insufficient balance, skip deduct (user=%d cost=%.6f request_id=%s)", payload.UserID, cost.ActualCost, payload.RequestID)
 					} else {
 						return fmt.Errorf("deduct balance: %w", err)
 					}
@@ -443,8 +457,13 @@ func (s *UsageQueueService) processPayload(ctx context.Context, payload *usageQu
 	if inserted && s.billingCacheService != nil {
 		switch payload.BillingType {
 		case BillingTypeSubscription:
-			if payload.GroupID != nil && cost.TotalCost > 0 {
+			if subscriptionUsageUpdated && payload.GroupID != nil && cost.TotalCost > 0 {
 				s.billingCacheService.QueueUpdateSubscriptionUsage(payload.UserID, groupIDValue, cost.TotalCost)
+			} else if invalidateSubscriptionCache && payload.GroupID != nil {
+				// 订阅不存在/不可更新：失效缓存，避免脏数据长期存在。
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				_ = s.billingCacheService.InvalidateSubscription(ctx, payload.UserID, groupIDValue)
+				cancel()
 			}
 		case BillingTypeBalance:
 			if cost.ActualCost > 0 {
@@ -513,20 +532,20 @@ func (s *UsageQueueService) EnqueueClaudeUsage(ctx context.Context, result *Forw
 	durationMs := int(result.Duration.Milliseconds())
 
 	payload := &usageQueuePayload{
-		ID:          uuid.NewString(),
-		Kind:        usageQueueKindClaude,
-		RequestID:    result.RequestID,
-		Model:        result.Model,
-		Stream:       result.Stream,
-		UserID:       apiKey.User.ID,
-		APIKeyID:     apiKey.ID,
-		AccountID:    account.ID,
-		GroupID:      apiKey.GroupID,
-		SubscriptionID: subscriptionID,
-		RateMultiplier: multiplier,
-		BillingType:    billingType,
-		InputTokens:    result.Usage.InputTokens,
-		OutputTokens:   result.Usage.OutputTokens,
+		ID:                  uuid.NewString(),
+		Kind:                usageQueueKindClaude,
+		RequestID:           result.RequestID,
+		Model:               result.Model,
+		Stream:              result.Stream,
+		UserID:              apiKey.User.ID,
+		APIKeyID:            apiKey.ID,
+		AccountID:           account.ID,
+		GroupID:             apiKey.GroupID,
+		SubscriptionID:      subscriptionID,
+		RateMultiplier:      multiplier,
+		BillingType:         billingType,
+		InputTokens:         result.Usage.InputTokens,
+		OutputTokens:        result.Usage.OutputTokens,
 		CacheCreationTokens: result.Usage.CacheCreationInputTokens,
 		CacheReadTokens:     result.Usage.CacheReadInputTokens,
 		DurationMs:          durationMs,
@@ -560,20 +579,20 @@ func (s *UsageQueueService) EnqueueOpenAIUsage(ctx context.Context, result *Open
 	durationMs := int(result.Duration.Milliseconds())
 
 	payload := &usageQueuePayload{
-		ID:          uuid.NewString(),
-		Kind:        usageQueueKindOpenAI,
-		RequestID:    result.RequestID,
-		Model:        result.Model,
-		Stream:       result.Stream,
-		UserID:       apiKey.User.ID,
-		APIKeyID:     apiKey.ID,
-		AccountID:    account.ID,
-		GroupID:      apiKey.GroupID,
-		SubscriptionID: subscriptionID,
-		RateMultiplier: multiplier,
-		BillingType:    billingType,
-		InputTokens:    result.Usage.InputTokens,
-		OutputTokens:   result.Usage.OutputTokens,
+		ID:                  uuid.NewString(),
+		Kind:                usageQueueKindOpenAI,
+		RequestID:           result.RequestID,
+		Model:               result.Model,
+		Stream:              result.Stream,
+		UserID:              apiKey.User.ID,
+		APIKeyID:            apiKey.ID,
+		AccountID:           account.ID,
+		GroupID:             apiKey.GroupID,
+		SubscriptionID:      subscriptionID,
+		RateMultiplier:      multiplier,
+		BillingType:         billingType,
+		InputTokens:         result.Usage.InputTokens,
+		OutputTokens:        result.Usage.OutputTokens,
 		CacheCreationTokens: result.Usage.CacheCreationInputTokens,
 		CacheReadTokens:     result.Usage.CacheReadInputTokens,
 		DurationMs:          durationMs,
@@ -582,4 +601,3 @@ func (s *UsageQueueService) EnqueueOpenAIUsage(ctx context.Context, result *Open
 
 	return s.enqueue(ctx, payload)
 }
-

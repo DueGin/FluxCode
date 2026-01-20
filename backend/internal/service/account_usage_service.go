@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
+
+	"strings"
 	"sync"
 	"time"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 	"github.com/DueGin/FluxCode/internal/pkg/usagestats"
 )
@@ -234,6 +236,9 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 		// 4. 添加窗口统计（有独立缓存，1 分钟）
 		s.addWindowStats(ctx, account, usage)
 
+		// 5. 超限检测：5h/7d 达到或超过 100% 时，将账号置为“临时不可调度”，并写入提示信息
+		s.enforceAnthropicUsageWindows(ctx, account, usage)
+
 		return usage, nil
 	}
 
@@ -242,6 +247,7 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 		usage := s.estimateSetupTokenUsage(account)
 		// 添加窗口统计
 		s.addWindowStats(ctx, account, usage)
+		s.enforceAnthropicUsageWindows(ctx, account, usage)
 		return usage, nil
 	}
 
@@ -371,7 +377,7 @@ func (s *AccountUsageService) addWindowStats(ctx context.Context, account *Accou
 
 		stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, startTime)
 		if err != nil {
-			log.Printf("Failed to get window stats for account %d: %v", account.ID, err)
+			applog.Printf("Failed to get window stats for account %d: %v", account.ID, err)
 			return
 		}
 
@@ -462,7 +468,7 @@ func (s *AccountUsageService) buildUsageInfo(resp *ClaudeUsageResponse, updatedA
 			info.FiveHour.ResetsAt = &fiveHourReset
 			info.FiveHour.RemainingSeconds = int(time.Until(fiveHourReset).Seconds())
 		} else {
-			log.Printf("Failed to parse FiveHour.ResetsAt: %s, error: %v", resp.FiveHour.ResetsAt, err)
+			applog.Printf("Failed to parse FiveHour.ResetsAt: %s, error: %v", resp.FiveHour.ResetsAt, err)
 		}
 	}
 
@@ -475,7 +481,7 @@ func (s *AccountUsageService) buildUsageInfo(resp *ClaudeUsageResponse, updatedA
 				RemainingSeconds: int(time.Until(sevenDayReset).Seconds()),
 			}
 		} else {
-			log.Printf("Failed to parse SevenDay.ResetsAt: %s, error: %v", resp.SevenDay.ResetsAt, err)
+			applog.Printf("Failed to parse SevenDay.ResetsAt: %s, error: %v", resp.SevenDay.ResetsAt, err)
 			info.SevenDay = &UsageProgress{
 				Utilization: resp.SevenDay.Utilization,
 			}
@@ -491,7 +497,7 @@ func (s *AccountUsageService) buildUsageInfo(resp *ClaudeUsageResponse, updatedA
 				RemainingSeconds: int(time.Until(sonnetReset).Seconds()),
 			}
 		} else {
-			log.Printf("Failed to parse SevenDaySonnet.ResetsAt: %s, error: %v", resp.SevenDaySonnet.ResetsAt, err)
+			applog.Printf("Failed to parse SevenDaySonnet.ResetsAt: %s, error: %v", resp.SevenDaySonnet.ResetsAt, err)
 			info.SevenDaySonnet = &UsageProgress{
 				Utilization: resp.SevenDaySonnet.Utilization,
 			}
@@ -563,4 +569,100 @@ func buildGeminiUsageProgress(used, limit int64, resetAt time.Time, tokens int64
 			Cost:     cost,
 		},
 	}
+}
+
+func (s *AccountUsageService) enforceAnthropicUsageWindows(ctx context.Context, account *Account, usage *UsageInfo) {
+	if account == nil || usage == nil {
+		return
+	}
+	if s.accountRepo == nil {
+		return
+	}
+	if account.Platform != PlatformAnthropic {
+		return
+	}
+	// 仅对可展示 5h/7d 的账号类型执行（API Key 无 usage 窗口）
+	if account.Type != AccountTypeOAuth && account.Type != AccountTypeSetupToken {
+		return
+	}
+
+	type window struct {
+		name   string
+		used   float64
+		reset  *time.Time
+		exceed bool
+	}
+	windows := []window{
+		{name: "5h", used: usageValue(usage.FiveHour), reset: usageResetAt(usage.FiveHour)},
+		{name: "7d", used: usageValue(usage.SevenDay), reset: usageResetAt(usage.SevenDay)},
+		{name: "7d_sonnet", used: usageValue(usage.SevenDaySonnet), reset: usageResetAt(usage.SevenDaySonnet)},
+	}
+
+	var exceeded []window
+	for _, w := range windows {
+		if w.used >= 100 {
+			w.exceed = true
+			exceeded = append(exceeded, w)
+		}
+	}
+	if len(exceeded) == 0 {
+		return
+	}
+
+	now := time.Now()
+	var until *time.Time
+	for _, w := range exceeded {
+		if w.reset == nil {
+			continue
+		}
+		if !w.reset.After(now) {
+			continue
+		}
+		if until == nil || w.reset.After(*until) {
+			u := *w.reset
+			until = &u
+		}
+	}
+	// 兜底：没有 resetAt 时，先短暂冷却，避免被持续选中打爆上游
+	if until == nil {
+		u := now.Add(30 * time.Minute)
+		until = &u
+	}
+
+	var b strings.Builder
+	b.WriteString("Anthropic 额度已超限：")
+	for i, w := range exceeded {
+		if i > 0 {
+			b.WriteString("；")
+		}
+		b.WriteString(w.name)
+		b.WriteString(" 已用 ")
+		b.WriteString(fmt.Sprintf("%.1f%%", w.used))
+		if w.reset != nil {
+			b.WriteString("，预计 ")
+			b.WriteString(w.reset.Format(time.RFC3339))
+			b.WriteString(" 恢复")
+		} else {
+			b.WriteString("（重置时间未知）")
+		}
+	}
+
+	// 仅延长不缩短：不会覆盖更长的临时不可调度窗口
+	if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, *until, strings.TrimSpace(b.String())); err != nil {
+		applog.Printf("[UsageLimit] SetTempUnschedulable failed for account %d: %v", account.ID, err)
+	}
+}
+
+func usageValue(p *UsageProgress) float64 {
+	if p == nil {
+		return 0
+	}
+	return p.Utilization
+}
+
+func usageResetAt(p *UsageProgress) *time.Time {
+	if p == nil {
+		return nil
+	}
+	return p.ResetsAt
 }
