@@ -489,8 +489,11 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 		}
 	}
 
-	requestID := resp.Header.Get("x-request-id")
-	if requestID != "" {
+	rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
+	requestID := normalizeRequestID(rawRequestID)
+	if rawRequestID != "" {
+		c.Header("x-request-id", rawRequestID)
+	} else {
 		c.Header("x-request-id", requestID)
 	}
 
@@ -791,8 +794,11 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		}
 
 		// 解包并返回错误
-		requestID := resp.Header.Get("x-request-id")
-		if requestID != "" {
+		rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
+		requestID := normalizeRequestID(rawRequestID)
+		if rawRequestID != "" {
+			c.Header("x-request-id", rawRequestID)
+		} else {
 			c.Header("x-request-id", requestID)
 		}
 		unwrapped, _ := s.unwrapV1InternalResponse(respBody)
@@ -805,8 +811,11 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 	}
 
 handleSuccess:
-	requestID := resp.Header.Get("x-request-id")
-	if requestID != "" {
+	rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
+	requestID := normalizeRequestID(rawRequestID)
+	if rawRequestID != "" {
+		c.Header("x-request-id", rawRequestID)
+	} else {
 		c.Header("x-request-id", requestID)
 	}
 

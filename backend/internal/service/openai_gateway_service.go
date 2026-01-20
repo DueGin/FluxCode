@@ -594,6 +594,14 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		return s.handleErrorResponse(ctx, resp, c, account)
 	}
 
+	rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
+	requestID := normalizeRequestID(rawRequestID)
+	if rawRequestID != "" {
+		c.Header("x-request-id", rawRequestID)
+	} else {
+		c.Header("x-request-id", requestID)
+	}
+
 	// Handle normal response
 	var usage *OpenAIUsage
 	var firstTokenMs *int
@@ -619,7 +627,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	}
 
 	return &OpenAIForwardResult{
-		RequestID:    resp.Header.Get("x-request-id"),
+		RequestID:    requestID,
 		Usage:        *usage,
 		Model:        originalModel,
 		Stream:       reqStream,

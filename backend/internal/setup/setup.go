@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -24,6 +25,12 @@ import (
 const (
 	ConfigFile = "config.yaml"
 	EnvFile    = ".env"
+)
+
+const (
+	installAdvisoryLockID    int64 = 694208311321144028
+	installLockRetryInterval       = 500 * time.Millisecond
+	installLockTimeout             = 30 * time.Second
 )
 
 // SetupConfig holds the setup configuration
@@ -213,6 +220,14 @@ func Install(cfg *SetupConfig) error {
 		return fmt.Errorf("redis connection failed: %w", err)
 	}
 
+	// Acquire a DB-scoped distributed lock to prevent concurrent installs across multiple instances.
+	// This does not rely on local filesystem state (config.yaml/.installed), which may not be shared.
+	unlock, err := acquireInstallAdvisoryLock(&cfg.Database)
+	if err != nil {
+		return fmt.Errorf("failed to acquire install lock: %w", err)
+	}
+	defer unlock()
+
 	// Initialize database
 	if err := initializeDatabase(cfg); err != nil {
 		return fmt.Errorf("database initialization failed: %w", err)
@@ -241,6 +256,79 @@ func createInstallLock() error {
 	lockFile := ".installed"
 	content := fmt.Sprintf("installed_at=%s\n", time.Now().UTC().Format(time.RFC3339))
 	return os.WriteFile(lockFile, []byte(content), 0400) // Read-only for owner
+}
+
+func acquireInstallAdvisoryLock(cfg *DatabaseConfig) (func(), error) {
+	if cfg == nil {
+		return nil, errors.New("nil database config")
+	}
+
+	dsn := fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode,
+	)
+
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	lockCtx, cancel := context.WithTimeout(context.Background(), installLockTimeout)
+	conn, err := db.Conn(lockCtx)
+	if err != nil {
+		cancel()
+		_ = db.Close()
+		return nil, err
+	}
+
+	if err := pgInstallAdvisoryLock(lockCtx, conn); err != nil {
+		cancel()
+		_ = conn.Close()
+		_ = db.Close()
+		return nil, err
+	}
+
+	return func() {
+		cancel()
+		_ = pgInstallAdvisoryUnlock(context.Background(), conn)
+		_ = conn.Close()
+		_ = db.Close()
+	}, nil
+}
+
+func pgInstallAdvisoryLock(ctx context.Context, conn *sql.Conn) error {
+	if conn == nil {
+		return errors.New("nil sql conn")
+	}
+
+	ticker := time.NewTicker(installLockRetryInterval)
+	defer ticker.Stop()
+
+	for {
+		var locked bool
+		if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", installAdvisoryLockID).Scan(&locked); err != nil {
+			return fmt.Errorf("acquire install lock: %w", err)
+		}
+		if locked {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("acquire install lock: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+func pgInstallAdvisoryUnlock(ctx context.Context, conn *sql.Conn) error {
+	if conn == nil {
+		return errors.New("nil sql conn")
+	}
+	_, err := conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", installAdvisoryLockID)
+	if err != nil {
+		return fmt.Errorf("release install lock: %w", err)
+	}
+	return nil
 }
 
 func initializeDatabase(cfg *SetupConfig) error {

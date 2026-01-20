@@ -268,6 +268,7 @@ func parseUsageQueuePayload(msg redis.XMessage) (*usageQueuePayload, error) {
 	if strings.TrimSpace(payload.ID) == "" {
 		payload.ID = uuid.NewString()
 	}
+	payload.RequestID = normalizeRequestIDWithFallback(payload.RequestID, payload.ID)
 	if payload.Kind != usageQueueKindClaude && payload.Kind != usageQueueKindOpenAI {
 		return nil, fmt.Errorf("unknown kind: %s", payload.Kind)
 	}
@@ -488,6 +489,7 @@ func (s *UsageQueueService) enqueue(ctx context.Context, payload *usageQueuePayl
 	if strings.TrimSpace(payload.ID) == "" {
 		payload.ID = uuid.NewString()
 	}
+	payload.RequestID = normalizeRequestIDWithFallback(payload.RequestID, payload.ID)
 	payload.EnqueuedAt = time.Now().UnixMilli()
 
 	b, err := json.Marshal(payload)
