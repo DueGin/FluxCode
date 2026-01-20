@@ -1189,6 +1189,14 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	}
 
 	// 处理正常响应
+	rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
+	requestID := normalizeRequestID(rawRequestID)
+	if rawRequestID != "" {
+		c.Header("x-request-id", rawRequestID)
+	} else {
+		c.Header("x-request-id", requestID)
+	}
+
 	var usage *ClaudeUsage
 	var firstTokenMs *int
 	if reqStream {
@@ -1211,7 +1219,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	}
 
 	return &ForwardResult{
-		RequestID:    resp.Header.Get("x-request-id"),
+		RequestID:    requestID,
 		Usage:        *usage,
 		Model:        originalModel, // 使用原始模型用于计费和日志
 		Stream:       reqStream,

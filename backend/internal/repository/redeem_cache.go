@@ -3,9 +3,11 @@ package repository
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/service"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -14,6 +16,13 @@ const (
 	redeemLockKeyPrefix      = "redeem:lock:"
 	redeemRateLimitDuration  = 24 * time.Hour
 )
+
+var redeemLockReleaseScript = redis.NewScript(`
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`)
 
 // redeemRateLimitKey generates the Redis key for redeem attempt rate limiting.
 func redeemRateLimitKey(userID int64) string {
@@ -26,7 +35,8 @@ func redeemLockKey(code string) string {
 }
 
 type redeemCache struct {
-	rdb *redis.Client
+	rdb        *redis.Client
+	lockTokens sync.Map // key -> token
 }
 
 func NewRedeemCache(rdb *redis.Client) service.RedeemCache {
@@ -53,10 +63,28 @@ func (c *redeemCache) IncrementRedeemAttemptCount(ctx context.Context, userID in
 
 func (c *redeemCache) AcquireRedeemLock(ctx context.Context, code string, ttl time.Duration) (bool, error) {
 	key := redeemLockKey(code)
-	return c.rdb.SetNX(ctx, key, 1, ttl).Result()
+	token := uuid.NewString()
+	ok, err := c.rdb.SetNX(ctx, key, token, ttl).Result()
+	if err != nil {
+		return false, err
+	}
+	if ok {
+		c.lockTokens.Store(key, token)
+	}
+	return ok, nil
 }
 
 func (c *redeemCache) ReleaseRedeemLock(ctx context.Context, code string) error {
 	key := redeemLockKey(code)
-	return c.rdb.Del(ctx, key).Err()
+	tokenAny, ok := c.lockTokens.Load(key)
+	if !ok {
+		return nil
+	}
+	token, _ := tokenAny.(string)
+	c.lockTokens.Delete(key)
+	if token == "" {
+		return nil
+	}
+	_, err := redeemLockReleaseScript.Run(ctx, c.rdb, []string{key}, token).Result()
+	return err
 }

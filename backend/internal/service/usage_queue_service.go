@@ -102,17 +102,17 @@ func NewUsageQueueService(
 	}
 
 	s := &UsageQueueService{
-		rdb:                rdb,
-		entClient:          entClient,
-		cfg:                cfg,
-		billingService:     billingService,
-		usageLogRepo:       usageLogRepo,
-		userRepo:           userRepo,
-		userSubRepo:        userSubRepo,
+		rdb:                 rdb,
+		entClient:           entClient,
+		cfg:                 cfg,
+		billingService:      billingService,
+		usageLogRepo:        usageLogRepo,
+		userRepo:            userRepo,
+		userSubRepo:         userSubRepo,
 		billingCacheService: billingCacheService,
-		deferredService:    deferredService,
-		stopChan:           make(chan struct{}),
-		workers:            workers,
+		deferredService:     deferredService,
+		stopChan:            make(chan struct{}),
+		workers:             workers,
 	}
 
 	host, _ := os.Hostname()
@@ -267,6 +267,7 @@ func parseUsageQueuePayload(msg redis.XMessage) (*usageQueuePayload, error) {
 	if strings.TrimSpace(payload.ID) == "" {
 		payload.ID = uuid.NewString()
 	}
+	payload.RequestID = normalizeRequestIDWithFallback(payload.RequestID, payload.ID)
 	if payload.Kind != usageQueueKindClaude && payload.Kind != usageQueueKindOpenAI {
 		return nil, fmt.Errorf("unknown kind: %s", payload.Kind)
 	}
@@ -469,6 +470,7 @@ func (s *UsageQueueService) enqueue(ctx context.Context, payload *usageQueuePayl
 	if strings.TrimSpace(payload.ID) == "" {
 		payload.ID = uuid.NewString()
 	}
+	payload.RequestID = normalizeRequestIDWithFallback(payload.RequestID, payload.ID)
 	payload.EnqueuedAt = time.Now().UnixMilli()
 
 	b, err := json.Marshal(payload)
@@ -513,20 +515,20 @@ func (s *UsageQueueService) EnqueueClaudeUsage(ctx context.Context, result *Forw
 	durationMs := int(result.Duration.Milliseconds())
 
 	payload := &usageQueuePayload{
-		ID:          uuid.NewString(),
-		Kind:        usageQueueKindClaude,
-		RequestID:    result.RequestID,
-		Model:        result.Model,
-		Stream:       result.Stream,
-		UserID:       apiKey.User.ID,
-		APIKeyID:     apiKey.ID,
-		AccountID:    account.ID,
-		GroupID:      apiKey.GroupID,
-		SubscriptionID: subscriptionID,
-		RateMultiplier: multiplier,
-		BillingType:    billingType,
-		InputTokens:    result.Usage.InputTokens,
-		OutputTokens:   result.Usage.OutputTokens,
+		ID:                  uuid.NewString(),
+		Kind:                usageQueueKindClaude,
+		RequestID:           result.RequestID,
+		Model:               result.Model,
+		Stream:              result.Stream,
+		UserID:              apiKey.User.ID,
+		APIKeyID:            apiKey.ID,
+		AccountID:           account.ID,
+		GroupID:             apiKey.GroupID,
+		SubscriptionID:      subscriptionID,
+		RateMultiplier:      multiplier,
+		BillingType:         billingType,
+		InputTokens:         result.Usage.InputTokens,
+		OutputTokens:        result.Usage.OutputTokens,
 		CacheCreationTokens: result.Usage.CacheCreationInputTokens,
 		CacheReadTokens:     result.Usage.CacheReadInputTokens,
 		DurationMs:          durationMs,
@@ -560,20 +562,20 @@ func (s *UsageQueueService) EnqueueOpenAIUsage(ctx context.Context, result *Open
 	durationMs := int(result.Duration.Milliseconds())
 
 	payload := &usageQueuePayload{
-		ID:          uuid.NewString(),
-		Kind:        usageQueueKindOpenAI,
-		RequestID:    result.RequestID,
-		Model:        result.Model,
-		Stream:       result.Stream,
-		UserID:       apiKey.User.ID,
-		APIKeyID:     apiKey.ID,
-		AccountID:    account.ID,
-		GroupID:      apiKey.GroupID,
-		SubscriptionID: subscriptionID,
-		RateMultiplier: multiplier,
-		BillingType:    billingType,
-		InputTokens:    result.Usage.InputTokens,
-		OutputTokens:   result.Usage.OutputTokens,
+		ID:                  uuid.NewString(),
+		Kind:                usageQueueKindOpenAI,
+		RequestID:           result.RequestID,
+		Model:               result.Model,
+		Stream:              result.Stream,
+		UserID:              apiKey.User.ID,
+		APIKeyID:            apiKey.ID,
+		AccountID:           account.ID,
+		GroupID:             apiKey.GroupID,
+		SubscriptionID:      subscriptionID,
+		RateMultiplier:      multiplier,
+		BillingType:         billingType,
+		InputTokens:         result.Usage.InputTokens,
+		OutputTokens:        result.Usage.OutputTokens,
 		CacheCreationTokens: result.Usage.CacheCreationInputTokens,
 		CacheReadTokens:     result.Usage.CacheReadInputTokens,
 		DurationMs:          durationMs,
@@ -582,4 +584,3 @@ func (s *UsageQueueService) EnqueueOpenAIUsage(ctx context.Context, result *Open
 
 	return s.enqueue(ctx, payload)
 }
-

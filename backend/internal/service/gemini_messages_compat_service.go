@@ -553,11 +553,14 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 		return nil, s.writeGeminiMappedError(c, resp.StatusCode, respBody)
 	}
 
-	requestID := resp.Header.Get(requestIDHeader)
-	if requestID == "" {
-		requestID = resp.Header.Get("x-goog-request-id")
+	rawRequestID := resp.Header.Get(requestIDHeader)
+	if rawRequestID == "" {
+		rawRequestID = resp.Header.Get("x-goog-request-id")
 	}
-	if requestID != "" {
+	requestID := normalizeRequestID(rawRequestID)
+	if strings.TrimSpace(rawRequestID) != "" {
+		c.Header("x-request-id", rawRequestID)
+	} else {
 		c.Header("x-request-id", requestID)
 	}
 
@@ -820,11 +823,14 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	requestID := resp.Header.Get(requestIDHeader)
-	if requestID == "" {
-		requestID = resp.Header.Get("x-goog-request-id")
+	rawRequestID := resp.Header.Get(requestIDHeader)
+	if rawRequestID == "" {
+		rawRequestID = resp.Header.Get("x-goog-request-id")
 	}
-	if requestID != "" {
+	requestID := normalizeRequestID(rawRequestID)
+	if strings.TrimSpace(rawRequestID) != "" {
+		c.Header("x-request-id", rawRequestID)
+	} else {
 		c.Header("x-request-id", requestID)
 	}
 
