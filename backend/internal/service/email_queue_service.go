@@ -34,6 +34,8 @@ const (
 	emailQueueAlertEmail = "1917764907@qq.com"
 )
 
+var ErrUnsupportedEmailTaskType = errors.New("unsupported email task type")
+
 // EmailQueueService 异步邮件队列服务
 type EmailQueueService struct {
 	rdb            *redis.Client
@@ -446,6 +448,28 @@ func (s *EmailQueueService) handleMessage(ctx context.Context, workerID int, con
 		return
 	}
 
+	// 不支持的任务类型：属于不可重试错误，直接失败并丢弃（避免静默当作成功、或进入无意义重试）
+	if errors.Is(procErr, ErrUnsupportedEmailTaskType) {
+		applog.Printf("[EmailQueue] Worker %d drop task(type=%s,email=%s) due to unsupported task type: %v",
+			workerID, payload.TaskType, payload.Email, procErr)
+		s.setTaskStatus(ctx, EmailTaskStatus{
+			TaskID:         payload.ID,
+			TaskType:       payload.TaskType,
+			Email:          payload.Email,
+			SiteName:       payload.SiteName,
+			Status:         "failed",
+			QueueMessageID: msg.ID,
+			Attempt:        payload.Attempt,
+			MaxAttempts:    payload.MaxAttempts,
+			SendAckAt:      payload.EnqueuedAt,
+			ConsumeAckAt:   time.Now().UnixMilli(),
+			LastError:      procErr.Error(),
+			Worker:         consumer,
+		})
+		s.ackAndDelete(ctx, workerID, msg.ID)
+		return
+	}
+
 	// 冷却限制：认为是“可预期的拒绝”，不做重试（避免队列堆积/邮件轰炸）
 	if errors.Is(procErr, ErrVerifyCodeTooFrequent) {
 		applog.Printf("[EmailQueue] Worker %d drop task(type=%s,email=%s) due to cooldown", workerID, payload.TaskType, payload.Email)
@@ -546,7 +570,7 @@ func (s *EmailQueueService) processTask(ctx context.Context, payload emailTaskPa
 		return s.emailService.ResendVerifyCode(ctx, payload.Email, payload.SiteName)
 	default:
 		applog.Printf("[EmailQueue] Unknown task type: %s", payload.TaskType)
-		return nil
+		return fmt.Errorf("%w: %s", ErrUnsupportedEmailTaskType, payload.TaskType)
 	}
 }
 

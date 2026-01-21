@@ -131,7 +131,9 @@ type GatewayConfig struct {
 	// 建议值：根据用户访问频率设置，一般 10-30 分钟
 	ClientIdleTTLSeconds int `mapstructure:"client_idle_ttl_seconds"`
 	// ConcurrencySlotTTLMinutes: 并发槽位过期时间（分钟）
-	// 应大于最长 LLM 请求时间，防止请求完成前槽位过期
+	// 说明：
+	// - 槽位会在请求期间通过心跳刷新，因此可设置较小值以加速“节点重启/崩溃”后的僵尸槽位回收。
+	// - 值越小，重启后并发数恢复越快；但会增加 Redis 心跳刷新频率。
 	ConcurrencySlotTTLMinutes int `mapstructure:"concurrency_slot_ttl_minutes"`
 
 	// 是否记录上游错误响应体摘要（避免输出请求内容）
@@ -371,7 +373,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.idle_conn_timeout_seconds", 300) // 空闲连接超时（秒）
 	viper.SetDefault("gateway.max_upstream_clients", 5000)
 	viper.SetDefault("gateway.client_idle_ttl_seconds", 900)
-	viper.SetDefault("gateway.concurrency_slot_ttl_minutes", 15) // 并发槽位过期时间（支持超长请求）
+	viper.SetDefault("gateway.concurrency_slot_ttl_minutes", 2) // 并发槽位过期时间（分钟；重启后更快回收僵尸槽位）
 	viper.SetDefault("gateway.scheduling.sticky_session_max_waiting", 3)
 	viper.SetDefault("gateway.scheduling.sticky_session_wait_timeout", 45*time.Second)
 	viper.SetDefault("gateway.scheduling.fallback_wait_timeout", 30*time.Second)

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -116,11 +117,25 @@ func (s *RateLimitService) handle401(ctx context.Context, account *Account, head
 		return true
 	}
 
+	// 自定义 base_url（中转站/代理/自建网关）场景下，401 经常是中间层误报或短暂异常：
+	// - 同一时间大量账号同时 401，通常不可能都在同一时刻失效
+	// - 直接 SetError 会导致大量账号永久不可调度，需要人工逐个恢复
+	// 因此对“非官方上游”的 401 一律先走短暂冷却，让调度系统自恢复，并打出更明确的决策日志。
+	if trusted, _ := s.authUpstreamTrustedFor401(account); !trusted {
+		s.logUpstreamAuthAbnormal(account, 401, headers, responseBody, tempMatched, "temp_unsched(untrusted_upstream)", auth401Cooldown)
+		s.setTempUnschedulable(ctx, account, 401, headers, responseBody, auth401Cooldown)
+		return true
+	}
+
 	// OAuth/Setup token 账号的 401 很可能是短暂链路/令牌刷新窗口问题：
 	// - 若直接 SetError 会导致账号永久不可调度，且 TokenRefreshService 也无法再刷新（只遍历 active 状态）
 	// 因此默认先做短暂冷却（temp_unschedulable），再由调度/刷新机制自行恢复。
 	if account.IsOAuth() || !s.shouldHardDisable401(account, headers, responseBody) {
-		s.logUpstreamAuthAbnormal(account, 401, headers, responseBody, tempMatched, "temp_unsched", auth401Cooldown)
+		decision := "temp_unsched"
+		if account.IsOAuth() {
+			decision = "temp_unsched(oauth)"
+		}
+		s.logUpstreamAuthAbnormal(account, 401, headers, responseBody, tempMatched, decision, auth401Cooldown)
 		s.setTempUnschedulable(ctx, account, 401, headers, responseBody, auth401Cooldown)
 		return true
 	}
@@ -138,6 +153,13 @@ func (s *RateLimitService) shouldHardDisable401(account *Account, headers http.H
 	// OAuth/Setup token：优先走 temp unsched，让刷新服务恢复。
 	if account.IsOAuth() {
 		return false
+	}
+
+	// APIKey + 自定义 base_url：不自动升级为永久 error，避免中转站/代理误报造成大面积账号误伤。
+	if account.Type == AccountTypeAPIKey {
+		if trusted, _ := s.authUpstreamTrustedFor401(account); !trusted {
+			return false
+		}
 	}
 
 	// APIKey：仅在“高度确定”的情况下才升级为永久 error，避免线上偶发 401 误伤大量账号。
@@ -196,6 +218,81 @@ func (s *RateLimitService) shouldHardDisable401(account *Account, headers http.H
 	}
 
 	return false
+}
+
+// authUpstreamTrustedFor401 returns whether the upstream is "trusted" enough to hard-disable on 401.
+//
+// Rationale:
+//   - For APIKey accounts using custom base_url (relay/proxy/self-hosted gateways), 401 is frequently
+//     a transient or misclassified error from the middle layer.
+//   - Hard-disabling (SetError) on a single 401 can mistakenly take down many accounts at once.
+//   - For official upstream hosts, we keep the stricter behavior for clearly invalid credentials.
+func (s *RateLimitService) authUpstreamTrustedFor401(account *Account) (trusted bool, upstreamHost string) {
+	if account == nil {
+		return true, ""
+	}
+
+	// Non-APIKey requests are sent to official upstream endpoints.
+	if account.Type != AccountTypeAPIKey {
+		switch account.Platform {
+		case PlatformAnthropic:
+			return true, "api.anthropic.com"
+		case PlatformOpenAI:
+			if account.Type == AccountTypeOAuth {
+				return true, "chatgpt.com"
+			}
+			return true, "api.openai.com"
+		default:
+			return true, ""
+		}
+	}
+
+	raw := strings.TrimSpace(account.GetCredential("base_url"))
+
+	switch account.Platform {
+	case PlatformAnthropic:
+		const official = "api.anthropic.com"
+		if raw == "" {
+			return true, official
+		}
+		host := baseURLHost(raw)
+		if host == "" {
+			return false, ""
+		}
+		return host == official, host
+
+	case PlatformOpenAI:
+		const official = "api.openai.com"
+		if raw == "" {
+			return true, official
+		}
+		host := baseURLHost(raw)
+		if host == "" {
+			return false, ""
+		}
+		return host == official, host
+
+	default:
+		// Unknown platform: don't block hard-disable by default.
+		return true, baseURLHost(raw)
+	}
+}
+
+func baseURLHost(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return ""
+	}
+	if !strings.Contains(s, "://") {
+		s = "https://" + s
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return ""
+	}
+	host := strings.ToLower(strings.TrimSpace(u.Hostname()))
+	host = strings.TrimPrefix(host, "www.")
+	return host
 }
 
 func (s *RateLimitService) buildAuthErrorMessage(base string, headers http.Header, responseBody []byte) string {
@@ -301,6 +398,8 @@ func (s *RateLimitService) logUpstreamAuthAbnormal(account *Account, statusCode 
 		return
 	}
 
+	upstreamTrusted, upstreamHost := s.authUpstreamTrustedFor401(account)
+
 	var requestID, wwwAuthenticate, contentType string
 	if headers != nil {
 		requestID = firstNonEmptyHeader(headers, "x-request-id", "request-id", "anthropic-request-id")
@@ -331,10 +430,12 @@ func (s *RateLimitService) logUpstreamAuthAbnormal(account *Account, statusCode 
 	}
 
 	applog.Printf(
-		"[WARN] [UpstreamAuth] code=%d decision=%s cooldown=%q account_id=%d account_name=%q platform=%s type=%s proxy_id=%v proxy=%q request_id=%q www_authenticate=%q content_type=%q upstream_message=%q body=%q temp_unsched_matched=%t",
+		"[WARN] [UpstreamAuth] code=%d decision=%s cooldown=%q upstream_trusted=%t upstream_host=%q account_id=%d account_name=%q platform=%s type=%s proxy_id=%v proxy=%q request_id=%q www_authenticate=%q content_type=%q upstream_message=%q body=%q temp_unsched_matched=%t",
 		statusCode,
 		decision,
 		cooldownStr,
+		upstreamTrusted,
+		upstreamHost,
 		account.ID,
 		account.Name,
 		account.Platform,

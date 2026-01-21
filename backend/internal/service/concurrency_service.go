@@ -7,12 +7,15 @@ import (
 	"fmt"
 
 	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
+	"sync"
 	"time"
 )
 
 // ConcurrencyCache 定义并发控制的缓存接口
 // 使用有序集合存储槽位，按时间戳清理过期条目
 type ConcurrencyCache interface {
+	SlotTTLSeconds() int
+
 	// 账号槽位管理
 	// 键格式: concurrency:account:{accountID}（有序集合，成员为 requestID）
 	AcquireAccountSlot(ctx context.Context, accountID int64, maxConcurrency int, requestID string) (bool, error)
@@ -96,6 +99,12 @@ func (s *ConcurrencyService) AcquireAccountSlot(ctx context.Context, accountID i
 			ReleaseFunc: func() {}, // no-op
 		}, nil
 	}
+	if s.cache == nil {
+		return &AcquireResult{
+			Acquired:    true,
+			ReleaseFunc: func() {}, // no-op
+		}, nil
+	}
 
 	// Generate unique request ID for this slot
 	requestID := generateRequestID()
@@ -106,9 +115,20 @@ func (s *ConcurrencyService) AcquireAccountSlot(ctx context.Context, accountID i
 	}
 
 	if acquired {
+		stopCh := make(chan struct{})
+		var stopOnce sync.Once
+		s.startSlotHeartbeat(ctx, slotHeartbeatParams{
+			slotType:       "account",
+			id:             accountID,
+			maxConcurrency: maxConcurrency,
+			requestID:      requestID,
+			stopCh:         stopCh,
+		})
+
 		return &AcquireResult{
 			Acquired: true,
 			ReleaseFunc: func() {
+				stopOnce.Do(func() { close(stopCh) })
 				bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				if err := s.cache.ReleaseAccountSlot(bgCtx, accountID, requestID); err != nil {
@@ -135,6 +155,12 @@ func (s *ConcurrencyService) AcquireUserSlot(ctx context.Context, userID int64, 
 			ReleaseFunc: func() {}, // no-op
 		}, nil
 	}
+	if s.cache == nil {
+		return &AcquireResult{
+			Acquired:    true,
+			ReleaseFunc: func() {}, // no-op
+		}, nil
+	}
 
 	// Generate unique request ID for this slot
 	requestID := generateRequestID()
@@ -145,9 +171,20 @@ func (s *ConcurrencyService) AcquireUserSlot(ctx context.Context, userID int64, 
 	}
 
 	if acquired {
+		stopCh := make(chan struct{})
+		var stopOnce sync.Once
+		s.startSlotHeartbeat(ctx, slotHeartbeatParams{
+			slotType:       "user",
+			id:             userID,
+			maxConcurrency: maxConcurrency,
+			requestID:      requestID,
+			stopCh:         stopCh,
+		})
+
 		return &AcquireResult{
 			Acquired: true,
 			ReleaseFunc: func() {
+				stopOnce.Do(func() { close(stopCh) })
 				bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				if err := s.cache.ReleaseUserSlot(bgCtx, userID, requestID); err != nil {
@@ -260,6 +297,76 @@ func (s *ConcurrencyService) CleanupExpiredAccountSlots(ctx context.Context, acc
 		return nil
 	}
 	return s.cache.CleanupExpiredAccountSlots(ctx, accountID)
+}
+
+type slotHeartbeatParams struct {
+	slotType       string
+	id             int64
+	maxConcurrency int
+	requestID      string
+	stopCh         <-chan struct{}
+}
+
+func (s *ConcurrencyService) heartbeatInterval() time.Duration {
+	if s == nil || s.cache == nil {
+		return 0
+	}
+	ttl := s.cache.SlotTTLSeconds()
+	if ttl <= 0 {
+		return 0
+	}
+	interval := time.Duration(ttl) * time.Second / 3
+	if interval < 5*time.Second {
+		interval = 5 * time.Second
+	}
+	if interval > 30*time.Second {
+		interval = 30 * time.Second
+	}
+	return interval
+}
+
+func (s *ConcurrencyService) startSlotHeartbeat(ctx context.Context, p slotHeartbeatParams) {
+	if s == nil || s.cache == nil {
+		return
+	}
+	if p.id <= 0 || p.maxConcurrency <= 0 || p.requestID == "" || p.stopCh == nil {
+		return
+	}
+
+	interval := s.heartbeatInterval()
+	if interval <= 0 {
+		return
+	}
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-p.stopCh:
+				return
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				bgCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				var err error
+				switch p.slotType {
+				case "account":
+					_, err = s.cache.AcquireAccountSlot(bgCtx, p.id, p.maxConcurrency, p.requestID)
+				case "user":
+					_, err = s.cache.AcquireUserSlot(bgCtx, p.id, p.maxConcurrency, p.requestID)
+				default:
+					cancel()
+					return
+				}
+				cancel()
+				if err != nil {
+					applog.Printf("Warning: refresh %s slot failed for %d (req=%s): %v", p.slotType, p.id, p.requestID, err)
+				}
+			}
+		}
+	}()
 }
 
 // StartSlotCleanupWorker starts a background cleanup worker for expired account slots.
