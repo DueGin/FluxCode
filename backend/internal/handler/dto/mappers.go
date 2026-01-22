@@ -369,3 +369,12 @@ func BulkAssignResultFromService(r *service.BulkAssignResult) *BulkAssignResult 
 		Errors:        r.Errors,
 	}
 }
+
+func BulkAdjustSubscriptionExpiryResultFromService(r *service.BulkAdjustSubscriptionExpiryResult) *BulkAdjustSubscriptionExpiryResult {
+	if r == nil {
+		return nil
+	}
+	return &BulkAdjustSubscriptionExpiryResult{
+		UpdatedCount: r.UpdatedCount,
+	}
+}

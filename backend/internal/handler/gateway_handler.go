@@ -30,6 +30,7 @@ type GatewayHandler struct {
 	billingCacheService       *service.BillingCacheService
 	usageQueueService         *service.UsageQueueService
 	concurrencyHelper         *ConcurrencyHelper
+	settingService            *service.SettingService
 }
 
 // NewGatewayHandler creates a new GatewayHandler
@@ -41,6 +42,7 @@ func NewGatewayHandler(
 	concurrencyService *service.ConcurrencyService,
 	billingCacheService *service.BillingCacheService,
 	usageQueueService *service.UsageQueueService,
+	settingService *service.SettingService,
 ) *GatewayHandler {
 	return &GatewayHandler{
 		gatewayService:            gatewayService,
@@ -50,6 +52,7 @@ func NewGatewayHandler(
 		billingCacheService:       billingCacheService,
 		usageQueueService:         usageQueueService,
 		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude),
+		settingService:            settingService,
 	}
 }
 
@@ -150,6 +153,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	if platform == service.PlatformGemini && sessionHash != "" {
 		sessionKey = "gemini:" + sessionHash
 	}
+	if shouldSwitchAccountOnRetry(c.Request.Context(), c.Request.Header, h.settingService) {
+		if sessionKey != "" {
+			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+				applog.Printf("Clear sticky session failed: %v", err)
+			}
+		}
+		sessionKey = ""
+	}
 
 	if platform == service.PlatformGemini {
 		const maxAccountSwitches = 3
@@ -241,6 +252,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			if err != nil {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
+					if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+						applog.Printf("Clear sticky session failed: %v", err)
+					}
 					failedAccountIDs[account.ID] = struct{}{}
 					if switchCount >= maxAccountSwitches {
 						lastFailoverStatus = failoverErr.StatusCode
@@ -253,6 +267,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					continue
 				}
 				// 错误响应已在Forward中处理，这里只记录日志
+				if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+					applog.Printf("Clear sticky session failed: %v", err)
+				}
 				applog.Printf("Forward request failed: %v", err)
 				return
 			}
@@ -387,6 +404,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		if err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
+				if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+					applog.Printf("Clear sticky session failed: %v", err)
+				}
 				failedAccountIDs[account.ID] = struct{}{}
 				if switchCount >= maxAccountSwitches {
 					lastFailoverStatus = failoverErr.StatusCode
@@ -399,6 +419,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				continue
 			}
 			// 错误响应已在Forward中处理，这里只记录日志
+			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+				applog.Printf("Clear sticky session failed: %v", err)
+			}
 			applog.Printf("Account %d: Forward request failed: %v", account.ID, err)
 			return
 		}

@@ -203,6 +203,14 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	if sessionHash != "" {
 		sessionKey = "gemini:" + sessionHash
 	}
+	if shouldSwitchAccountOnRetry(c.Request.Context(), c.Request.Header, h.settingService) {
+		if sessionKey != "" {
+			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+				applog.Printf("Clear sticky session failed: %v", err)
+			}
+		}
+		sessionKey = ""
+	}
 	const maxAccountSwitches = 3
 	switchCount := 0
 	failedAccountIDs := make(map[int64]struct{})
@@ -278,6 +286,9 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		if err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
+				if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+					applog.Printf("Clear sticky session failed: %v", err)
+				}
 				failedAccountIDs[account.ID] = struct{}{}
 				if switchCount >= maxAccountSwitches {
 					lastFailoverStatus = failoverErr.StatusCode
@@ -290,6 +301,9 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				continue
 			}
 			// ForwardNative already wrote the response
+			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+				applog.Printf("Clear sticky session failed: %v", err)
+			}
 			applog.Printf("Gemini native forward failed: %v", err)
 			return
 		}

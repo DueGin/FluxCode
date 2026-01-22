@@ -859,6 +859,15 @@ export default {
       groupDeleted: '分组删除成功',
       failedToCreate: '创建分组失败',
       failedToUpdate: '更新分组失败',
+      adjustExpiry: '调整天数',
+      adjustExpiryTitle: '批量调整订阅到期时间',
+      adjustExpiryDescription: '对该订阅分组下所有未过期的订阅批量增加/减少天数（仅对订阅分组生效）。',
+      adjustExpiryDays: '天数',
+      adjustExpiryPlaceholder: '例如 30 或 -7',
+      adjustExpiryHint: '正数增加，负数减少，0 无效。',
+      adjustExpiryInvalidDays: '请输入非 0 的整数天数',
+      adjustExpirySuccess: '已更新 {count} 个订阅',
+      adjustExpiryFailed: '批量调整订阅到期时间失败',
       subscription: {
         title: '订阅设置',
         type: '计费类型',
@@ -1845,6 +1854,14 @@ export default {
         defaultBalanceHint: '新用户的初始余额',
         defaultConcurrency: '默认并发数',
         defaultConcurrencyHint: '新用户的最大并发请求数'
+      },
+      scheduling: {
+        title: '调度配置',
+        description: '配置网关调度与切换策略',
+        gatewayRetrySwitchAfter: '重试切换账号阈值',
+        gatewayRetrySwitchAfterHint: '当请求重试次数达到该值时，网关将切换到其他账号调度（建议 2）',
+        dailyUsageRefreshTime: '每日用量检查时间',
+        dailyUsageRefreshTimeHint: '每日在此时间对启用账号刷新上游用量窗口（HH:MM）'
       },
       site: {
         title: '站点设置',

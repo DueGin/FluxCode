@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/service"
@@ -45,6 +47,8 @@ const (
 	// SSEPingFormatNone indicates no ping should be sent (e.g., OpenAI has no ping spec)
 	SSEPingFormatNone SSEPingFormat = ""
 )
+
+const defaultRetrySwitchAfter = 2
 
 // ConcurrencyError represents a concurrency limit error with context
 type ConcurrencyError struct {
@@ -228,6 +232,38 @@ func (h *ConcurrencyHelper) waitForSlotWithPingTimeout(c *gin.Context, slotType 
 			timer.Reset(backoff)
 		}
 	}
+}
+
+func parseRetryCount(headers http.Header) int {
+	if headers == nil {
+		return 0
+	}
+	candidates := []string{"X-Stainless-Retry-Count", "X-Retry-Count", "Retry-Count"}
+	for _, key := range candidates {
+		raw := strings.TrimSpace(headers.Get(key))
+		if raw == "" {
+			continue
+		}
+		if v, err := strconv.Atoi(raw); err == nil && v >= 0 {
+			return v
+		}
+	}
+	return 0
+}
+
+func shouldSwitchAccountOnRetry(ctx context.Context, headers http.Header, settingService *service.SettingService) bool {
+	retryCount := parseRetryCount(headers)
+	if retryCount <= 0 {
+		return false
+	}
+	switchAfter := defaultRetrySwitchAfter
+	if settingService != nil {
+		switchAfter = settingService.GetGatewayRetrySwitchAfter(ctx)
+	}
+	if switchAfter <= 0 {
+		return false
+	}
+	return retryCount >= switchAfter
 }
 
 // AcquireAccountSlotWithWaitTimeout acquires an account slot with a custom timeout (keeps SSE ping).

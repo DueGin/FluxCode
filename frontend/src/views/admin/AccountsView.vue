@@ -289,7 +289,7 @@
                   ?
                 </span>
                 <div
-                  class="pointer-events-none absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded bg-gray-900 px-3 py-2 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
+                  class="pointer-events-none absolute top-full z-50 mt-2 hidden w-64 -translate-x-1/2 rounded bg-gray-900 px-3 py-2 text-xs text-white dark:bg-gray-700 whitespace-normal break-words group-hover:block left-1/2"
                 >
                   {{ getSchedulableHint(row) }}
                   <div
@@ -618,7 +618,7 @@ import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vu
 import AccountTestModal from '@/components/account/AccountTestModal.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
-import { formatRelativeTime, formatDateTime, formatDateTimeBeijing, diffBeijingDays } from '@/utils/format'
+import { formatRelativeTime, formatDateTime, formatDateTimeBeijing, diffBeijingDays, formatRFC3339InText } from '@/utils/format'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -834,6 +834,26 @@ const shouldShowSchedulableHint = (account: Account): boolean => {
   return false
 }
 
+const formatTempUnschedReason = (raw: string | null): string => {
+  const reason = raw?.trim() || ''
+  if (!reason) return ''
+  try {
+    const parsed = JSON.parse(reason) as {
+      error_message?: string
+      ErrorMessage?: string
+      message?: string
+    }
+    const message =
+      parsed.error_message?.trim() ||
+      parsed.ErrorMessage?.trim() ||
+      parsed.message?.trim() ||
+      ''
+    return formatRFC3339InText(message)
+  } catch {
+    return formatRFC3339InText(reason)
+  }
+}
+
 const getSchedulableHint = (account: Account): string => {
   if (isExpired(account.expires_at)) {
     return t('admin.accounts.schedulableReason.expired')
@@ -848,7 +868,7 @@ const getSchedulableHint = (account: Account): string => {
     return t('admin.accounts.schedulableReason.manualOff')
   }
   if (isTempUnschedulable(account)) {
-    const reason = account.temp_unschedulable_reason?.trim()
+    const reason = formatTempUnschedReason(account.temp_unschedulable_reason)
     return reason
       ? t('admin.accounts.schedulableReason.tempUnschedWithReason', { reason })
       : t('admin.accounts.schedulableReason.tempUnsched')

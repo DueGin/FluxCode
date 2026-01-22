@@ -242,6 +242,10 @@ func (r *stubUserSubscriptionRepo) ExtendExpiry(ctx context.Context, subscriptio
 	return errors.New("not implemented")
 }
 
+func (r *stubUserSubscriptionRepo) BulkAdjustExpiryByGroupID(ctx context.Context, groupID int64, days int) ([]int64, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (r *stubUserSubscriptionRepo) UpdateStatus(ctx context.Context, subscriptionID int64, status string) error {
 	if r.updateStatus != nil {
 		return r.updateStatus(ctx, subscriptionID, status)

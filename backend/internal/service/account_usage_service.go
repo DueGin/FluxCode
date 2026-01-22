@@ -186,6 +186,16 @@ func NewAccountUsageService(
 	}
 }
 
+// GetUsageFresh bypasses cached usage snapshots and fetches the latest usage when possible.
+func (s *AccountUsageService) GetUsageFresh(ctx context.Context, accountID int64) (*UsageInfo, error) {
+	if s != nil && s.cache != nil {
+		s.cache.apiCache.Delete(accountID)
+		s.cache.windowStatsCache.Delete(accountID)
+		s.cache.antigravityCache.Delete(accountID)
+	}
+	return s.GetUsage(ctx, accountID)
+}
+
 // GetUsage 获取账号使用量
 // OAuth账号: 调用Anthropic API获取真实数据（需要profile scope），API响应缓存10分钟，窗口统计缓存1分钟
 // Setup Token账号: 根据session_window推算5h窗口，7d数据不可用（没有profile scope）
@@ -197,12 +207,22 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 	}
 
 	if account.Platform == PlatformGemini {
-		return s.getGeminiUsage(ctx, account)
+		usage, err := s.getGeminiUsage(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		s.enforceUsageWindows(ctx, account, usage)
+		return usage, nil
 	}
 
 	// Antigravity 平台：使用 AntigravityQuotaFetcher 获取额度
 	if account.Platform == PlatformAntigravity {
-		return s.getAntigravityUsage(ctx, account)
+		usage, err := s.getAntigravityUsage(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		s.enforceUsageWindows(ctx, account, usage)
+		return usage, nil
 	}
 
 	// 只有oauth类型账号可以通过API获取usage（有profile scope）
@@ -237,7 +257,7 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 		s.addWindowStats(ctx, account, usage)
 
 		// 5. 超限检测：5h/7d 达到或超过 100% 时，将账号置为“临时不可调度”，并写入提示信息
-		s.enforceAnthropicUsageWindows(ctx, account, usage)
+		s.enforceUsageWindows(ctx, account, usage)
 
 		return usage, nil
 	}
@@ -247,7 +267,7 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 		usage := s.estimateSetupTokenUsage(account)
 		// 添加窗口统计
 		s.addWindowStats(ctx, account, usage)
-		s.enforceAnthropicUsageWindows(ctx, account, usage)
+		s.enforceUsageWindows(ctx, account, usage)
 		return usage, nil
 	}
 
@@ -571,18 +591,15 @@ func buildGeminiUsageProgress(used, limit int64, resetAt time.Time, tokens int64
 	}
 }
 
-func (s *AccountUsageService) enforceAnthropicUsageWindows(ctx context.Context, account *Account, usage *UsageInfo) {
+func (s *AccountUsageService) enforceUsageWindows(ctx context.Context, account *Account, usage *UsageInfo) {
 	if account == nil || usage == nil {
 		return
 	}
 	if s.accountRepo == nil {
 		return
 	}
-	if account.Platform != PlatformAnthropic {
-		return
-	}
-	// 仅对可展示 5h/7d 的账号类型执行（API Key 无 usage 窗口）
-	if account.Type != AccountTypeOAuth && account.Type != AccountTypeSetupToken {
+	// 仅在有 5h/7d 窗口数据时执行（API Key 等无 usage 窗口的账号会被跳过）
+	if usage.FiveHour == nil && usage.SevenDay == nil && usage.SevenDaySonnet == nil {
 		return
 	}
 
@@ -629,8 +646,21 @@ func (s *AccountUsageService) enforceAnthropicUsageWindows(ctx context.Context, 
 		until = &u
 	}
 
+	platformLabel := "账号"
+	switch account.Platform {
+	case PlatformAnthropic:
+		platformLabel = "Anthropic"
+	case PlatformOpenAI:
+		platformLabel = "OpenAI"
+	case PlatformGemini:
+		platformLabel = "Gemini"
+	case PlatformAntigravity:
+		platformLabel = "Antigravity"
+	}
+
 	var b strings.Builder
-	b.WriteString("Anthropic 额度已超限：")
+	b.WriteString(platformLabel)
+	b.WriteString(" 额度已超限：")
 	for i, w := range exceeded {
 		if i > 0 {
 			b.WriteString("；")

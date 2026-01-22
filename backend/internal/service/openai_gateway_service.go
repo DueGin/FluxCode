@@ -139,6 +139,13 @@ func (s *OpenAIGatewayService) BindStickySession(ctx context.Context, sessionHas
 	return s.cache.SetSessionAccountID(ctx, "openai:"+sessionHash, accountID, openaiStickySessionTTL)
 }
 
+func (s *OpenAIGatewayService) ClearStickySession(ctx context.Context, sessionHash string) error {
+	if sessionHash == "" || s.cache == nil {
+		return nil
+	}
+	return s.cache.DeleteSessionAccountID(ctx, "openai:"+sessionHash)
+}
+
 // SelectAccount selects an OpenAI account with sticky session support
 func (s *OpenAIGatewayService) SelectAccount(ctx context.Context, groupID *int64, sessionHash string) (*Account, error) {
 	return s.SelectAccountForModel(ctx, groupID, sessionHash, "")
@@ -1143,154 +1150,9 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 		return
 	}
 
-	// Convert snapshot to map for merging into Extra
-	updates := make(map[string]any)
-	if snapshot.PrimaryUsedPercent != nil {
-		updates["codex_primary_used_percent"] = *snapshot.PrimaryUsedPercent
-	}
-	if snapshot.PrimaryResetAfterSeconds != nil {
-		updates["codex_primary_reset_after_seconds"] = *snapshot.PrimaryResetAfterSeconds
-	}
-	if snapshot.PrimaryWindowMinutes != nil {
-		updates["codex_primary_window_minutes"] = *snapshot.PrimaryWindowMinutes
-	}
-	if snapshot.SecondaryUsedPercent != nil {
-		updates["codex_secondary_used_percent"] = *snapshot.SecondaryUsedPercent
-	}
-	if snapshot.SecondaryResetAfterSeconds != nil {
-		updates["codex_secondary_reset_after_seconds"] = *snapshot.SecondaryResetAfterSeconds
-	}
-	if snapshot.SecondaryWindowMinutes != nil {
-		updates["codex_secondary_window_minutes"] = *snapshot.SecondaryWindowMinutes
-	}
-	if snapshot.PrimaryOverSecondaryPercent != nil {
-		updates["codex_primary_over_secondary_percent"] = *snapshot.PrimaryOverSecondaryPercent
-	}
-	updates["codex_usage_updated_at"] = snapshot.UpdatedAt
-
-	// Normalize to canonical 5h/7d fields based on window_minutes
-	// This fixes the issue where OpenAI's primary/secondary naming is reversed
-	// Strategy: Compare the two windows and assign the smaller one to 5h, larger one to 7d
-
-	// IMPORTANT: We can only reliably determine window type from window_minutes field
-	// The reset_after_seconds is remaining time, not window size, so it cannot be used for comparison
-
-	var primaryWindowMins, secondaryWindowMins int
-	var hasPrimaryWindow, hasSecondaryWindow bool
-
-	// Only use window_minutes for reliable window size comparison
-	if snapshot.PrimaryWindowMinutes != nil {
-		primaryWindowMins = *snapshot.PrimaryWindowMinutes
-		hasPrimaryWindow = true
-	}
-
-	if snapshot.SecondaryWindowMinutes != nil {
-		secondaryWindowMins = *snapshot.SecondaryWindowMinutes
-		hasSecondaryWindow = true
-	}
-
-	// Determine which is 5h and which is 7d
-	var use5hFromPrimary, use7dFromPrimary bool
-	var use5hFromSecondary, use7dFromSecondary bool
-
-	if hasPrimaryWindow && hasSecondaryWindow {
-		// Both window sizes known: compare and assign smaller to 5h, larger to 7d
-		if primaryWindowMins < secondaryWindowMins {
-			use5hFromPrimary = true
-			use7dFromSecondary = true
-		} else {
-			use5hFromSecondary = true
-			use7dFromPrimary = true
-		}
-	} else if hasPrimaryWindow {
-		// Only primary window size known: classify by absolute threshold
-		if primaryWindowMins <= 360 {
-			use5hFromPrimary = true
-		} else {
-			use7dFromPrimary = true
-		}
-	} else if hasSecondaryWindow {
-		// Only secondary window size known: classify by absolute threshold
-		if secondaryWindowMins <= 360 {
-			use5hFromSecondary = true
-		} else {
-			use7dFromSecondary = true
-		}
-	} else {
-		// No window_minutes available: cannot reliably determine window types
-		// Fall back to legacy assumption (may be incorrect)
-		// Assume primary=7d, secondary=5h based on historical observation
-		if snapshot.SecondaryUsedPercent != nil || snapshot.SecondaryResetAfterSeconds != nil || snapshot.SecondaryWindowMinutes != nil {
-			use5hFromSecondary = true
-		}
-		if snapshot.PrimaryUsedPercent != nil || snapshot.PrimaryResetAfterSeconds != nil || snapshot.PrimaryWindowMinutes != nil {
-			use7dFromPrimary = true
-		}
-	}
-
-	// Track canonical window values for enforcement (disable scheduling when a window is exhausted).
-	type windowLimit struct {
-		name              string
-		usedPercent       *float64
-		resetAfterSeconds *int
-	}
-	var limit5h windowLimit
-	var limit7d windowLimit
-	limit5h.name = "5h"
-	limit7d.name = "7d"
-
-	// Write canonical 5h fields
-	if use5hFromPrimary {
-		if snapshot.PrimaryUsedPercent != nil {
-			updates["codex_5h_used_percent"] = *snapshot.PrimaryUsedPercent
-			limit5h.usedPercent = snapshot.PrimaryUsedPercent
-		}
-		if snapshot.PrimaryResetAfterSeconds != nil {
-			updates["codex_5h_reset_after_seconds"] = *snapshot.PrimaryResetAfterSeconds
-			limit5h.resetAfterSeconds = snapshot.PrimaryResetAfterSeconds
-		}
-		if snapshot.PrimaryWindowMinutes != nil {
-			updates["codex_5h_window_minutes"] = *snapshot.PrimaryWindowMinutes
-		}
-	} else if use5hFromSecondary {
-		if snapshot.SecondaryUsedPercent != nil {
-			updates["codex_5h_used_percent"] = *snapshot.SecondaryUsedPercent
-			limit5h.usedPercent = snapshot.SecondaryUsedPercent
-		}
-		if snapshot.SecondaryResetAfterSeconds != nil {
-			updates["codex_5h_reset_after_seconds"] = *snapshot.SecondaryResetAfterSeconds
-			limit5h.resetAfterSeconds = snapshot.SecondaryResetAfterSeconds
-		}
-		if snapshot.SecondaryWindowMinutes != nil {
-			updates["codex_5h_window_minutes"] = *snapshot.SecondaryWindowMinutes
-		}
-	}
-
-	// Write canonical 7d fields
-	if use7dFromPrimary {
-		if snapshot.PrimaryUsedPercent != nil {
-			updates["codex_7d_used_percent"] = *snapshot.PrimaryUsedPercent
-			limit7d.usedPercent = snapshot.PrimaryUsedPercent
-		}
-		if snapshot.PrimaryResetAfterSeconds != nil {
-			updates["codex_7d_reset_after_seconds"] = *snapshot.PrimaryResetAfterSeconds
-			limit7d.resetAfterSeconds = snapshot.PrimaryResetAfterSeconds
-		}
-		if snapshot.PrimaryWindowMinutes != nil {
-			updates["codex_7d_window_minutes"] = *snapshot.PrimaryWindowMinutes
-		}
-	} else if use7dFromSecondary {
-		if snapshot.SecondaryUsedPercent != nil {
-			updates["codex_7d_used_percent"] = *snapshot.SecondaryUsedPercent
-			limit7d.usedPercent = snapshot.SecondaryUsedPercent
-		}
-		if snapshot.SecondaryResetAfterSeconds != nil {
-			updates["codex_7d_reset_after_seconds"] = *snapshot.SecondaryResetAfterSeconds
-			limit7d.resetAfterSeconds = snapshot.SecondaryResetAfterSeconds
-		}
-		if snapshot.SecondaryWindowMinutes != nil {
-			updates["codex_7d_window_minutes"] = *snapshot.SecondaryWindowMinutes
-		}
+	updates := buildCodexUsageUpdates(snapshot)
+	if len(updates) == 0 {
+		return
 	}
 
 	// Update account's Extra field asynchronously
@@ -1299,67 +1161,18 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 		defer cancel()
 		_ = s.accountRepo.UpdateExtra(updateCtx, accountID, updates)
 
-		// Enforce Codex quota windows: if 5h/7d is exhausted, temporarily remove the account from scheduling
-		// and surface a human-readable reason in temp_unschedulable_reason.
 		if s.rateLimitService == nil {
 			return
 		}
 		now := time.Now()
-		type exceeded struct {
-			name    string
-			used    float64
-			resetAt time.Time
-		}
-		var exceededWindows []exceeded
-		addIfExceeded := func(w windowLimit) {
-			if w.usedPercent == nil || w.resetAfterSeconds == nil {
-				return
-			}
-			if *w.resetAfterSeconds <= 0 {
-				return
-			}
-			if *w.usedPercent < 100 {
-				return
-			}
-			resetAt := now.Add(time.Duration(*w.resetAfterSeconds) * time.Second)
-			if !resetAt.After(now) {
-				return
-			}
-			exceededWindows = append(exceededWindows, exceeded{
-				name:    w.name,
-				used:    *w.usedPercent,
-				resetAt: resetAt,
-			})
-		}
-		addIfExceeded(limit5h)
-		addIfExceeded(limit7d)
-
-		if len(exceededWindows) == 0 {
+		tempAccount := &Account{Extra: updates}
+		_, exceeded := codexUsageWindows(tempAccount, now)
+		if len(exceeded) == 0 {
 			return
 		}
-
-		until := exceededWindows[0].resetAt
-		for i := 1; i < len(exceededWindows); i++ {
-			if exceededWindows[i].resetAt.After(until) {
-				until = exceededWindows[i].resetAt
-			}
-		}
-
-		var b strings.Builder
-		b.WriteString("OpenAI Codex 额度已超限：")
-		for i, w := range exceededWindows {
-			if i > 0 {
-				b.WriteString("；")
-			}
-			b.WriteString(w.name)
-			b.WriteString(" 已用 ")
-			b.WriteString(fmt.Sprintf("%.1f%%", w.used))
-			b.WriteString("，预计 ")
-			b.WriteString(w.resetAt.Format(time.RFC3339))
-			b.WriteString(" 恢复")
-		}
-
-		if err := s.rateLimitService.SetTempUnschedulableWithReason(updateCtx, accountID, until, b.String()); err != nil {
+		until := selectLatestReset(exceeded, now, 5*time.Minute)
+		reason := buildCodexExceededReason(exceeded)
+		if err := s.rateLimitService.SetTempUnschedulableWithReason(updateCtx, accountID, until, reason); err != nil {
 			applog.Printf("[CodexQuota] SetTempUnschedulable failed for account %d: %v", accountID, err)
 		}
 	}()

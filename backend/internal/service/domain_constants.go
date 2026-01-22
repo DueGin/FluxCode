@@ -78,17 +78,19 @@ const (
 	SettingKeyTurnstileSecretKey = "turnstile_secret_key" // Turnstile Secret Key
 
 	// OEM设置
-	SettingKeySiteName     = "site_name"     // 网站名称
-	SettingKeySiteLogo     = "site_logo"     // 网站Logo (base64)
-	SettingKeySiteSubtitle = "site_subtitle" // 网站副标题
-	SettingKeyAPIBaseURL   = "api_base_url"  // API端点地址（用于客户端配置和导入）
-	SettingKeyContactInfo  = "contact_info"  // 客服联系方式
+	SettingKeySiteName         = "site_name"          // 网站名称
+	SettingKeySiteLogo         = "site_logo"          // 网站Logo (base64)
+	SettingKeySiteSubtitle     = "site_subtitle"      // 网站副标题
+	SettingKeyAPIBaseURL       = "api_base_url"       // API端点地址（用于客户端配置和导入）
+	SettingKeyContactInfo      = "contact_info"       // 客服联系方式
 	SettingKeyAfterSaleContact = "after_sale_contact" // 售后联系方式（KV JSON 数组）
-	SettingKeyDocURL       = "doc_url"       // 文档链接
+	SettingKeyDocURL           = "doc_url"            // 文档链接
 
 	// 默认配置
-	SettingKeyDefaultConcurrency = "default_concurrency" // 新用户默认并发量
-	SettingKeyDefaultBalance     = "default_balance"     // 新用户默认余额
+	SettingKeyDefaultConcurrency      = "default_concurrency"        // 新用户默认并发量
+	SettingKeyDefaultBalance          = "default_balance"            // 新用户默认余额
+	SettingKeyGatewayRetrySwitchAfter = "gateway_retry_switch_after" // 重试多少次后切换账号调度
+	SettingKeyDailyUsageRefreshTime   = "daily_usage_refresh_time"   // 每日用量刷新时间（HH:MM）
 
 	// 管理员 API Key
 	SettingKeyAdminAPIKey = "admin_api_key" // 全局管理员 API Key（用于外部系统集成）

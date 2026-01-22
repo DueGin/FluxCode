@@ -213,6 +213,8 @@ interface Props {
   columns: Column[]
   data: any[]
   loading?: boolean
+  defaultSortKey?: string
+  defaultSortOrder?: 'asc' | 'desc'
   stickyFirstColumn?: boolean
   stickyActionsColumn?: boolean
   expandableActions?: boolean
@@ -221,13 +223,15 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
+  defaultSortKey: '',
+  defaultSortOrder: 'asc',
   stickyFirstColumn: true,
   stickyActionsColumn: true,
   expandableActions: true
 })
 
-const sortKey = ref<string>('')
-const sortOrder = ref<'asc' | 'desc'>('asc')
+const sortKey = ref<string>(props.defaultSortKey)
+const sortOrder = ref<'asc' | 'desc'>(props.defaultSortOrder)
 const actionsExpanded = ref(false)
 
 // 数据/列变化时重新检查滚动状态

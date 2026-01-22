@@ -97,6 +97,35 @@ func ProvideAccountExpirationWorker(db *sql.DB, timingWheel *TimingWheelService)
 	return svc
 }
 
+func ProvideTempUnschedRecoveryWorker(
+	db *sql.DB,
+	timingWheel *TimingWheelService,
+	accountRepo AccountRepository,
+	usageService *AccountUsageService,
+	rateLimitService *RateLimitService,
+	cache TempUnschedRecoveryCache,
+) *TempUnschedRecoveryWorker {
+	svc := NewTempUnschedRecoveryWorker(db, timingWheel, accountRepo, usageService, rateLimitService, cache, time.Hour, 5*time.Minute)
+	svc.Start()
+	return svc
+}
+
+func ProvideDailyUsageRefreshWorker(
+	db *sql.DB,
+	settingService *SettingService,
+	accountRepo AccountRepository,
+	usageService *AccountUsageService,
+	rateLimitService *RateLimitService,
+	httpUpstream HTTPUpstream,
+) *DailyUsageRefreshWorker {
+	svc := NewDailyUsageRefreshWorker(db, settingService, accountRepo, usageService, rateLimitService, httpUpstream)
+	if settingService != nil {
+		settingService.RegisterDailyUsageRefreshTimeListener(svc.ResetSchedule)
+	}
+	svc.Start()
+	return svc
+}
+
 // ProvideConcurrencyService creates ConcurrencyService and starts slot cleanup worker.
 func ProvideConcurrencyService(cache ConcurrencyCache, accountRepo AccountRepository, cfg *config.Config) *ConcurrencyService {
 	svc := NewConcurrencyService(cache)
@@ -151,6 +180,7 @@ var ProviderSet = wire.NewSet(
 	ProvideTimingWheelService,
 	ProvideDeferredService,
 	ProvideAccountExpirationWorker,
+	ProvideDailyUsageRefreshWorker,
 	NewAntigravityQuotaFetcher,
 	NewUserAttributeService,
 	NewUsageCache,

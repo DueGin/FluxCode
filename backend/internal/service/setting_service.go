@@ -3,13 +3,14 @@ package service
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/DueGin/FluxCode/internal/config"
 	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
@@ -18,6 +19,11 @@ import (
 var (
 	ErrRegistrationDisabled = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
 	ErrSettingNotFound      = infraerrors.NotFound("SETTING_NOT_FOUND", "setting not found")
+)
+
+const (
+	defaultGatewayRetrySwitchAfter = 2
+	defaultDailyUsageRefreshTime   = "03:00"
 )
 
 type SettingRepository interface {
@@ -34,6 +40,9 @@ type SettingRepository interface {
 type SettingService struct {
 	settingRepo SettingRepository
 	cfg         *config.Config
+	listenersMu sync.Mutex
+
+	dailyUsageRefreshListeners []func()
 }
 
 func (s *SettingService) webTitleDefault() string {
@@ -48,6 +57,27 @@ func NewSettingService(settingRepo SettingRepository, cfg *config.Config) *Setti
 	return &SettingService{
 		settingRepo: settingRepo,
 		cfg:         cfg,
+	}
+}
+
+func (s *SettingService) RegisterDailyUsageRefreshTimeListener(listener func()) {
+	if s == nil || listener == nil {
+		return
+	}
+	s.listenersMu.Lock()
+	s.dailyUsageRefreshListeners = append(s.dailyUsageRefreshListeners, listener)
+	s.listenersMu.Unlock()
+}
+
+func (s *SettingService) notifyDailyUsageRefreshTimeChanged() {
+	if s == nil {
+		return
+	}
+	s.listenersMu.Lock()
+	listeners := append([]func(){}, s.dailyUsageRefreshListeners...)
+	s.listenersMu.Unlock()
+	for _, listener := range listeners {
+		listener()
 	}
 }
 
@@ -104,6 +134,15 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 
 // UpdateSettings 更新系统设置
 func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSettings) error {
+	previousDaily := defaultDailyUsageRefreshTime
+	if s != nil && s.settingRepo != nil {
+		if value, err := s.settingRepo.GetValue(ctx, SettingKeyDailyUsageRefreshTime); err == nil {
+			previousDaily = strings.TrimSpace(value)
+		}
+	}
+	if strings.TrimSpace(previousDaily) == "" {
+		previousDaily = defaultDailyUsageRefreshTime
+	}
 	updates := make(map[string]string)
 
 	// 注册设置
@@ -140,6 +179,14 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	// 默认配置
 	updates[SettingKeyDefaultConcurrency] = strconv.Itoa(settings.DefaultConcurrency)
 	updates[SettingKeyDefaultBalance] = strconv.FormatFloat(settings.DefaultBalance, 'f', 8, 64)
+	if settings.GatewayRetrySwitchAfter <= 0 {
+		settings.GatewayRetrySwitchAfter = defaultGatewayRetrySwitchAfter
+	}
+	updates[SettingKeyGatewayRetrySwitchAfter] = strconv.Itoa(settings.GatewayRetrySwitchAfter)
+	if strings.TrimSpace(settings.DailyUsageRefreshTime) == "" {
+		settings.DailyUsageRefreshTime = defaultDailyUsageRefreshTime
+	}
+	updates[SettingKeyDailyUsageRefreshTime] = strings.TrimSpace(settings.DailyUsageRefreshTime)
 
 	// Model fallback configuration
 	updates[SettingKeyEnableModelFallback] = strconv.FormatBool(settings.EnableModelFallback)
@@ -148,7 +195,19 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyFallbackModelGemini] = settings.FallbackModelGemini
 	updates[SettingKeyFallbackModelAntigravity] = settings.FallbackModelAntigravity
 
-	return s.settingRepo.SetMultiple(ctx, updates)
+	if err := s.settingRepo.SetMultiple(ctx, updates); err != nil {
+		return err
+	}
+
+	newDaily := strings.TrimSpace(settings.DailyUsageRefreshTime)
+	if newDaily == "" {
+		newDaily = defaultDailyUsageRefreshTime
+	}
+	if previousDaily != newDaily {
+		s.notifyDailyUsageRefreshTimeChanged()
+	}
+
+	return nil
 }
 
 // IsRegistrationEnabled 检查是否开放注册
@@ -206,6 +265,37 @@ func (s *SettingService) GetDefaultBalance(ctx context.Context) float64 {
 	return s.cfg.Default.UserBalance
 }
 
+// GetGatewayRetrySwitchAfter returns how many client retries trigger account switching.
+func (s *SettingService) GetGatewayRetrySwitchAfter(ctx context.Context) int {
+	if s == nil || s.settingRepo == nil {
+		return defaultGatewayRetrySwitchAfter
+	}
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyGatewayRetrySwitchAfter)
+	if err != nil {
+		return defaultGatewayRetrySwitchAfter
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
+		return v
+	}
+	return defaultGatewayRetrySwitchAfter
+}
+
+// GetDailyUsageRefreshTime returns the daily refresh time in HH:MM format.
+func (s *SettingService) GetDailyUsageRefreshTime(ctx context.Context) string {
+	if s == nil || s.settingRepo == nil {
+		return defaultDailyUsageRefreshTime
+	}
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyDailyUsageRefreshTime)
+	if err != nil {
+		return defaultDailyUsageRefreshTime
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return defaultDailyUsageRefreshTime
+	}
+	return value
+}
+
 // InitializeDefaultSettings 初始化默认设置
 func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	// 检查是否已有设置
@@ -220,15 +310,17 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 	// 初始化默认设置
 	defaults := map[string]string{
-		SettingKeyRegistrationEnabled: "true",
-		SettingKeyEmailVerifyEnabled:  "false",
-		SettingKeySiteName:            s.webTitleDefault(),
-		SettingKeySiteLogo:            "",
-		SettingKeyAfterSaleContact:    "[]",
-		SettingKeyDefaultConcurrency:  strconv.Itoa(s.cfg.Default.UserConcurrency),
-		SettingKeyDefaultBalance:      strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
-		SettingKeySMTPPort:            "587",
-		SettingKeySMTPUseTLS:          "false",
+		SettingKeyRegistrationEnabled:     "true",
+		SettingKeyEmailVerifyEnabled:      "false",
+		SettingKeySiteName:                s.webTitleDefault(),
+		SettingKeySiteLogo:                "",
+		SettingKeyAfterSaleContact:        "[]",
+		SettingKeyDefaultConcurrency:      strconv.Itoa(s.cfg.Default.UserConcurrency),
+		SettingKeyDefaultBalance:          strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
+		SettingKeyGatewayRetrySwitchAfter: strconv.Itoa(defaultGatewayRetrySwitchAfter),
+		SettingKeyDailyUsageRefreshTime:   defaultDailyUsageRefreshTime,
+		SettingKeySMTPPort:                "587",
+		SettingKeySMTPUseTLS:              "false",
 		// Model fallback defaults
 		SettingKeyEnableModelFallback:      "false",
 		SettingKeyFallbackModelAnthropic:   "claude-3-5-sonnet-20241022",
@@ -278,6 +370,13 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	} else {
 		result.DefaultConcurrency = s.cfg.Default.UserConcurrency
 	}
+
+	if switchAfter, err := strconv.Atoi(settings[SettingKeyGatewayRetrySwitchAfter]); err == nil {
+		result.GatewayRetrySwitchAfter = switchAfter
+	} else {
+		result.GatewayRetrySwitchAfter = defaultGatewayRetrySwitchAfter
+	}
+	result.DailyUsageRefreshTime = s.getStringOrDefault(settings, SettingKeyDailyUsageRefreshTime, defaultDailyUsageRefreshTime)
 
 	// 解析浮点数类型
 	if balance, err := strconv.ParseFloat(settings[SettingKeyDefaultBalance], 64); err == nil {

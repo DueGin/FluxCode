@@ -830,6 +830,10 @@ export interface ExtendSubscriptionRequest {
   days: number
 }
 
+export interface BulkAdjustSubscriptionExpiryResult {
+  updated_count: number
+}
+
 // ==================== Query Parameters ====================
 
 export interface UsageQueryParams {

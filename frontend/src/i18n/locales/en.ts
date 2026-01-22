@@ -869,6 +869,16 @@ export default {
       failedToCreate: 'Failed to create group',
       failedToUpdate: 'Failed to update group',
       failedToDelete: 'Failed to delete group',
+      adjustExpiry: 'Adjust Expiry',
+      adjustExpiryTitle: 'Adjust Subscription Expiry',
+      adjustExpiryDescription:
+        'Bulk add/subtract days for all unexpired subscriptions under this group. Only applies to subscription groups.',
+      adjustExpiryDays: 'Days',
+      adjustExpiryPlaceholder: 'e.g. 30 or -7',
+      adjustExpiryHint: 'Positive to extend, negative to reduce. 0 is not allowed.',
+      adjustExpiryInvalidDays: 'Please enter a non-zero integer number of days',
+      adjustExpirySuccess: 'Updated {count} subscriptions',
+      adjustExpiryFailed: 'Failed to adjust subscription expiry',
       deleteConfirm:
         "Are you sure you want to delete '{name}'? All associated API keys will no longer belong to any group.",
       deleteConfirmSubscription:
@@ -1839,6 +1849,15 @@ export default {
         defaultBalanceHint: 'Initial balance for new users',
         defaultConcurrency: 'Default Concurrency',
         defaultConcurrencyHint: 'Maximum concurrent requests for new users'
+      },
+      scheduling: {
+        title: 'Scheduling Settings',
+        description: 'Configure gateway scheduling and switching strategy',
+        gatewayRetrySwitchAfter: 'Switch account after retries',
+        gatewayRetrySwitchAfterHint:
+          'When the request retry count reaches this value, the gateway will switch to another account (recommended: 2)',
+        dailyUsageRefreshTime: 'Daily usage refresh time',
+        dailyUsageRefreshTimeHint: 'Refresh usage windows for active accounts at HH:MM each day'
       },
       site: {
         title: 'Site Settings',

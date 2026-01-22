@@ -87,7 +87,11 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		shouldDisable = true
 	case 429:
 		s.handle429(ctx, account, headers)
-		shouldDisable = false
+		if s.handleQuotaExceeded429(ctx, account, headers, responseBody) {
+			shouldDisable = true
+		} else {
+			shouldDisable = false
+		}
 	case 529:
 		s.handle529(ctx, account)
 		shouldDisable = false
@@ -690,6 +694,189 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 	}
 
 	applog.Printf("Account %d rate limited until %v", account.ID, resetAt)
+}
+
+func (s *RateLimitService) handleQuotaExceeded429(ctx context.Context, account *Account, headers http.Header, responseBody []byte) bool {
+	if account == nil || s.accountRepo == nil {
+		return false
+	}
+
+	code, msg, matched := isQuotaExceededResponse(responseBody)
+	if !matched {
+		return false
+	}
+
+	until := parseRateLimitReset(headers)
+	now := time.Now()
+	if until == nil || !until.After(now) {
+		fallback := now.Add(30 * time.Minute)
+		until = &fallback
+	}
+
+	reason := buildQuotaExceededReason(code, msg, headers)
+	if err := s.SetTempUnschedulableWithReason(ctx, account.ID, *until, reason); err != nil {
+		applog.Printf("[QuotaExceeded] SetTempUnschedulable failed for account %d: %v", account.ID, err)
+		return false
+	}
+
+	applog.Printf("[QuotaExceeded] account_id=%d until=%v", account.ID, until)
+	return true
+}
+
+func isQuotaExceededResponse(body []byte) (string, string, bool) {
+	msg := strings.TrimSpace(extractUpstreamErrorMessage(body))
+	msgLower := strings.ToLower(msg)
+
+	code := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "error.code").String()))
+	errType := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "error.type").String()))
+	status := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "error.status").String()))
+	topType := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "type").String()))
+
+	if isQuotaExceededCode(code) || isQuotaExceededCode(errType) || isQuotaExceededCode(status) || isQuotaExceededCode(topType) {
+		return code, msg, true
+	}
+	if msgLower == "" {
+		return code, msg, false
+	}
+	if containsQuotaKeyword(msgLower) {
+		return code, msg, true
+	}
+	return code, msg, false
+}
+
+func isQuotaExceededCode(code string) bool {
+	switch code {
+	case "insufficient_quota",
+		"quota_exceeded",
+		"billing_hard_limit_reached",
+		"billing_hard_limit",
+		"hard_limit_reached",
+		"account_limit_reached":
+		return true
+	default:
+		return false
+	}
+}
+
+func containsQuotaKeyword(msgLower string) bool {
+	if msgLower == "" {
+		return false
+	}
+	keywords := []string{
+		"insufficient quota",
+		"quota exceeded",
+		"exceeded your current quota",
+		"exceeded your quota",
+		"exceeded the quota",
+		"hard limit",
+		"billing hard limit",
+		"usage limit",
+		"usage cap",
+		"plan limit",
+		"out of quota",
+		"out of credits",
+		"out of credit",
+		"insufficient credits",
+		"account limit",
+		"quota has been exceeded",
+		"quota exceeded for",
+		"exceeded the allowed",
+		"额度",
+		"配额",
+		"超限",
+		"限额",
+		"余额不足",
+	}
+	for _, keyword := range keywords {
+		if strings.Contains(msgLower, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+func parseRateLimitReset(headers http.Header) *time.Time {
+	if headers == nil {
+		return nil
+	}
+	keys := []string{
+		"anthropic-ratelimit-unified-reset",
+		"x-ratelimit-reset-requests",
+		"x-ratelimit-reset-tokens",
+		"x-ratelimit-reset",
+		"ratelimit-reset",
+	}
+	for _, key := range keys {
+		value := strings.TrimSpace(headers.Get(key))
+		if value == "" {
+			continue
+		}
+		if resetAt := parseResetValue(value); resetAt != nil {
+			return resetAt
+		}
+	}
+	return nil
+}
+
+func parseResetValue(raw string) *time.Time {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil
+	}
+	if ts, err := strconv.ParseInt(value, 10, 64); err == nil {
+		now := time.Now()
+		switch {
+		case ts > 1_000_000_000_000:
+			resetAt := time.Unix(0, ts*int64(time.Millisecond))
+			return &resetAt
+		case ts > 1_000_000_000:
+			resetAt := time.Unix(ts, 0)
+			return &resetAt
+		default:
+			resetAt := now.Add(time.Duration(ts) * time.Second)
+			return &resetAt
+		}
+	}
+	if d, err := time.ParseDuration(value); err == nil {
+		resetAt := time.Now().Add(d)
+		return &resetAt
+	}
+	if t, err := time.Parse(time.RFC3339, value); err == nil {
+		return &t
+	}
+	return nil
+}
+
+func buildQuotaExceededReason(code, msg string, headers http.Header) string {
+	reqID := ""
+	if headers != nil {
+		reqID = firstNonEmptyHeader(headers, "x-request-id", "request-id", "anthropic-request-id")
+	}
+	msg = sanitizeSensitiveText(strings.TrimSpace(msg))
+	reqID = sanitizeSensitiveText(strings.TrimSpace(reqID))
+	code = sanitizeSensitiveText(strings.TrimSpace(code))
+
+	if msg != "" && len(msg) > 512 {
+		msg = msg[:512] + "..."
+	}
+	if reqID != "" && len(reqID) > 128 {
+		reqID = reqID[:128] + "..."
+	}
+	if code != "" && len(code) > 64 {
+		code = code[:64] + "..."
+	}
+
+	reason := "Upstream quota exceeded (429)"
+	if code != "" {
+		reason += "; upstream_code=" + code
+	}
+	if msg != "" {
+		reason += "; upstream_message=" + msg
+	}
+	if reqID != "" {
+		reason += "; request_id=" + reqID
+	}
+	return reason
 }
 
 // handle529 处理529过载错误

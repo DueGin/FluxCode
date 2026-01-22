@@ -69,6 +69,7 @@ type GatewayCache interface {
 	GetSessionAccountID(ctx context.Context, sessionHash string) (int64, error)
 	SetSessionAccountID(ctx context.Context, sessionHash string, accountID int64, ttl time.Duration) error
 	RefreshSessionTTL(ctx context.Context, sessionHash string, ttl time.Duration) error
+	DeleteSessionAccountID(ctx context.Context, sessionHash string) error
 }
 
 type AccountWaitPlan struct {
@@ -211,6 +212,13 @@ func (s *GatewayService) BindStickySession(ctx context.Context, sessionHash stri
 		return nil
 	}
 	return s.cache.SetSessionAccountID(ctx, sessionHash, accountID, stickySessionTTL)
+}
+
+func (s *GatewayService) ClearStickySession(ctx context.Context, sessionHash string) error {
+	if sessionHash == "" || s.cache == nil {
+		return nil
+	}
+	return s.cache.DeleteSessionAccountID(ctx, sessionHash)
 }
 
 func (s *GatewayService) extractCacheableContent(parsed *ParsedRequest) string {

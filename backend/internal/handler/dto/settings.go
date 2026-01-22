@@ -22,16 +22,18 @@ type SystemSettings struct {
 	TurnstileSiteKey   string `json:"turnstile_site_key"`
 	TurnstileSecretKey string `json:"turnstile_secret_key,omitempty"`
 
-	SiteName     string `json:"site_name"`
-	SiteLogo     string `json:"site_logo"`
-	SiteSubtitle string `json:"site_subtitle"`
-	APIBaseURL   string `json:"api_base_url"`
-	ContactInfo  string `json:"contact_info"`
+	SiteName         string   `json:"site_name"`
+	SiteLogo         string   `json:"site_logo"`
+	SiteSubtitle     string   `json:"site_subtitle"`
+	APIBaseURL       string   `json:"api_base_url"`
+	ContactInfo      string   `json:"contact_info"`
 	AfterSaleContact []KVItem `json:"after_sale_contact"`
-	DocURL       string `json:"doc_url"`
+	DocURL           string   `json:"doc_url"`
 
-	DefaultConcurrency int     `json:"default_concurrency"`
-	DefaultBalance     float64 `json:"default_balance"`
+	DefaultConcurrency      int     `json:"default_concurrency"`
+	DefaultBalance          float64 `json:"default_balance"`
+	GatewayRetrySwitchAfter int     `json:"gateway_retry_switch_after"`
+	DailyUsageRefreshTime   string  `json:"daily_usage_refresh_time"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -42,16 +44,16 @@ type SystemSettings struct {
 }
 
 type PublicSettings struct {
-	RegistrationEnabled bool   `json:"registration_enabled"`
-	EmailVerifyEnabled  bool   `json:"email_verify_enabled"`
-	TurnstileEnabled    bool   `json:"turnstile_enabled"`
-	TurnstileSiteKey    string `json:"turnstile_site_key"`
-	SiteName            string `json:"site_name"`
-	SiteLogo            string `json:"site_logo"`
-	SiteSubtitle        string `json:"site_subtitle"`
-	APIBaseURL          string `json:"api_base_url"`
-	ContactInfo         string `json:"contact_info"`
+	RegistrationEnabled bool     `json:"registration_enabled"`
+	EmailVerifyEnabled  bool     `json:"email_verify_enabled"`
+	TurnstileEnabled    bool     `json:"turnstile_enabled"`
+	TurnstileSiteKey    string   `json:"turnstile_site_key"`
+	SiteName            string   `json:"site_name"`
+	SiteLogo            string   `json:"site_logo"`
+	SiteSubtitle        string   `json:"site_subtitle"`
+	APIBaseURL          string   `json:"api_base_url"`
+	ContactInfo         string   `json:"contact_info"`
 	AfterSaleContact    []KVItem `json:"after_sale_contact"`
-	DocURL              string `json:"doc_url"`
-	Version             string `json:"version"`
+	DocURL              string   `json:"doc_url"`
+	Version             string   `json:"version"`
 }

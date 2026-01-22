@@ -179,6 +179,26 @@
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
               <button
+                v-if="row.subscription_type === 'subscription'"
+                @click="openAdjustExpiry(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-violet-50 hover:text-violet-600 dark:hover:bg-violet-900/20 dark:hover:text-violet-400"
+              >
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  stroke-width="1.5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+                <span class="text-xs">{{ t('admin.groups.adjustExpiry') }}</span>
+              </button>
+              <button
                 @click="handleEdit(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
@@ -641,6 +661,78 @@
       </template>
     </BaseDialog>
 
+    <!-- Bulk Adjust Subscription Expiry Modal -->
+    <BaseDialog
+      :show="showAdjustExpiryModal"
+      :title="t('admin.groups.adjustExpiryTitle')"
+      width="normal"
+      @close="closeAdjustExpiryModal"
+    >
+      <form
+        v-if="adjustingGroup"
+        id="adjust-expiry-form"
+        @submit.prevent="submitAdjustExpiry"
+        class="space-y-4"
+      >
+        <div
+          class="rounded-lg bg-violet-50 p-3 text-sm text-violet-800 dark:bg-violet-900/20 dark:text-violet-200"
+        >
+          <p class="font-medium">{{ adjustingGroup.name }}</p>
+          <p class="mt-1 text-xs text-violet-700/80 dark:text-violet-200/80">
+            {{ t('admin.groups.adjustExpiryDescription') }}
+          </p>
+        </div>
+
+        <div>
+          <label class="input-label">{{ t('admin.groups.adjustExpiryDays') }}</label>
+          <input
+            v-model.number="adjustExpiryForm.days"
+            type="number"
+            step="1"
+            class="input"
+            :placeholder="t('admin.groups.adjustExpiryPlaceholder')"
+          />
+          <p class="input-hint">{{ t('admin.groups.adjustExpiryHint') }}</p>
+        </div>
+      </form>
+
+      <template #footer>
+        <div class="flex justify-end gap-3 pt-4">
+          <button @click="closeAdjustExpiryModal" type="button" class="btn btn-secondary">
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            type="submit"
+            form="adjust-expiry-form"
+            :disabled="adjustingExpiry || !canSubmitAdjustExpiry"
+            class="btn btn-primary"
+          >
+            <svg
+              v-if="adjustingExpiry"
+              class="-ml-1 mr-2 h-4 w-4 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            {{ adjustingExpiry ? t('common.processing') : t('common.confirm') }}
+          </button>
+        </div>
+      </template>
+    </BaseDialog>
+
     <!-- Delete Confirmation Dialog -->
     <ConfirmDialog
       :show="showDeleteDialog"
@@ -745,9 +837,21 @@ let abortController: AbortController | null = null
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
 const showDeleteDialog = ref(false)
+const showAdjustExpiryModal = ref(false)
 const submitting = ref(false)
+const adjustingExpiry = ref(false)
 const editingGroup = ref<Group | null>(null)
 const deletingGroup = ref<Group | null>(null)
+const adjustingGroup = ref<Group | null>(null)
+
+const adjustExpiryForm = reactive({
+  days: '' as number | ''
+})
+
+const canSubmitAdjustExpiry = computed(() => {
+  const days = adjustExpiryForm.days === '' ? NaN : Number(adjustExpiryForm.days)
+  return Number.isInteger(days) && days !== 0
+})
 
 const createForm = reactive({
   name: '',
@@ -900,6 +1004,43 @@ const handleUpdateGroup = async () => {
 const handleDelete = (group: Group) => {
   deletingGroup.value = group
   showDeleteDialog.value = true
+}
+
+const openAdjustExpiry = (group: Group) => {
+  if (group.subscription_type !== 'subscription') {
+    return
+  }
+  adjustingGroup.value = group
+  adjustExpiryForm.days = ''
+  showAdjustExpiryModal.value = true
+}
+
+const closeAdjustExpiryModal = () => {
+  showAdjustExpiryModal.value = false
+  adjustingGroup.value = null
+  adjustExpiryForm.days = ''
+}
+
+const submitAdjustExpiry = async () => {
+  if (!adjustingGroup.value) return
+
+  const days = adjustExpiryForm.days === '' ? NaN : Number(adjustExpiryForm.days)
+  if (!Number.isInteger(days) || days === 0) {
+    appStore.showError(t('admin.groups.adjustExpiryInvalidDays'))
+    return
+  }
+
+  adjustingExpiry.value = true
+  try {
+    const result = await adminAPI.groups.adjustSubscriptionExpiry(adjustingGroup.value.id, days)
+    appStore.showSuccess(t('admin.groups.adjustExpirySuccess', { count: result.updated_count }))
+    closeAdjustExpiryModal()
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('admin.groups.adjustExpiryFailed'))
+    console.error('Error adjusting subscription expiry:', error)
+  } finally {
+    adjustingExpiry.value = false
+  }
 }
 
 const confirmDelete = async () => {

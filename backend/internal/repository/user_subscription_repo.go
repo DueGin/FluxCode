@@ -238,6 +238,53 @@ func (r *userSubscriptionRepository) ExtendExpiry(ctx context.Context, subscript
 	return translatePersistenceError(err, service.ErrSubscriptionNotFound, nil)
 }
 
+func (r *userSubscriptionRepository) BulkAdjustExpiryByGroupID(ctx context.Context, groupID int64, days int) ([]int64, error) {
+	if days == 0 {
+		return nil, nil
+	}
+
+	const updateSQL = `
+		UPDATE user_subscriptions us
+		SET
+			expires_at = LEAST($1, us.expires_at + ($2 * INTERVAL '1 day')),
+			status = CASE
+				WHEN LEAST($1, us.expires_at + ($2 * INTERVAL '1 day')) <= NOW() THEN $5
+				ELSE us.status
+			END,
+			updated_at = NOW()
+		FROM groups g
+		WHERE us.group_id = $3
+			AND us.group_id = g.id
+			AND us.deleted_at IS NULL
+			AND g.deleted_at IS NULL
+			AND g.subscription_type = $4
+			AND us.expires_at > NOW()
+			AND us.status != $5
+		RETURNING us.user_id
+	`
+
+	client := clientFromContext(ctx, r.client)
+	rows, err := client.QueryContext(ctx, updateSQL, service.MaxExpiresAt, days, groupID, service.SubscriptionTypeSubscription, service.SubscriptionStatusExpired)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	userIDs := make([]int64, 0)
+	for rows.Next() {
+		var userID int64
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		userIDs = append(userIDs, userID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return userIDs, nil
+}
+
 func (r *userSubscriptionRepository) UpdateStatus(ctx context.Context, subscriptionID int64, status string) error {
 	client := clientFromContext(ctx, r.client)
 	_, err := client.UserSubscription.UpdateOneID(subscriptionID).

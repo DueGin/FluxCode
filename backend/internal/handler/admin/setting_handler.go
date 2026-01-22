@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"strings"
+
 	"github.com/DueGin/FluxCode/internal/handler/dto"
 	"github.com/DueGin/FluxCode/internal/pkg/response"
 	"github.com/DueGin/FluxCode/internal/service"
@@ -60,6 +62,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		DocURL:                   settings.DocURL,
 		DefaultConcurrency:       settings.DefaultConcurrency,
 		DefaultBalance:           settings.DefaultBalance,
+		GatewayRetrySwitchAfter:  settings.GatewayRetrySwitchAfter,
+		DailyUsageRefreshTime:    settings.DailyUsageRefreshTime,
 		EnableModelFallback:      settings.EnableModelFallback,
 		FallbackModelAnthropic:   settings.FallbackModelAnthropic,
 		FallbackModelOpenAI:      settings.FallbackModelOpenAI,
@@ -89,17 +93,19 @@ type UpdateSettingsRequest struct {
 	TurnstileSecretKey string `json:"turnstile_secret_key"`
 
 	// OEM设置
-	SiteName     string `json:"site_name"`
-	SiteLogo     string `json:"site_logo"`
-	SiteSubtitle string `json:"site_subtitle"`
-	APIBaseURL   string `json:"api_base_url"`
-	ContactInfo  string `json:"contact_info"`
+	SiteName         string       `json:"site_name"`
+	SiteLogo         string       `json:"site_logo"`
+	SiteSubtitle     string       `json:"site_subtitle"`
+	APIBaseURL       string       `json:"api_base_url"`
+	ContactInfo      string       `json:"contact_info"`
 	AfterSaleContact []dto.KVItem `json:"after_sale_contact"`
-	DocURL       string `json:"doc_url"`
+	DocURL           string       `json:"doc_url"`
 
 	// 默认配置
-	DefaultConcurrency int     `json:"default_concurrency"`
-	DefaultBalance     float64 `json:"default_balance"`
+	DefaultConcurrency      int     `json:"default_concurrency"`
+	DefaultBalance          float64 `json:"default_balance"`
+	GatewayRetrySwitchAfter int     `json:"gateway_retry_switch_after"`
+	DailyUsageRefreshTime   string  `json:"daily_usage_refresh_time"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -124,6 +130,12 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.DefaultBalance < 0 {
 		req.DefaultBalance = 0
+	}
+	if req.GatewayRetrySwitchAfter <= 0 {
+		req.GatewayRetrySwitchAfter = 2
+	}
+	if strings.TrimSpace(req.DailyUsageRefreshTime) == "" {
+		req.DailyUsageRefreshTime = "03:00"
 	}
 	if req.SMTPPort <= 0 {
 		req.SMTPPort = 587
@@ -160,23 +172,23 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	settings := &service.SystemSettings{
-		RegistrationEnabled:      req.RegistrationEnabled,
-		EmailVerifyEnabled:       req.EmailVerifyEnabled,
-		SMTPHost:                 req.SMTPHost,
-		SMTPPort:                 req.SMTPPort,
-		SMTPUsername:             req.SMTPUsername,
-		SMTPPassword:             req.SMTPPassword,
-		SMTPFrom:                 req.SMTPFrom,
-		SMTPFromName:             req.SMTPFromName,
-		SMTPUseTLS:               req.SMTPUseTLS,
-		TurnstileEnabled:         req.TurnstileEnabled,
-		TurnstileSiteKey:         req.TurnstileSiteKey,
-		TurnstileSecretKey:       req.TurnstileSecretKey,
-		SiteName:                 req.SiteName,
-		SiteLogo:                 req.SiteLogo,
-		SiteSubtitle:             req.SiteSubtitle,
-		APIBaseURL:               req.APIBaseURL,
-		ContactInfo:              req.ContactInfo,
+		RegistrationEnabled: req.RegistrationEnabled,
+		EmailVerifyEnabled:  req.EmailVerifyEnabled,
+		SMTPHost:            req.SMTPHost,
+		SMTPPort:            req.SMTPPort,
+		SMTPUsername:        req.SMTPUsername,
+		SMTPPassword:        req.SMTPPassword,
+		SMTPFrom:            req.SMTPFrom,
+		SMTPFromName:        req.SMTPFromName,
+		SMTPUseTLS:          req.SMTPUseTLS,
+		TurnstileEnabled:    req.TurnstileEnabled,
+		TurnstileSiteKey:    req.TurnstileSiteKey,
+		TurnstileSecretKey:  req.TurnstileSecretKey,
+		SiteName:            req.SiteName,
+		SiteLogo:            req.SiteLogo,
+		SiteSubtitle:        req.SiteSubtitle,
+		APIBaseURL:          req.APIBaseURL,
+		ContactInfo:         req.ContactInfo,
 		AfterSaleContact: func() []service.KVItem {
 			out := make([]service.KVItem, 0, len(req.AfterSaleContact))
 			for _, item := range req.AfterSaleContact {
@@ -187,6 +199,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		DocURL:                   req.DocURL,
 		DefaultConcurrency:       req.DefaultConcurrency,
 		DefaultBalance:           req.DefaultBalance,
+		GatewayRetrySwitchAfter:  req.GatewayRetrySwitchAfter,
+		DailyUsageRefreshTime:    req.DailyUsageRefreshTime,
 		EnableModelFallback:      req.EnableModelFallback,
 		FallbackModelAnthropic:   req.FallbackModelAnthropic,
 		FallbackModelOpenAI:      req.FallbackModelOpenAI,
@@ -233,6 +247,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		DocURL:                   updatedSettings.DocURL,
 		DefaultConcurrency:       updatedSettings.DefaultConcurrency,
 		DefaultBalance:           updatedSettings.DefaultBalance,
+		GatewayRetrySwitchAfter:  updatedSettings.GatewayRetrySwitchAfter,
+		DailyUsageRefreshTime:    updatedSettings.DailyUsageRefreshTime,
 		EnableModelFallback:      updatedSettings.EnableModelFallback,
 		FallbackModelAnthropic:   updatedSettings.FallbackModelAnthropic,
 		FallbackModelOpenAI:      updatedSettings.FallbackModelOpenAI,

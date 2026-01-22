@@ -310,6 +310,52 @@
           </div>
         </div>
 
+        <!-- Scheduling Settings -->
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.settings.scheduling.title') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.settings.scheduling.description') }}
+            </p>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.scheduling.gatewayRetrySwitchAfter') }}
+                </label>
+                <input
+                  v-model.number="form.gateway_retry_switch_after"
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="input"
+                  placeholder="2"
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.scheduling.gatewayRetrySwitchAfterHint') }}
+                </p>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.scheduling.dailyUsageRefreshTime') }}
+                </label>
+                <input
+                  v-model="form.daily_usage_refresh_time"
+                  type="time"
+                  class="input"
+                  placeholder="03:00"
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.scheduling.dailyUsageRefreshTimeHint') }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Site Settings -->
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
@@ -784,6 +830,8 @@ const form = reactive<SystemSettings>({
   email_verify_enabled: false,
   default_balance: 0,
   default_concurrency: 1,
+  gateway_retry_switch_after: 2,
+  daily_usage_refresh_time: '03:00',
   site_name: 'FluxCode',
   site_logo: '',
   site_subtitle: 'Subscription to API Conversion Platform',

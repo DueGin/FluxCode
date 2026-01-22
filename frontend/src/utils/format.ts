@@ -175,6 +175,20 @@ export function formatDateTime(date: string | Date | null | undefined): string {
   return formatDate(date, 'YYYY-MM-DD HH:mm:ss')
 }
 
+/**
+ * 将文本中的 RFC3339 时间戳（如 2026-01-21T07:00:00Z）格式化为 YYYY-MM-DD HH:mm:ss（本地时区）
+ */
+export function formatRFC3339InText(text: string | null | undefined): string {
+  const raw = (text ?? '').toString()
+  if (!raw) return ''
+  const re = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?\b/g
+  return raw.replace(re, (match) => {
+    const parsed = new Date(match)
+    if (isNaN(parsed.getTime())) return match
+    return formatDateTime(parsed)
+  })
+}
+
 export function formatDateOnlyBeijing(date: string | Date | null | undefined): string {
   if (!date) return ''
   const d = new Date(date)

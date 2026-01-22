@@ -16,6 +16,8 @@ export interface SystemSettings {
   // Default settings
   default_balance: number
   default_concurrency: number
+  gateway_retry_switch_after: number
+  daily_usage_refresh_time: string
   // OEM settings
   site_name: string
   site_logo: string

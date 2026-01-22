@@ -21,16 +21,18 @@ type SystemSettings struct {
 	TurnstileSiteKey   string
 	TurnstileSecretKey string
 
-	SiteName     string
-	SiteLogo     string
-	SiteSubtitle string
-	APIBaseURL   string
-	ContactInfo  string
+	SiteName         string
+	SiteLogo         string
+	SiteSubtitle     string
+	APIBaseURL       string
+	ContactInfo      string
 	AfterSaleContact []KVItem
-	DocURL       string
+	DocURL           string
 
-	DefaultConcurrency int
-	DefaultBalance     float64
+	DefaultConcurrency      int
+	DefaultBalance          float64
+	GatewayRetrySwitchAfter int
+	DailyUsageRefreshTime   string
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`

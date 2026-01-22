@@ -222,6 +222,10 @@ type BulkAssignResult struct {
 	Errors        []string           `json:"errors"`
 }
 
+type BulkAdjustSubscriptionExpiryResult struct {
+	UpdatedCount int64 `json:"updated_count"`
+}
+
 type PricingPlanGroup struct {
 	ID          int64   `json:"id"`
 	Name        string  `json:"name"`

@@ -128,6 +128,27 @@ func (s *UsageLogRepoSuite) TestListByUser() {
 	s.Require().Equal(int64(2), page.Total)
 }
 
+func (s *UsageLogRepoSuite) TestListByUser_DefaultSortCreatedAtDesc() {
+	user := mustCreateUser(s.T(), s.client, &service.User{Email: "listbyuser_sort@test.com"})
+	apiKey := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: user.ID, Key: "sk-listbyuser-sort", Name: "k"})
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-listbyuser-sort"})
+
+	base := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	newer := base.Add(2 * time.Hour)
+	older := base.Add(1 * time.Hour)
+
+	// 先插入“更新”的记录，再插入“更旧”的记录，确保排序依据是 created_at 而非插入顺序/ID。
+	s.createUsageLog(user, apiKey, account, 10, 20, 0.5, newer)
+	s.createUsageLog(user, apiKey, account, 15, 25, 0.6, older)
+
+	logs, _, err := s.repo.ListByUser(s.ctx, user.ID, pagination.PaginationParams{Page: 1, PageSize: 10})
+	s.Require().NoError(err)
+	s.Require().Len(logs, 2)
+	s.Require().True(logs[0].CreatedAt.After(logs[1].CreatedAt) || logs[0].CreatedAt.Equal(logs[1].CreatedAt))
+	s.Require().Equal(newer, logs[0].CreatedAt)
+	s.Require().Equal(older, logs[1].CreatedAt)
+}
+
 // --- ListByAPIKey ---
 
 func (s *UsageLogRepoSuite) TestListByAPIKey() {
@@ -193,6 +214,27 @@ func (s *UsageLogRepoSuite) TestListWithFilters() {
 	s.Require().NoError(err, "ListWithFilters")
 	s.Require().Len(logs, 1)
 	s.Require().Equal(int64(1), page.Total)
+}
+
+func (s *UsageLogRepoSuite) TestListWithFilters_DefaultSortCreatedAtDesc() {
+	user := mustCreateUser(s.T(), s.client, &service.User{Email: "filters_sort@test.com"})
+	apiKey := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: user.ID, Key: "sk-filters-sort", Name: "k"})
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-filters-sort"})
+
+	base := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+	newer := base.Add(2 * time.Hour)
+	older := base.Add(1 * time.Hour)
+
+	// 同上：插入顺序与时间顺序相反，验证默认按 created_at 倒序。
+	s.createUsageLog(user, apiKey, account, 10, 20, 0.5, newer)
+	s.createUsageLog(user, apiKey, account, 15, 25, 0.6, older)
+
+	filters := usagestats.UsageLogFilters{UserID: user.ID}
+	logs, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, filters)
+	s.Require().NoError(err)
+	s.Require().Len(logs, 2)
+	s.Require().Equal(newer, logs[0].CreatedAt)
+	s.Require().Equal(older, logs[1].CreatedAt)
 }
 
 // --- GetDashboardStats ---

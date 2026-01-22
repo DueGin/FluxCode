@@ -24,6 +24,7 @@ type OpenAIGatewayHandler struct {
 	billingCacheService *service.BillingCacheService
 	usageQueueService   *service.UsageQueueService
 	concurrencyHelper   *ConcurrencyHelper
+	settingService      *service.SettingService
 }
 
 // NewOpenAIGatewayHandler creates a new OpenAIGatewayHandler
@@ -32,12 +33,14 @@ func NewOpenAIGatewayHandler(
 	concurrencyService *service.ConcurrencyService,
 	billingCacheService *service.BillingCacheService,
 	usageQueueService *service.UsageQueueService,
+	settingService *service.SettingService,
 ) *OpenAIGatewayHandler {
 	return &OpenAIGatewayHandler{
 		gatewayService:      gatewayService,
 		billingCacheService: billingCacheService,
 		usageQueueService:   usageQueueService,
 		concurrencyHelper:   NewConcurrencyHelper(concurrencyService, SSEPingFormatNone),
+		settingService:      settingService,
 	}
 }
 
@@ -141,6 +144,14 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 
 	// Generate session hash (from header for OpenAI)
 	sessionHash := h.gatewayService.GenerateSessionHash(c)
+	if shouldSwitchAccountOnRetry(c.Request.Context(), c.Request.Header, h.settingService) {
+		if sessionHash != "" {
+			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionHash); err != nil {
+				applog.Printf("Clear sticky session failed: %v", err)
+			}
+		}
+		sessionHash = ""
+	}
 
 	const maxAccountSwitches = 3
 	switchCount := 0
@@ -217,6 +228,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		if err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
+				if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionHash); err != nil {
+					applog.Printf("Clear sticky session failed: %v", err)
+				}
 				failedAccountIDs[account.ID] = struct{}{}
 				if switchCount >= maxAccountSwitches {
 					lastFailoverStatus = failoverErr.StatusCode
@@ -229,6 +243,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				continue
 			}
 			// Error response already handled in Forward, just log
+			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionHash); err != nil {
+				applog.Printf("Clear sticky session failed: %v", err)
+			}
 			applog.Printf("Account %d: Forward request failed: %v", account.ID, err)
 			return
 		}
