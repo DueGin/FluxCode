@@ -64,6 +64,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		DefaultBalance:           settings.DefaultBalance,
 		GatewayRetrySwitchAfter:  settings.GatewayRetrySwitchAfter,
 		DailyUsageRefreshTime:    settings.DailyUsageRefreshTime,
+		Auth401CooldownSeconds:   settings.Auth401CooldownSeconds,
 		EnableModelFallback:      settings.EnableModelFallback,
 		FallbackModelAnthropic:   settings.FallbackModelAnthropic,
 		FallbackModelOpenAI:      settings.FallbackModelOpenAI,
@@ -106,6 +107,7 @@ type UpdateSettingsRequest struct {
 	DefaultBalance          float64 `json:"default_balance"`
 	GatewayRetrySwitchAfter int     `json:"gateway_retry_switch_after"`
 	DailyUsageRefreshTime   string  `json:"daily_usage_refresh_time"`
+	Auth401CooldownSeconds  int     `json:"auth_401_cooldown_seconds"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -136,6 +138,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 	if strings.TrimSpace(req.DailyUsageRefreshTime) == "" {
 		req.DailyUsageRefreshTime = "03:00"
+	}
+	if req.Auth401CooldownSeconds <= 0 {
+		req.Auth401CooldownSeconds = 300
 	}
 	if req.SMTPPort <= 0 {
 		req.SMTPPort = 587
@@ -201,6 +206,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		DefaultBalance:           req.DefaultBalance,
 		GatewayRetrySwitchAfter:  req.GatewayRetrySwitchAfter,
 		DailyUsageRefreshTime:    req.DailyUsageRefreshTime,
+		Auth401CooldownSeconds:   req.Auth401CooldownSeconds,
 		EnableModelFallback:      req.EnableModelFallback,
 		FallbackModelAnthropic:   req.FallbackModelAnthropic,
 		FallbackModelOpenAI:      req.FallbackModelOpenAI,
@@ -249,6 +255,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		DefaultBalance:           updatedSettings.DefaultBalance,
 		GatewayRetrySwitchAfter:  updatedSettings.GatewayRetrySwitchAfter,
 		DailyUsageRefreshTime:    updatedSettings.DailyUsageRefreshTime,
+		Auth401CooldownSeconds:   updatedSettings.Auth401CooldownSeconds,
 		EnableModelFallback:      updatedSettings.EnableModelFallback,
 		FallbackModelAnthropic:   updatedSettings.FallbackModelAnthropic,
 		FallbackModelOpenAI:      updatedSettings.FallbackModelOpenAI,

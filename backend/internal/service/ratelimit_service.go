@@ -23,6 +23,7 @@ type RateLimitService struct {
 	accountRepo        AccountRepository
 	usageRepo          UsageLogRepository
 	cfg                *config.Config
+	settingService     *SettingService
 	geminiQuotaService *GeminiQuotaService
 	tempUnschedCache   TempUnschedCache
 	usageCacheMu       sync.RWMutex
@@ -36,18 +37,26 @@ type geminiUsageCacheEntry struct {
 }
 
 const geminiPrecheckCacheTTL = time.Minute
-const auth401Cooldown = 5 * time.Minute
 
 // NewRateLimitService 创建RateLimitService实例
-func NewRateLimitService(accountRepo AccountRepository, usageRepo UsageLogRepository, cfg *config.Config, geminiQuotaService *GeminiQuotaService, tempUnschedCache TempUnschedCache) *RateLimitService {
+func NewRateLimitService(accountRepo AccountRepository, usageRepo UsageLogRepository, cfg *config.Config, settingService *SettingService, geminiQuotaService *GeminiQuotaService, tempUnschedCache TempUnschedCache) *RateLimitService {
 	return &RateLimitService{
 		accountRepo:        accountRepo,
 		usageRepo:          usageRepo,
 		cfg:                cfg,
+		settingService:     settingService,
 		geminiQuotaService: geminiQuotaService,
 		tempUnschedCache:   tempUnschedCache,
 		usageCache:         make(map[int64]*geminiUsageCacheEntry),
 	}
+}
+
+func (s *RateLimitService) auth401Cooldown(ctx context.Context) time.Duration {
+	if s == nil || s.settingService == nil {
+		return 5 * time.Minute
+	}
+	seconds := s.settingService.GetAuth401CooldownSeconds(ctx)
+	return time.Duration(seconds) * time.Second
 }
 
 // HandleUpstreamError 处理上游错误响应，标记账号状态
@@ -126,8 +135,9 @@ func (s *RateLimitService) handle401(ctx context.Context, account *Account, head
 	// - 直接 SetError 会导致大量账号永久不可调度，需要人工逐个恢复
 	// 因此对“非官方上游”的 401 一律先走短暂冷却，让调度系统自恢复，并打出更明确的决策日志。
 	if trusted, _ := s.authUpstreamTrustedFor401(account); !trusted {
-		s.logUpstreamAuthAbnormal(account, 401, headers, responseBody, tempMatched, "temp_unsched(untrusted_upstream)", auth401Cooldown)
-		s.setTempUnschedulable(ctx, account, 401, headers, responseBody, auth401Cooldown)
+		cooldown := s.auth401Cooldown(ctx)
+		s.logUpstreamAuthAbnormal(account, 401, headers, responseBody, tempMatched, "temp_unsched(untrusted_upstream)", cooldown)
+		s.setTempUnschedulable(ctx, account, 401, headers, responseBody, cooldown)
 		return true
 	}
 
@@ -139,8 +149,9 @@ func (s *RateLimitService) handle401(ctx context.Context, account *Account, head
 		if account.IsOAuth() {
 			decision = "temp_unsched(oauth)"
 		}
-		s.logUpstreamAuthAbnormal(account, 401, headers, responseBody, tempMatched, decision, auth401Cooldown)
-		s.setTempUnschedulable(ctx, account, 401, headers, responseBody, auth401Cooldown)
+		cooldown := s.auth401Cooldown(ctx)
+		s.logUpstreamAuthAbnormal(account, 401, headers, responseBody, tempMatched, decision, cooldown)
+		s.setTempUnschedulable(ctx, account, 401, headers, responseBody, cooldown)
 		return true
 	}
 
@@ -341,7 +352,7 @@ func (s *RateLimitService) setTempUnschedulable(ctx context.Context, account *Ac
 		return
 	}
 	if cooldown <= 0 {
-		cooldown = auth401Cooldown
+		cooldown = s.auth401Cooldown(ctx)
 	}
 
 	now := time.Now()

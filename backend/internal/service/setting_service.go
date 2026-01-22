@@ -24,6 +24,7 @@ var (
 const (
 	defaultGatewayRetrySwitchAfter = 2
 	defaultDailyUsageRefreshTime   = "03:00"
+	defaultAuth401CooldownSeconds  = 300
 )
 
 type SettingRepository interface {
@@ -187,6 +188,10 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 		settings.DailyUsageRefreshTime = defaultDailyUsageRefreshTime
 	}
 	updates[SettingKeyDailyUsageRefreshTime] = strings.TrimSpace(settings.DailyUsageRefreshTime)
+	if settings.Auth401CooldownSeconds <= 0 {
+		settings.Auth401CooldownSeconds = defaultAuth401CooldownSeconds
+	}
+	updates[SettingKeyAuth401CooldownSeconds] = strconv.Itoa(settings.Auth401CooldownSeconds)
 
 	// Model fallback configuration
 	updates[SettingKeyEnableModelFallback] = strconv.FormatBool(settings.EnableModelFallback)
@@ -296,6 +301,20 @@ func (s *SettingService) GetDailyUsageRefreshTime(ctx context.Context) string {
 	return value
 }
 
+func (s *SettingService) GetAuth401CooldownSeconds(ctx context.Context) int {
+	if s == nil || s.settingRepo == nil {
+		return defaultAuth401CooldownSeconds
+	}
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyAuth401CooldownSeconds)
+	if err != nil {
+		return defaultAuth401CooldownSeconds
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
+		return v
+	}
+	return defaultAuth401CooldownSeconds
+}
+
 // InitializeDefaultSettings 初始化默认设置
 func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	// 检查是否已有设置
@@ -319,6 +338,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyDefaultBalance:          strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
 		SettingKeyGatewayRetrySwitchAfter: strconv.Itoa(defaultGatewayRetrySwitchAfter),
 		SettingKeyDailyUsageRefreshTime:   defaultDailyUsageRefreshTime,
+		SettingKeyAuth401CooldownSeconds:  strconv.Itoa(defaultAuth401CooldownSeconds),
 		SettingKeySMTPPort:                "587",
 		SettingKeySMTPUseTLS:              "false",
 		// Model fallback defaults
@@ -377,6 +397,11 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		result.GatewayRetrySwitchAfter = defaultGatewayRetrySwitchAfter
 	}
 	result.DailyUsageRefreshTime = s.getStringOrDefault(settings, SettingKeyDailyUsageRefreshTime, defaultDailyUsageRefreshTime)
+	if v, err := strconv.Atoi(settings[SettingKeyAuth401CooldownSeconds]); err == nil && v > 0 {
+		result.Auth401CooldownSeconds = v
+	} else {
+		result.Auth401CooldownSeconds = defaultAuth401CooldownSeconds
+	}
 
 	// 解析浮点数类型
 	if balance, err := strconv.ParseFloat(settings[SettingKeyDefaultBalance], 64); err == nil {

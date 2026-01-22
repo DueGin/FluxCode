@@ -33,6 +33,7 @@ type SystemSettings struct {
 	DefaultBalance          float64
 	GatewayRetrySwitchAfter int
 	DailyUsageRefreshTime   string
+	Auth401CooldownSeconds  int
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`

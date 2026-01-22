@@ -340,6 +340,22 @@
               </div>
               <div>
                 <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.scheduling.auth401CooldownSeconds') }}
+                </label>
+                <input
+                  v-model.number="form.auth_401_cooldown_seconds"
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="input"
+                  placeholder="300"
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.scheduling.auth401CooldownSecondsHint') }}
+                </p>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.scheduling.dailyUsageRefreshTime') }}
                 </label>
                 <input
@@ -832,6 +848,7 @@ const form = reactive<SystemSettings>({
   default_concurrency: 1,
   gateway_retry_switch_after: 2,
   daily_usage_refresh_time: '03:00',
+  auth_401_cooldown_seconds: 300,
   site_name: 'FluxCode',
   site_logo: '',
   site_subtitle: 'Subscription to API Conversion Platform',

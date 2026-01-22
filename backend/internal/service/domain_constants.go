@@ -91,6 +91,7 @@ const (
 	SettingKeyDefaultBalance          = "default_balance"            // 新用户默认余额
 	SettingKeyGatewayRetrySwitchAfter = "gateway_retry_switch_after" // 重试多少次后切换账号调度
 	SettingKeyDailyUsageRefreshTime   = "daily_usage_refresh_time"   // 每日用量刷新时间（HH:MM）
+	SettingKeyAuth401CooldownSeconds  = "auth_401_cooldown_seconds"  // 上游鉴权401临时冷却时间（秒）
 
 	// 管理员 API Key
 	SettingKeyAdminAPIKey = "admin_api_key" // 全局管理员 API Key（用于外部系统集成）

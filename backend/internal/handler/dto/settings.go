@@ -34,6 +34,7 @@ type SystemSettings struct {
 	DefaultBalance          float64 `json:"default_balance"`
 	GatewayRetrySwitchAfter int     `json:"gateway_retry_switch_after"`
 	DailyUsageRefreshTime   string  `json:"daily_usage_refresh_time"`
+	Auth401CooldownSeconds  int     `json:"auth_401_cooldown_seconds"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`

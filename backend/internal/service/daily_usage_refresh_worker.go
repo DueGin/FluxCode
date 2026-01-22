@@ -35,6 +35,14 @@ type DailyUsageRefreshWorker struct {
 	wg       sync.WaitGroup
 }
 
+// UsageRefreshResult captures the refresh outcome for a single account.
+type UsageRefreshResult struct {
+	AccountID int64  `json:"account_id"`
+	Action    string `json:"action"`
+	Outcome   string `json:"outcome"`
+	Detail    string `json:"detail"`
+}
+
 const dailyUsageRefreshAdvisoryLockID int64 = 74298347003
 
 func NewDailyUsageRefreshWorker(
@@ -93,6 +101,72 @@ func (w *DailyUsageRefreshWorker) ResetSchedule() {
 	case w.resetCh <- struct{}{}:
 	default:
 	}
+}
+
+// RefreshAccounts runs the usage refresh logic for the provided accounts.
+func (w *DailyUsageRefreshWorker) RefreshAccounts(ctx context.Context, accounts []*Account) []UsageRefreshResult {
+	if w == nil {
+		return nil
+	}
+	if len(accounts) == 0 {
+		return []UsageRefreshResult{}
+	}
+
+	concurrency := w.concurrency
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+
+	results := make([]UsageRefreshResult, len(accounts))
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+	for i := range accounts {
+		acc := accounts[i]
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(idx int, account *Account) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			start := time.Now()
+			action, outcome, detail := w.refreshAccountInternal(ctx, account)
+			if account != nil {
+				applog.Printf(
+					"[DailyUsageRefreshWorker] manual account_id=%d name=%q platform=%s type=%s action=%s outcome=%s detail=%s took=%s",
+					account.ID,
+					account.Name,
+					account.Platform,
+					account.Type,
+					action,
+					outcome,
+					detail,
+					time.Since(start),
+				)
+				results[idx] = UsageRefreshResult{
+					AccountID: account.ID,
+					Action:    action,
+					Outcome:   outcome,
+					Detail:    detail,
+				}
+				return
+			}
+
+			applog.Printf(
+				"[DailyUsageRefreshWorker] manual account_id=0 action=%s outcome=%s detail=%s took=%s",
+				action,
+				outcome,
+				detail,
+				time.Since(start),
+			)
+			results[idx] = UsageRefreshResult{
+				AccountID: 0,
+				Action:    action,
+				Outcome:   outcome,
+				Detail:    detail,
+			}
+		}(i, acc)
+	}
+	wg.Wait()
+	return results
 }
 
 func (w *DailyUsageRefreshWorker) loop() {
@@ -239,23 +313,36 @@ func (w *DailyUsageRefreshWorker) refreshAccountInternal(ctx context.Context, ac
 
 	windows := formatUsageInfo(usage)
 	if usageExceeded(usage) {
-		return action, "noop", "usage_exceeded " + windows
+		schedDetail := ""
+		if changed, err := w.ensureUnschedulable(reqCtx, account, action); err != nil {
+			return action, "error", "disable_schedulable_failed " + windows
+		} else if changed {
+			schedDetail = " schedulable_disabled"
+		}
+		return action, "ok", "usage_exceeded " + windows + schedDetail
+	}
+
+	schedDetail := ""
+	if changed, err := w.ensureSchedulable(reqCtx, account, action); err != nil {
+		return action, "error", "enable_schedulable_failed " + windows
+	} else if changed {
+		schedDetail = " schedulable_enabled"
 	}
 
 	if account.TempUnschedulableUntil == nil {
-		return action, "ok", "usage_ok " + windows
+		return action, "ok", "usage_ok " + windows + schedDetail
 	}
 	if !shouldEnableSchedulingByUsage(account.TempUnschedulableReason) {
-		return action, "ok", "usage_ok temp_unsched_other_reason " + windows
+		return action, "ok", "usage_ok temp_unsched_other_reason " + windows + schedDetail
 	}
 	if w.rateLimitService == nil {
-		return action, "noop", "rate_limit_service_nil " + windows
+		return action, "noop", "rate_limit_service_nil " + windows + schedDetail
 	}
 
 	if err := w.rateLimitService.ClearTempUnschedulable(reqCtx, account.ID); err != nil {
 		return action, "error", "clear_temp_unsched_failed " + windows
 	}
-	return action, "ok", "cleared_temp_unsched " + windows
+	return action, "ok", "cleared_temp_unsched " + windows + schedDetail
 }
 
 func (w *DailyUsageRefreshWorker) refreshCodexUsage(ctx context.Context, account *Account) (action string, outcome string, detail string) {
@@ -294,10 +381,6 @@ func (w *DailyUsageRefreshWorker) refreshCodexUsage(ctx context.Context, account
 		}
 	}
 
-	if w.rateLimitService == nil {
-		return action, "ok", fmt.Sprintf("probe_ok status=%d model=%s extra_updated=%t", statusCode, modelID, extraUpdated)
-	}
-
 	now := time.Now()
 	windows, exceeded := codexUsageWindows(account, now)
 	windowSummary := formatUsageWindows(windows)
@@ -306,28 +389,49 @@ func (w *DailyUsageRefreshWorker) refreshCodexUsage(ctx context.Context, account
 	}
 
 	if len(exceeded) == 0 {
-		if account.TempUnschedulableUntil == nil {
-			return action, "ok", fmt.Sprintf("probe_ok status=%d model=%s extra_updated=%t %s", statusCode, modelID, extraUpdated, windowSummary)
-		}
-		if !shouldEnableSchedulingByUsage(account.TempUnschedulableReason) {
-			return action, "ok", fmt.Sprintf("probe_ok status=%d model=%s temp_unsched_other_reason %s", statusCode, modelID, windowSummary)
-		}
 		reqCtx, cancel := context.WithTimeout(ctx, w.perAccountTimeout)
 		defer cancel()
+		schedDetail := ""
+		if changed, err := w.ensureSchedulable(reqCtx, account, action); err != nil {
+			return action, "error", "enable_schedulable_failed " + windowSummary
+		} else if changed {
+			schedDetail = " schedulable_enabled"
+		}
+
+		if account.TempUnschedulableUntil == nil {
+			return action, "ok", fmt.Sprintf("probe_ok status=%d model=%s extra_updated=%t %s", statusCode, modelID, extraUpdated, windowSummary) + schedDetail
+		}
+		if !shouldEnableSchedulingByUsage(account.TempUnschedulableReason) {
+			return action, "ok", fmt.Sprintf("probe_ok status=%d model=%s temp_unsched_other_reason %s", statusCode, modelID, windowSummary) + schedDetail
+		}
+		if w.rateLimitService == nil {
+			return action, "noop", "rate_limit_service_nil " + windowSummary + schedDetail
+		}
 		if err := w.rateLimitService.ClearTempUnschedulable(reqCtx, account.ID); err != nil {
 			return action, "error", "clear_temp_unsched_failed " + windowSummary
 		}
-		return action, "ok", "cleared_temp_unsched " + windowSummary
+		return action, "ok", "cleared_temp_unsched " + windowSummary + schedDetail
+	}
+
+	schedDetail := ""
+	reqCtx, cancel := context.WithTimeout(ctx, w.perAccountTimeout)
+	defer cancel()
+	if changed, err := w.ensureUnschedulable(reqCtx, account, action); err != nil {
+		return action, "error", "disable_schedulable_failed " + windowSummary
+	} else if changed {
+		schedDetail = " schedulable_disabled"
+	}
+
+	if w.rateLimitService == nil {
+		return action, "ok", "rate_limit_service_nil " + windowSummary + schedDetail
 	}
 
 	until := selectLatestReset(exceeded, now, 5*time.Minute)
 	reason := buildUsageExceededReason(account.Platform, exceeded)
-	reqCtx, cancel := context.WithTimeout(ctx, w.perAccountTimeout)
-	defer cancel()
 	if err := w.rateLimitService.SetTempUnschedulableWithReason(reqCtx, account.ID, until, reason); err != nil {
 		return action, "error", "set_temp_unsched_failed " + windowSummary
 	}
-	return action, "ok", "set_temp_unsched " + windowSummary
+	return action, "ok", "set_temp_unsched " + windowSummary + schedDetail
 }
 
 func (w *DailyUsageRefreshWorker) probeCodexUsage(ctx context.Context, account *Account) (updates map[string]any, attempted bool, statusCode int, modelID string, err error) {
@@ -455,6 +559,39 @@ func shouldEnableSchedulingByUsage(reason string) bool {
 	default:
 		return false
 	}
+}
+
+func (w *DailyUsageRefreshWorker) ensureSchedulable(ctx context.Context, account *Account, reason string) (bool, error) {
+	if w == nil || account == nil || w.accountRepo == nil {
+		return false, nil
+	}
+	if account.Schedulable || account.IsExpired() {
+		if account.IsExpired() {
+			applog.Printf("[DailyUsageRefreshWorker] Skip enable schedulable for expired account_id=%d name=%q platform=%s reason=%s", account.ID, account.Name, account.Platform, reason)
+		}
+		return false, nil
+	}
+	if err := w.accountRepo.SetSchedulable(ctx, account.ID, true); err != nil {
+		return false, err
+	}
+	account.Schedulable = true
+	applog.Printf("[DailyUsageRefreshWorker] Enabled schedulable account_id=%d name=%q platform=%s reason=%s", account.ID, account.Name, account.Platform, reason)
+	return true, nil
+}
+
+func (w *DailyUsageRefreshWorker) ensureUnschedulable(ctx context.Context, account *Account, reason string) (bool, error) {
+	if w == nil || account == nil || w.accountRepo == nil {
+		return false, nil
+	}
+	if !account.Schedulable {
+		return false, nil
+	}
+	if err := w.accountRepo.SetSchedulable(ctx, account.ID, false); err != nil {
+		return false, err
+	}
+	account.Schedulable = false
+	applog.Printf("[DailyUsageRefreshWorker] Disabled schedulable account_id=%d name=%q platform=%s reason=%s", account.ID, account.Name, account.Platform, reason)
+	return true, nil
 }
 
 func formatUsageInfo(usage *UsageInfo) string {

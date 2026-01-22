@@ -77,15 +77,16 @@ func NewOAuthHandler(oauthService *service.OAuthService) *OAuthHandler {
 
 // AccountHandler handles admin account management
 type AccountHandler struct {
-	adminService        service.AdminService
-	oauthService        *service.OAuthService
-	openaiOAuthService  *service.OpenAIOAuthService
-	geminiOAuthService  *service.GeminiOAuthService
-	rateLimitService    *service.RateLimitService
-	accountUsageService *service.AccountUsageService
-	accountTestService  *service.AccountTestService
-	concurrencyService  *service.ConcurrencyService
-	crsSyncService      *service.CRSSyncService
+	adminService            service.AdminService
+	oauthService            *service.OAuthService
+	openaiOAuthService      *service.OpenAIOAuthService
+	geminiOAuthService      *service.GeminiOAuthService
+	rateLimitService        *service.RateLimitService
+	accountUsageService     *service.AccountUsageService
+	dailyUsageRefreshWorker *service.DailyUsageRefreshWorker
+	accountTestService      *service.AccountTestService
+	concurrencyService      *service.ConcurrencyService
+	crsSyncService          *service.CRSSyncService
 }
 
 // NewAccountHandler creates a new admin account handler
@@ -96,20 +97,22 @@ func NewAccountHandler(
 	geminiOAuthService *service.GeminiOAuthService,
 	rateLimitService *service.RateLimitService,
 	accountUsageService *service.AccountUsageService,
+	dailyUsageRefreshWorker *service.DailyUsageRefreshWorker,
 	accountTestService *service.AccountTestService,
 	concurrencyService *service.ConcurrencyService,
 	crsSyncService *service.CRSSyncService,
 ) *AccountHandler {
 	return &AccountHandler{
-		adminService:        adminService,
-		oauthService:        oauthService,
-		openaiOAuthService:  openaiOAuthService,
-		geminiOAuthService:  geminiOAuthService,
-		rateLimitService:    rateLimitService,
-		accountUsageService: accountUsageService,
-		accountTestService:  accountTestService,
-		concurrencyService:  concurrencyService,
-		crsSyncService:      crsSyncService,
+		adminService:            adminService,
+		oauthService:            oauthService,
+		openaiOAuthService:      openaiOAuthService,
+		geminiOAuthService:      geminiOAuthService,
+		rateLimitService:        rateLimitService,
+		accountUsageService:     accountUsageService,
+		dailyUsageRefreshWorker: dailyUsageRefreshWorker,
+		accountTestService:      accountTestService,
+		concurrencyService:      concurrencyService,
+		crsSyncService:          crsSyncService,
 	}
 }
 
@@ -933,6 +936,73 @@ func (h *AccountHandler) ClearTempUnschedulable(c *gin.Context) {
 	response.Success(c, gin.H{"message": "Temp unschedulable cleared successfully"})
 }
 
+// BulkClearTempUnschedulableRequest represents the request body for bulk reset temp unschedulable status.
+type BulkClearTempUnschedulableRequest struct {
+	AccountIDs []int64 `json:"account_ids" binding:"required,min=1"`
+}
+
+// BulkClearTempUnschedulableResult represents a single account reset result.
+type BulkClearTempUnschedulableResult struct {
+	AccountID int64  `json:"account_id"`
+	Success   bool   `json:"success"`
+	Error     string `json:"error,omitempty"`
+}
+
+// BulkClearTempUnschedulable handles bulk reset temporary unschedulable status.
+// POST /api/v1/admin/accounts/bulk-clear-temp-unschedulable
+func (h *AccountHandler) BulkClearTempUnschedulable(c *gin.Context) {
+	var req BulkClearTempUnschedulableRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	uniqueIDs := make([]int64, 0, len(req.AccountIDs))
+	seen := make(map[int64]struct{}, len(req.AccountIDs))
+	for _, id := range req.AccountIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		uniqueIDs = append(uniqueIDs, id)
+	}
+	if len(uniqueIDs) == 0 {
+		response.BadRequest(c, "Invalid account IDs")
+		return
+	}
+
+	ctx := c.Request.Context()
+	results := make([]BulkClearTempUnschedulableResult, 0, len(uniqueIDs))
+	successCount := 0
+	failedCount := 0
+	for _, id := range uniqueIDs {
+		if err := h.rateLimitService.ClearTempUnschedulable(ctx, id); err != nil {
+			failedCount++
+			results = append(results, BulkClearTempUnschedulableResult{
+				AccountID: id,
+				Success:   false,
+				Error:     err.Error(),
+			})
+			continue
+		}
+		successCount++
+		results = append(results, BulkClearTempUnschedulableResult{
+			AccountID: id,
+			Success:   true,
+		})
+	}
+
+	response.Success(c, gin.H{
+		"total":   len(uniqueIDs),
+		"success": successCount,
+		"failed":  failedCount,
+		"results": results,
+	})
+}
+
 // GetTodayStats handles getting account today statistics
 // GET /api/v1/admin/accounts/:id/today-stats
 func (h *AccountHandler) GetTodayStats(c *gin.Context) {
@@ -1002,6 +1072,100 @@ func (h *AccountHandler) BulkSetSchedulable(c *gin.Context) {
 	}
 
 	response.Success(c, result)
+}
+
+// BulkRefreshUsageRequest represents the request body for manual usage refresh.
+type BulkRefreshUsageRequest struct {
+	AccountIDs []int64 `json:"account_ids" binding:"required,min=1"`
+}
+
+// BulkRefreshUsage handles manual usage refresh for selected accounts.
+// POST /api/v1/admin/accounts/bulk-refresh-usage
+func (h *AccountHandler) BulkRefreshUsage(c *gin.Context) {
+	var req BulkRefreshUsageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if h.dailyUsageRefreshWorker == nil {
+		response.InternalError(c, "Usage refresh worker not initialized")
+		return
+	}
+
+	uniqueIDs := make([]int64, 0, len(req.AccountIDs))
+	seen := make(map[int64]struct{}, len(req.AccountIDs))
+	for _, id := range req.AccountIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		uniqueIDs = append(uniqueIDs, id)
+	}
+	if len(uniqueIDs) == 0 {
+		response.BadRequest(c, "Invalid account IDs")
+		return
+	}
+
+	ctx := c.Request.Context()
+	accounts, err := h.adminService.GetAccountsByIDs(ctx, uniqueIDs)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	accountsByID := make(map[int64]*service.Account, len(accounts))
+	for _, acc := range accounts {
+		if acc == nil {
+			continue
+		}
+		accountsByID[acc.ID] = acc
+	}
+
+	toRefresh := make([]*service.Account, 0, len(accountsByID))
+	for _, id := range uniqueIDs {
+		if acc, ok := accountsByID[id]; ok {
+			toRefresh = append(toRefresh, acc)
+		}
+	}
+
+	refreshResults := h.dailyUsageRefreshWorker.RefreshAccounts(ctx, toRefresh)
+	resultsByID := make(map[int64]service.UsageRefreshResult, len(refreshResults))
+	for _, res := range refreshResults {
+		resultsByID[res.AccountID] = res
+	}
+
+	results := make([]service.UsageRefreshResult, 0, len(uniqueIDs))
+	successCount := 0
+	failedCount := 0
+	for _, id := range uniqueIDs {
+		if res, ok := resultsByID[id]; ok {
+			results = append(results, res)
+			if strings.EqualFold(res.Outcome, "error") {
+				failedCount++
+			} else {
+				successCount++
+			}
+			continue
+		}
+
+		results = append(results, service.UsageRefreshResult{
+			AccountID: id,
+			Action:    "usage_refresh",
+			Outcome:   "error",
+			Detail:    "account_not_found",
+		})
+		failedCount++
+	}
+
+	response.Success(c, gin.H{
+		"total":   len(uniqueIDs),
+		"success": successCount,
+		"failed":  failedCount,
+		"results": results,
+	})
 }
 
 // GetAvailableModels handles getting available models for an account

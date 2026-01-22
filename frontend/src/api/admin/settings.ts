@@ -18,6 +18,7 @@ export interface SystemSettings {
   default_concurrency: number
   gateway_retry_switch_after: number
   daily_usage_refresh_time: string
+  auth_401_cooldown_seconds: number
   // OEM settings
   site_name: string
   site_logo: string

@@ -21,6 +21,7 @@ import (
 	"github.com/DueGin/FluxCode/internal/config"
 	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -85,9 +86,12 @@ type OpenAIGatewayService struct {
 	concurrencyService  *ConcurrencyService
 	billingService      *BillingService
 	rateLimitService    *RateLimitService
+	openaiOAuthService  *OpenAIOAuthService
 	billingCacheService *BillingCacheService
 	httpUpstream        HTTPUpstream
 	deferredService     *DeferredService
+
+	openaiOAuthRefreshGroup singleflight.Group
 }
 
 // NewOpenAIGatewayService creates a new OpenAIGatewayService
@@ -101,6 +105,7 @@ func NewOpenAIGatewayService(
 	concurrencyService *ConcurrencyService,
 	billingService *BillingService,
 	rateLimitService *RateLimitService,
+	openaiOAuthService *OpenAIOAuthService,
 	billingCacheService *BillingCacheService,
 	httpUpstream HTTPUpstream,
 	deferredService *DeferredService,
@@ -115,6 +120,7 @@ func NewOpenAIGatewayService(
 		concurrencyService:  concurrencyService,
 		billingService:      billingService,
 		rateLimitService:    rateLimitService,
+		openaiOAuthService:  openaiOAuthService,
 		billingCacheService: billingCacheService,
 		httpUpstream:        httpUpstream,
 		deferredService:     deferredService,
@@ -493,13 +499,92 @@ func (s *OpenAIGatewayService) schedulingConfig() config.GatewaySchedulingConfig
 	}
 }
 
+type openaiOAuthRefreshResult struct {
+	AccessToken string
+	Credentials map[string]any
+}
+
+func (s *OpenAIGatewayService) getOpenAIOAuthAccessToken(ctx context.Context, account *Account, forceRefresh bool) (string, error) {
+	if account == nil {
+		return "", errors.New("account is nil")
+	}
+	if account.Platform != PlatformOpenAI || account.Type != AccountTypeOAuth {
+		return "", errors.New("not an openai oauth account")
+	}
+
+	accessToken := strings.TrimSpace(account.GetOpenAIAccessToken())
+	if !forceRefresh {
+		if accessToken == "" {
+			return "", errors.New("access_token not found in credentials")
+		}
+		return accessToken, nil
+	}
+
+	if s == nil || s.openaiOAuthService == nil {
+		return "", errors.New("openai oauth service not configured")
+	}
+
+	key := fmt.Sprintf("openai_oauth_refresh:%d", account.ID)
+	v, err, _ := s.openaiOAuthRefreshGroup.Do(key, func() (any, error) {
+		target := account
+		if s.accountRepo != nil {
+			if fresh, err := s.accountRepo.GetByID(ctx, account.ID); err == nil && fresh != nil {
+				target = fresh
+			}
+		}
+
+		tokenInfo, err := s.openaiOAuthService.RefreshAccountToken(ctx, target)
+		if err != nil {
+			return nil, err
+		}
+
+		newCredentials := s.openaiOAuthService.BuildAccountCredentials(tokenInfo)
+		for k, v := range target.Credentials {
+			if _, exists := newCredentials[k]; !exists {
+				newCredentials[k] = v
+			}
+		}
+		target.Credentials = newCredentials
+
+		if s.accountRepo != nil {
+			if err := s.accountRepo.Update(ctx, target); err != nil {
+				applog.Printf("[OpenAI OAuth] save refreshed credentials failed: account=%d err=%v", target.ID, err)
+			}
+		}
+
+		accessToken := strings.TrimSpace(tokenInfo.AccessToken)
+		if accessToken == "" {
+			accessToken = strings.TrimSpace(target.GetOpenAIAccessToken())
+		}
+		if accessToken == "" {
+			return nil, errors.New("access_token not found after refresh")
+		}
+
+		return &openaiOAuthRefreshResult{
+			AccessToken: accessToken,
+			Credentials: newCredentials,
+		}, nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	result, ok := v.(*openaiOAuthRefreshResult)
+	if !ok || result == nil || strings.TrimSpace(result.AccessToken) == "" {
+		return "", errors.New("refresh result invalid")
+	}
+
+	account.Credentials = result.Credentials
+	return strings.TrimSpace(result.AccessToken), nil
+}
+
 // GetAccessToken gets the access token for an OpenAI account
 func (s *OpenAIGatewayService) GetAccessToken(ctx context.Context, account *Account) (string, string, error) {
 	switch account.Type {
 	case AccountTypeOAuth:
-		accessToken := account.GetOpenAIAccessToken()
-		if accessToken == "" {
-			return "", "", errors.New("access_token not found in credentials")
+		accessToken, err := s.getOpenAIOAuthAccessToken(ctx, account, false)
+		if err != nil {
+			return "", "", err
 		}
 		return accessToken, "oauth", nil
 	case AccountTypeAPIKey:
@@ -522,9 +607,11 @@ func (s *OpenAIGatewayService) shouldFailoverUpstreamError(statusCode int) bool 
 	}
 }
 
-func (s *OpenAIGatewayService) handleFailoverSideEffects(ctx context.Context, resp *http.Response, account *Account) {
-	body, _ := io.ReadAll(resp.Body)
-	s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, body)
+func (s *OpenAIGatewayService) handleFailoverSideEffects(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte) {
+	if s.rateLimitService == nil {
+		return
+	}
+	s.rateLimitService.HandleUpstreamError(ctx, account, statusCode, headers, responseBody)
 }
 
 // Forward forwards request to OpenAI API
@@ -573,33 +660,60 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		return nil, err
 	}
 
-	// Build upstream request
-	upstreamReq, err := s.buildUpstreamRequest(ctx, c, account, body, token, reqStream)
-	if err != nil {
-		return nil, err
-	}
-
 	// Get proxy URL
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
 
+	send := func(token string) (*http.Response, error) {
+		upstreamReq, err := s.buildUpstreamRequest(ctx, c, account, body, token, reqStream)
+		if err != nil {
+			return nil, err
+		}
+		return s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+	}
+
 	// Send request
-	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+	resp, err := send(token)
 	if err != nil {
 		return nil, fmt.Errorf("upstream request failed: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
 
-	// Handle error response
+	// Handle error response (retry once on OpenAI OAuth 401 by refreshing token)
 	if resp.StatusCode >= 400 {
-		if s.shouldFailoverUpstreamError(resp.StatusCode) {
-			s.handleFailoverSideEffects(ctx, resp, account)
-			return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
+		responseBody, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
+		if resp.StatusCode == 401 && account.Type == AccountTypeOAuth {
+			newToken, refreshErr := s.getOpenAIOAuthAccessToken(ctx, account, true)
+			if refreshErr != nil {
+				applog.Printf("[OpenAI OAuth] refresh on 401 failed: account=%d err=%v", account.ID, refreshErr)
+			} else if strings.TrimSpace(newToken) != "" {
+				retryResp, err := send(newToken)
+				if err != nil {
+					applog.Printf("[OpenAI OAuth] retry after refresh failed: account=%d err=%v", account.ID, err)
+				} else if retryResp.StatusCode < 400 {
+					resp = retryResp
+				} else {
+					responseBody, _ = io.ReadAll(retryResp.Body)
+					_ = retryResp.Body.Close()
+					resp = retryResp
+				}
+			}
 		}
-		return s.handleErrorResponse(ctx, resp, c, account)
+
+		// Still error after retry attempt
+		if resp.StatusCode >= 400 {
+			if s.shouldFailoverUpstreamError(resp.StatusCode) {
+				s.handleFailoverSideEffects(ctx, account, resp.StatusCode, resp.Header, responseBody)
+				return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
+			}
+			return s.handleErrorResponse(ctx, resp.StatusCode, resp.Header, responseBody, c, account)
+		}
 	}
+
+	defer func() { _ = resp.Body.Close() }()
 
 	rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
 	requestID := normalizeRequestID(rawRequestID)
@@ -711,34 +825,32 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	return req, nil
 }
 
-func (s *OpenAIGatewayService) handleErrorResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account) (*OpenAIForwardResult, error) {
-	body, _ := io.ReadAll(resp.Body)
-
+func (s *OpenAIGatewayService) handleErrorResponse(ctx context.Context, upstreamStatusCode int, headers http.Header, body []byte, c *gin.Context, account *Account) (*OpenAIForwardResult, error) {
 	// Check custom error codes
-	if !account.ShouldHandleErrorCode(resp.StatusCode) {
+	if !account.ShouldHandleErrorCode(upstreamStatusCode) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"type":    "upstream_error",
 				"message": "Upstream gateway error",
 			},
 		})
-		return nil, fmt.Errorf("upstream error: %d (not in custom error codes)", resp.StatusCode)
+		return nil, fmt.Errorf("upstream error: %d (not in custom error codes)", upstreamStatusCode)
 	}
 
 	// Handle upstream error (mark account status)
 	shouldDisable := false
 	if s.rateLimitService != nil {
-		shouldDisable = s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, body)
+		shouldDisable = s.rateLimitService.HandleUpstreamError(ctx, account, upstreamStatusCode, headers, body)
 	}
 	if shouldDisable {
-		return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
+		return nil, &UpstreamFailoverError{StatusCode: upstreamStatusCode}
 	}
 
 	// Return appropriate error response
 	var errType, errMsg string
 	var statusCode int
 
-	switch resp.StatusCode {
+	switch upstreamStatusCode {
 	case 401:
 		statusCode = http.StatusBadGateway
 		errType = "upstream_error"
@@ -768,7 +880,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(ctx context.Context, resp *ht
 		},
 	})
 
-	return nil, fmt.Errorf("upstream error: %d", resp.StatusCode)
+	return nil, fmt.Errorf("upstream error: %d", upstreamStatusCode)
 }
 
 // openaiStreamingResult streaming response result
