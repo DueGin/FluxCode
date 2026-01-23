@@ -1953,37 +1953,56 @@ func (s *GeminiMessagesCompatService) handleGeminiUpstreamError(ctx context.Cont
 	isCodeAssist := account.IsGeminiCodeAssist()
 
 	resetAt := ParseGeminiRateLimitResetTime(body)
+	var resetTime time.Time
 	if resetAt == nil {
 		// 根据账号类型使用不同的默认重置时间
-		var ra time.Time
 		if isCodeAssist {
 			// Code Assist: fallback cooldown by tier
 			cooldown := geminiCooldownForTier(tierID)
 			if s.rateLimitService != nil {
 				cooldown = s.rateLimitService.GeminiCooldown(ctx, account)
 			}
-			ra = time.Now().Add(cooldown)
-			applog.Printf("[Gemini 429] Account %d (Code Assist, tier=%s, project=%s) rate limited, cooldown=%v", account.ID, tierID, projectID, time.Until(ra).Truncate(time.Second))
+			resetTime = time.Now().Add(cooldown)
+			applog.Printf("[Gemini 429] Account %d (Code Assist, tier=%s, project=%s) rate limited, cooldown=%v", account.ID, tierID, projectID, time.Until(resetTime).Truncate(time.Second))
 		} else {
 			// API Key / AI Studio OAuth: PST 午夜
 			if ts := nextGeminiDailyResetUnix(); ts != nil {
-				ra = time.Unix(*ts, 0)
-				applog.Printf("[Gemini 429] Account %d (API Key/AI Studio, type=%s) rate limited, reset at PST midnight (%v)", account.ID, account.Type, ra)
+				resetTime = time.Unix(*ts, 0)
+				applog.Printf("[Gemini 429] Account %d (API Key/AI Studio, type=%s) rate limited, reset at PST midnight (%v)", account.ID, account.Type, resetTime)
 			} else {
 				// 兜底：5 分钟
-				ra = time.Now().Add(5 * time.Minute)
+				resetTime = time.Now().Add(5 * time.Minute)
 				applog.Printf("[Gemini 429] Account %d rate limited, fallback to 5min", account.ID)
 			}
 		}
-		_ = s.accountRepo.SetRateLimited(ctx, account.ID, ra)
-		return
+	} else {
+		// 使用解析到的重置时间
+		resetTime = time.Unix(*resetAt, 0)
+		applog.Printf("[Gemini 429] Account %d rate limited until %v (oauth_type=%s, tier=%s)",
+			account.ID, resetTime, oauthType, tierID)
 	}
 
-	// 使用解析到的重置时间
-	resetTime := time.Unix(*resetAt, 0)
 	_ = s.accountRepo.SetRateLimited(ctx, account.ID, resetTime)
-	applog.Printf("[Gemini 429] Account %d rate limited until %v (oauth_type=%s, tier=%s)",
-		account.ID, resetTime, oauthType, tierID)
+	reason := buildGeminiRateLimitReason(body, resetTime)
+	if err := setUnschedulableWithReason(ctx, s.accountRepo, account, reason); err != nil {
+		applog.Printf("[Gemini 429] SetUnschedulableWithReason failed for account %d: %v", account.ID, err)
+	}
+}
+
+func buildGeminiRateLimitReason(body []byte, resetAt time.Time) string {
+	msg := strings.TrimSpace(extractUpstreamErrorMessage(body))
+	msg = sanitizeSensitiveText(msg)
+	if msg != "" && len(msg) > 512 {
+		msg = msg[:512] + "..."
+	}
+	reason := "Gemini 429 限流，已取消调度"
+	if !resetAt.IsZero() {
+		reason += "，预计 " + resetAt.Format(time.RFC3339) + " 恢复"
+	}
+	if msg != "" {
+		reason += "; upstream_message=" + msg
+	}
+	return reason
 }
 
 // ParseGeminiRateLimitResetTime 解析 Gemini 格式的 429 响应，返回重置时间的 Unix 时间戳

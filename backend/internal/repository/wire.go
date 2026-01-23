@@ -58,7 +58,6 @@ var ProviderSet = wire.NewSet(
 	NewBillingCache,
 	NewAPIKeyCache,
 	NewTempUnschedCache,
-	NewTempUnschedRecoveryCache,
 	ProvideConcurrencyCache,
 	NewEmailCache,
 	NewIdentityCache,

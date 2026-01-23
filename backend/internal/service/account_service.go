@@ -38,6 +38,7 @@ type AccountRepository interface {
 	BatchUpdateLastUsed(ctx context.Context, updates map[int64]time.Time) error
 	SetError(ctx context.Context, id int64, errorMsg string) error
 	SetSchedulable(ctx context.Context, id int64, schedulable bool) error
+	SetUnschedulableWithReason(ctx context.Context, id int64, reason string) error
 	BindGroups(ctx context.Context, accountID int64, groupIDs []int64) error
 
 	ListSchedulable(ctx context.Context) ([]Account, error)

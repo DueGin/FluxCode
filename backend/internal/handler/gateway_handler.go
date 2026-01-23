@@ -31,6 +31,7 @@ type GatewayHandler struct {
 	usageQueueService         *service.UsageQueueService
 	concurrencyHelper         *ConcurrencyHelper
 	settingService            *service.SettingService
+	alertService              *service.AlertService
 }
 
 // NewGatewayHandler creates a new GatewayHandler
@@ -43,6 +44,7 @@ func NewGatewayHandler(
 	billingCacheService *service.BillingCacheService,
 	usageQueueService *service.UsageQueueService,
 	settingService *service.SettingService,
+	alertService *service.AlertService,
 ) *GatewayHandler {
 	return &GatewayHandler{
 		gatewayService:            gatewayService,
@@ -53,6 +55,7 @@ func NewGatewayHandler(
 		usageQueueService:         usageQueueService,
 		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude),
 		settingService:            settingService,
+		alertService:              alertService,
 	}
 }
 
@@ -71,6 +74,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
+	userName := formatUserNameForLog(apiKey.User, subject.UserID)
 
 	// 读取请求体
 	body, err := io.ReadAll(c.Request.Body)
@@ -124,7 +128,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	// 1. 首先获取用户并发槽位
 	userReleaseFunc, err := h.concurrencyHelper.AcquireUserSlotWithWait(c, subject.UserID, subject.Concurrency, reqStream, &streamStarted)
 	if err != nil {
-		applog.Printf("User concurrency acquire failed: %v", err)
+		applog.Printf("User concurrency acquire failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 		h.handleConcurrencyError(c, err, "user", streamStarted)
 		return
 	}
@@ -156,7 +160,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	if shouldSwitchAccountOnRetry(c.Request.Context(), c.Request.Header, h.settingService) {
 		if sessionKey != "" {
 			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
-				applog.Printf("Clear sticky session failed: %v", err)
+				applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 			}
 		}
 		sessionKey = ""
@@ -227,7 +231,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					if accountWaitRelease != nil {
 						accountWaitRelease()
 					}
-					applog.Printf("Account concurrency acquire failed: %v", err)
+					applog.Printf("Account concurrency acquire failed: %v (user_name=%q user_id=%d account_id=%d%s)", err, userName, subject.UserID, account.ID, requestIDSuffix(c))
 					h.handleConcurrencyError(c, err, "account", streamStarted)
 					return
 				}
@@ -253,7 +257,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
 					if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
-						applog.Printf("Clear sticky session failed: %v", err)
+						applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 					}
 					failedAccountIDs[account.ID] = struct{}{}
 					if switchCount >= maxAccountSwitches {
@@ -268,9 +272,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				// 错误响应已在Forward中处理，这里只记录日志
 				if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
-					applog.Printf("Clear sticky session failed: %v", err)
+					applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 				}
-				applog.Printf("Forward request failed: %v", err)
+				applog.Printf("Forward request failed: %v (user_name=%q user_id=%d account_id=%d%s)", err, userName, subject.UserID, account.ID, requestIDSuffix(c))
 				return
 			}
 
@@ -379,7 +383,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if accountWaitRelease != nil {
 					accountWaitRelease()
 				}
-				applog.Printf("Account concurrency acquire failed: %v", err)
+				applog.Printf("Account concurrency acquire failed: %v (user_name=%q user_id=%d account_id=%d%s)", err, userName, subject.UserID, account.ID, requestIDSuffix(c))
 				h.handleConcurrencyError(c, err, "account", streamStarted)
 				return
 			}
@@ -405,7 +409,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
 				if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
-					applog.Printf("Clear sticky session failed: %v", err)
+					applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 				}
 				failedAccountIDs[account.ID] = struct{}{}
 				if switchCount >= maxAccountSwitches {
@@ -420,9 +424,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			// 错误响应已在Forward中处理，这里只记录日志
 			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
-				applog.Printf("Clear sticky session failed: %v", err)
+				applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 			}
-			applog.Printf("Account %d: Forward request failed: %v", account.ID, err)
+			applog.Printf("Account %d: Forward request failed: %v (user_name=%q user_id=%d%s)", account.ID, err, userName, subject.UserID, requestIDSuffix(c))
 			return
 		}
 
@@ -654,6 +658,7 @@ func (h *GatewayHandler) mapUpstreamError(statusCode int) (int, string, string) 
 // handleStreamingAwareError handles errors that may occur after streaming has started
 func (h *GatewayHandler) handleStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
 	if streamStarted {
+		maybeSendNoAvailableAccountsAlert(h.alertService, c, message)
 		// Stream already started, send error as SSE event then close
 		flusher, ok := c.Writer.(http.Flusher)
 		if ok {
@@ -685,6 +690,7 @@ func (h *GatewayHandler) handleStreamingAwareError(c *gin.Context, status int, e
 
 // errorResponse 返回Claude API格式的错误响应
 func (h *GatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
+	maybeSendNoAvailableAccountsAlert(h.alertService, c, message)
 	c.JSON(status, gin.H{
 		"type": "error",
 		"error": gin.H{

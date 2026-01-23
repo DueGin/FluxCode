@@ -26,6 +26,7 @@ export async function list(
     status?: 'active' | 'used' | 'expired' | 'unused'
     is_welfare?: boolean
     welfare_no?: string
+    search_type?: 'code' | 'user'
     search?: string
   },
   options?: {

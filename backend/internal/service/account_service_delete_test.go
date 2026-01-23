@@ -139,6 +139,10 @@ func (s *accountRepoStub) SetOverloaded(ctx context.Context, id int64, until tim
 	panic("unexpected SetOverloaded call")
 }
 
+func (s *accountRepoStub) SetUnschedulableWithReason(ctx context.Context, id int64, reason string) error {
+	panic("unexpected SetUnschedulableWithReason call")
+}
+
 func (s *accountRepoStub) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
 	panic("unexpected SetTempUnschedulable call")
 }

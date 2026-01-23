@@ -45,13 +45,13 @@ type RedeemCodeRepository interface {
 	GetByCode(ctx context.Context, code string) (*RedeemCode, error)
 	Update(ctx context.Context, code *RedeemCode) error
 	Delete(ctx context.Context, id int64) error
-	Use(ctx context.Context, id, userID int64) error
+		Use(ctx context.Context, id, userID int64) error
 
-	List(ctx context.Context, params pagination.PaginationParams) ([]RedeemCode, *pagination.PaginationResult, error)
-	ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, *pagination.PaginationResult, error)
-	ListByUser(ctx context.Context, userID int64, limit int) ([]RedeemCode, error)
-	ListWelfareNos(ctx context.Context) ([]string, error)
-}
+		List(ctx context.Context, params pagination.PaginationParams) ([]RedeemCode, *pagination.PaginationResult, error)
+		ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, *pagination.PaginationResult, error)
+		ListByUser(ctx context.Context, userID int64, limit int) ([]RedeemCode, error)
+		ListWelfareNos(ctx context.Context) ([]string, error)
+	}
 
 // GenerateCodesRequest 生成兑换码请求
 type GenerateCodesRequest struct {

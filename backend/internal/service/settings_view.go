@@ -9,6 +9,9 @@ type SystemSettings struct {
 	RegistrationEnabled bool
 	EmailVerifyEnabled  bool
 
+	AlertEmails          []string `json:"alert_emails"`
+	AlertCooldownMinutes int      `json:"alert_cooldown_minutes"`
+
 	SMTPHost     string
 	SMTPPort     int
 	SMTPUsername string
@@ -29,11 +32,12 @@ type SystemSettings struct {
 	AfterSaleContact []KVItem
 	DocURL           string
 
-	DefaultConcurrency      int
-	DefaultBalance          float64
-	GatewayRetrySwitchAfter int
-	DailyUsageRefreshTime   string
-	Auth401CooldownSeconds  int
+	DefaultConcurrency        int
+	DefaultBalance            float64
+	GatewayRetrySwitchAfter   int
+	DailyUsageRefreshTime     string
+	Auth401CooldownSeconds    int
+	UsageWindowDisablePercent int
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`

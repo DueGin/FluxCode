@@ -41,35 +41,38 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 	}
 
 	response.Success(c, dto.SystemSettings{
-		RegistrationEnabled:      settings.RegistrationEnabled,
-		EmailVerifyEnabled:       settings.EmailVerifyEnabled,
-		SMTPHost:                 settings.SMTPHost,
-		SMTPPort:                 settings.SMTPPort,
-		SMTPUsername:             settings.SMTPUsername,
-		SMTPPassword:             settings.SMTPPassword,
-		SMTPFrom:                 settings.SMTPFrom,
-		SMTPFromName:             settings.SMTPFromName,
-		SMTPUseTLS:               settings.SMTPUseTLS,
-		TurnstileEnabled:         settings.TurnstileEnabled,
-		TurnstileSiteKey:         settings.TurnstileSiteKey,
-		TurnstileSecretKey:       settings.TurnstileSecretKey,
-		SiteName:                 settings.SiteName,
-		SiteLogo:                 settings.SiteLogo,
-		SiteSubtitle:             settings.SiteSubtitle,
-		APIBaseURL:               settings.APIBaseURL,
-		ContactInfo:              settings.ContactInfo,
-		AfterSaleContact:         afterSaleContact,
-		DocURL:                   settings.DocURL,
-		DefaultConcurrency:       settings.DefaultConcurrency,
-		DefaultBalance:           settings.DefaultBalance,
-		GatewayRetrySwitchAfter:  settings.GatewayRetrySwitchAfter,
-		DailyUsageRefreshTime:    settings.DailyUsageRefreshTime,
-		Auth401CooldownSeconds:   settings.Auth401CooldownSeconds,
-		EnableModelFallback:      settings.EnableModelFallback,
-		FallbackModelAnthropic:   settings.FallbackModelAnthropic,
-		FallbackModelOpenAI:      settings.FallbackModelOpenAI,
-		FallbackModelGemini:      settings.FallbackModelGemini,
-		FallbackModelAntigravity: settings.FallbackModelAntigravity,
+		RegistrationEnabled:       settings.RegistrationEnabled,
+		EmailVerifyEnabled:        settings.EmailVerifyEnabled,
+		AlertEmails:               settings.AlertEmails,
+		AlertCooldownMinutes:      settings.AlertCooldownMinutes,
+		SMTPHost:                  settings.SMTPHost,
+		SMTPPort:                  settings.SMTPPort,
+		SMTPUsername:              settings.SMTPUsername,
+		SMTPPassword:              settings.SMTPPassword,
+		SMTPFrom:                  settings.SMTPFrom,
+		SMTPFromName:              settings.SMTPFromName,
+		SMTPUseTLS:                settings.SMTPUseTLS,
+		TurnstileEnabled:          settings.TurnstileEnabled,
+		TurnstileSiteKey:          settings.TurnstileSiteKey,
+		TurnstileSecretKey:        settings.TurnstileSecretKey,
+		SiteName:                  settings.SiteName,
+		SiteLogo:                  settings.SiteLogo,
+		SiteSubtitle:              settings.SiteSubtitle,
+		APIBaseURL:                settings.APIBaseURL,
+		ContactInfo:               settings.ContactInfo,
+		AfterSaleContact:          afterSaleContact,
+		DocURL:                    settings.DocURL,
+		DefaultConcurrency:        settings.DefaultConcurrency,
+		DefaultBalance:            settings.DefaultBalance,
+		GatewayRetrySwitchAfter:   settings.GatewayRetrySwitchAfter,
+		DailyUsageRefreshTime:     settings.DailyUsageRefreshTime,
+		Auth401CooldownSeconds:    settings.Auth401CooldownSeconds,
+		UsageWindowDisablePercent: settings.UsageWindowDisablePercent,
+		EnableModelFallback:       settings.EnableModelFallback,
+		FallbackModelAnthropic:    settings.FallbackModelAnthropic,
+		FallbackModelOpenAI:       settings.FallbackModelOpenAI,
+		FallbackModelGemini:       settings.FallbackModelGemini,
+		FallbackModelAntigravity:  settings.FallbackModelAntigravity,
 	})
 }
 
@@ -78,6 +81,10 @@ type UpdateSettingsRequest struct {
 	// 注册设置
 	RegistrationEnabled bool `json:"registration_enabled"`
 	EmailVerifyEnabled  bool `json:"email_verify_enabled"`
+
+	// 告警设置
+	AlertEmails          []string `json:"alert_emails"`
+	AlertCooldownMinutes int      `json:"alert_cooldown_minutes"`
 
 	// 邮件服务设置
 	SMTPHost     string `json:"smtp_host"`
@@ -103,11 +110,12 @@ type UpdateSettingsRequest struct {
 	DocURL           string       `json:"doc_url"`
 
 	// 默认配置
-	DefaultConcurrency      int     `json:"default_concurrency"`
-	DefaultBalance          float64 `json:"default_balance"`
-	GatewayRetrySwitchAfter int     `json:"gateway_retry_switch_after"`
-	DailyUsageRefreshTime   string  `json:"daily_usage_refresh_time"`
-	Auth401CooldownSeconds  int     `json:"auth_401_cooldown_seconds"`
+	DefaultConcurrency        int     `json:"default_concurrency"`
+	DefaultBalance            float64 `json:"default_balance"`
+	GatewayRetrySwitchAfter   int     `json:"gateway_retry_switch_after"`
+	DailyUsageRefreshTime     string  `json:"daily_usage_refresh_time"`
+	Auth401CooldownSeconds    int     `json:"auth_401_cooldown_seconds"`
+	UsageWindowDisablePercent int     `json:"usage_window_disable_percent"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -142,8 +150,16 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	if req.Auth401CooldownSeconds <= 0 {
 		req.Auth401CooldownSeconds = 300
 	}
+	if req.UsageWindowDisablePercent <= 0 {
+		req.UsageWindowDisablePercent = 100
+	} else if req.UsageWindowDisablePercent > 100 {
+		req.UsageWindowDisablePercent = 100
+	}
 	if req.SMTPPort <= 0 {
 		req.SMTPPort = 587
+	}
+	if req.AlertCooldownMinutes < 0 {
+		req.AlertCooldownMinutes = 0
 	}
 
 	// Turnstile 参数验证
@@ -177,23 +193,25 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	settings := &service.SystemSettings{
-		RegistrationEnabled: req.RegistrationEnabled,
-		EmailVerifyEnabled:  req.EmailVerifyEnabled,
-		SMTPHost:            req.SMTPHost,
-		SMTPPort:            req.SMTPPort,
-		SMTPUsername:        req.SMTPUsername,
-		SMTPPassword:        req.SMTPPassword,
-		SMTPFrom:            req.SMTPFrom,
-		SMTPFromName:        req.SMTPFromName,
-		SMTPUseTLS:          req.SMTPUseTLS,
-		TurnstileEnabled:    req.TurnstileEnabled,
-		TurnstileSiteKey:    req.TurnstileSiteKey,
-		TurnstileSecretKey:  req.TurnstileSecretKey,
-		SiteName:            req.SiteName,
-		SiteLogo:            req.SiteLogo,
-		SiteSubtitle:        req.SiteSubtitle,
-		APIBaseURL:          req.APIBaseURL,
-		ContactInfo:         req.ContactInfo,
+		RegistrationEnabled:  req.RegistrationEnabled,
+		EmailVerifyEnabled:   req.EmailVerifyEnabled,
+		AlertEmails:          req.AlertEmails,
+		AlertCooldownMinutes: req.AlertCooldownMinutes,
+		SMTPHost:             req.SMTPHost,
+		SMTPPort:             req.SMTPPort,
+		SMTPUsername:         req.SMTPUsername,
+		SMTPPassword:         req.SMTPPassword,
+		SMTPFrom:             req.SMTPFrom,
+		SMTPFromName:         req.SMTPFromName,
+		SMTPUseTLS:           req.SMTPUseTLS,
+		TurnstileEnabled:     req.TurnstileEnabled,
+		TurnstileSiteKey:     req.TurnstileSiteKey,
+		TurnstileSecretKey:   req.TurnstileSecretKey,
+		SiteName:             req.SiteName,
+		SiteLogo:             req.SiteLogo,
+		SiteSubtitle:         req.SiteSubtitle,
+		APIBaseURL:           req.APIBaseURL,
+		ContactInfo:          req.ContactInfo,
 		AfterSaleContact: func() []service.KVItem {
 			out := make([]service.KVItem, 0, len(req.AfterSaleContact))
 			for _, item := range req.AfterSaleContact {
@@ -201,17 +219,18 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return out
 		}(),
-		DocURL:                   req.DocURL,
-		DefaultConcurrency:       req.DefaultConcurrency,
-		DefaultBalance:           req.DefaultBalance,
-		GatewayRetrySwitchAfter:  req.GatewayRetrySwitchAfter,
-		DailyUsageRefreshTime:    req.DailyUsageRefreshTime,
-		Auth401CooldownSeconds:   req.Auth401CooldownSeconds,
-		EnableModelFallback:      req.EnableModelFallback,
-		FallbackModelAnthropic:   req.FallbackModelAnthropic,
-		FallbackModelOpenAI:      req.FallbackModelOpenAI,
-		FallbackModelGemini:      req.FallbackModelGemini,
-		FallbackModelAntigravity: req.FallbackModelAntigravity,
+		DocURL:                    req.DocURL,
+		DefaultConcurrency:        req.DefaultConcurrency,
+		DefaultBalance:            req.DefaultBalance,
+		GatewayRetrySwitchAfter:   req.GatewayRetrySwitchAfter,
+		DailyUsageRefreshTime:     req.DailyUsageRefreshTime,
+		Auth401CooldownSeconds:    req.Auth401CooldownSeconds,
+		UsageWindowDisablePercent: req.UsageWindowDisablePercent,
+		EnableModelFallback:       req.EnableModelFallback,
+		FallbackModelAnthropic:    req.FallbackModelAnthropic,
+		FallbackModelOpenAI:       req.FallbackModelOpenAI,
+		FallbackModelGemini:       req.FallbackModelGemini,
+		FallbackModelAntigravity:  req.FallbackModelAntigravity,
 	}
 
 	if err := h.settingService.UpdateSettings(c.Request.Context(), settings); err != nil {
@@ -232,35 +251,38 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	response.Success(c, dto.SystemSettings{
-		RegistrationEnabled:      updatedSettings.RegistrationEnabled,
-		EmailVerifyEnabled:       updatedSettings.EmailVerifyEnabled,
-		SMTPHost:                 updatedSettings.SMTPHost,
-		SMTPPort:                 updatedSettings.SMTPPort,
-		SMTPUsername:             updatedSettings.SMTPUsername,
-		SMTPPassword:             updatedSettings.SMTPPassword,
-		SMTPFrom:                 updatedSettings.SMTPFrom,
-		SMTPFromName:             updatedSettings.SMTPFromName,
-		SMTPUseTLS:               updatedSettings.SMTPUseTLS,
-		TurnstileEnabled:         updatedSettings.TurnstileEnabled,
-		TurnstileSiteKey:         updatedSettings.TurnstileSiteKey,
-		TurnstileSecretKey:       updatedSettings.TurnstileSecretKey,
-		SiteName:                 updatedSettings.SiteName,
-		SiteLogo:                 updatedSettings.SiteLogo,
-		SiteSubtitle:             updatedSettings.SiteSubtitle,
-		APIBaseURL:               updatedSettings.APIBaseURL,
-		ContactInfo:              updatedSettings.ContactInfo,
-		AfterSaleContact:         updatedAfterSaleContact,
-		DocURL:                   updatedSettings.DocURL,
-		DefaultConcurrency:       updatedSettings.DefaultConcurrency,
-		DefaultBalance:           updatedSettings.DefaultBalance,
-		GatewayRetrySwitchAfter:  updatedSettings.GatewayRetrySwitchAfter,
-		DailyUsageRefreshTime:    updatedSettings.DailyUsageRefreshTime,
-		Auth401CooldownSeconds:   updatedSettings.Auth401CooldownSeconds,
-		EnableModelFallback:      updatedSettings.EnableModelFallback,
-		FallbackModelAnthropic:   updatedSettings.FallbackModelAnthropic,
-		FallbackModelOpenAI:      updatedSettings.FallbackModelOpenAI,
-		FallbackModelGemini:      updatedSettings.FallbackModelGemini,
-		FallbackModelAntigravity: updatedSettings.FallbackModelAntigravity,
+		RegistrationEnabled:       updatedSettings.RegistrationEnabled,
+		EmailVerifyEnabled:        updatedSettings.EmailVerifyEnabled,
+		AlertEmails:               updatedSettings.AlertEmails,
+		AlertCooldownMinutes:      updatedSettings.AlertCooldownMinutes,
+		SMTPHost:                  updatedSettings.SMTPHost,
+		SMTPPort:                  updatedSettings.SMTPPort,
+		SMTPUsername:              updatedSettings.SMTPUsername,
+		SMTPPassword:              updatedSettings.SMTPPassword,
+		SMTPFrom:                  updatedSettings.SMTPFrom,
+		SMTPFromName:              updatedSettings.SMTPFromName,
+		SMTPUseTLS:                updatedSettings.SMTPUseTLS,
+		TurnstileEnabled:          updatedSettings.TurnstileEnabled,
+		TurnstileSiteKey:          updatedSettings.TurnstileSiteKey,
+		TurnstileSecretKey:        updatedSettings.TurnstileSecretKey,
+		SiteName:                  updatedSettings.SiteName,
+		SiteLogo:                  updatedSettings.SiteLogo,
+		SiteSubtitle:              updatedSettings.SiteSubtitle,
+		APIBaseURL:                updatedSettings.APIBaseURL,
+		ContactInfo:               updatedSettings.ContactInfo,
+		AfterSaleContact:          updatedAfterSaleContact,
+		DocURL:                    updatedSettings.DocURL,
+		DefaultConcurrency:        updatedSettings.DefaultConcurrency,
+		DefaultBalance:            updatedSettings.DefaultBalance,
+		GatewayRetrySwitchAfter:   updatedSettings.GatewayRetrySwitchAfter,
+		DailyUsageRefreshTime:     updatedSettings.DailyUsageRefreshTime,
+		Auth401CooldownSeconds:    updatedSettings.Auth401CooldownSeconds,
+		UsageWindowDisablePercent: updatedSettings.UsageWindowDisablePercent,
+		EnableModelFallback:       updatedSettings.EnableModelFallback,
+		FallbackModelAnthropic:    updatedSettings.FallbackModelAnthropic,
+		FallbackModelOpenAI:       updatedSettings.FallbackModelOpenAI,
+		FallbackModelGemini:       updatedSettings.FallbackModelGemini,
+		FallbackModelAntigravity:  updatedSettings.FallbackModelAntigravity,
 	})
 }
 

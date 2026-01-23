@@ -131,6 +131,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		googleError(c, http.StatusInternalServerError, "User context not found")
 		return
 	}
+	userName := formatUserNameForLog(apiKey.User, authSubject.UserID)
 
 	// 检查平台：优先使用强制平台（/antigravity 路由，中间件已设置 request.Context），否则要求 gemini 分组
 	if !middleware.HasForcePlatform(c) {
@@ -183,6 +184,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	streamStarted := false
 	userReleaseFunc, err := geminiConcurrency.AcquireUserSlotWithWait(c, authSubject.UserID, authSubject.Concurrency, stream, &streamStarted)
 	if err != nil {
+		applog.Printf("User concurrency acquire failed: %v (user_name=%q user_id=%d%s)", err, userName, authSubject.UserID, requestIDSuffix(c))
 		googleError(c, http.StatusTooManyRequests, err.Error())
 		return
 	}
@@ -206,7 +208,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	if shouldSwitchAccountOnRetry(c.Request.Context(), c.Request.Header, h.settingService) {
 		if sessionKey != "" {
 			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
-				applog.Printf("Clear sticky session failed: %v", err)
+				applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, authSubject.UserID, requestIDSuffix(c))
 			}
 		}
 		sessionKey = ""
@@ -262,6 +264,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				if accountWaitRelease != nil {
 					accountWaitRelease()
 				}
+				applog.Printf("Account concurrency acquire failed: %v (user_name=%q user_id=%d account_id=%d%s)", err, userName, authSubject.UserID, account.ID, requestIDSuffix(c))
 				googleError(c, http.StatusTooManyRequests, err.Error())
 				return
 			}
@@ -287,7 +290,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
 				if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
-					applog.Printf("Clear sticky session failed: %v", err)
+					applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, authSubject.UserID, requestIDSuffix(c))
 				}
 				failedAccountIDs[account.ID] = struct{}{}
 				if switchCount >= maxAccountSwitches {
@@ -302,9 +305,9 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			}
 			// ForwardNative already wrote the response
 			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
-				applog.Printf("Clear sticky session failed: %v", err)
+				applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, authSubject.UserID, requestIDSuffix(c))
 			}
-			applog.Printf("Gemini native forward failed: %v", err)
+			applog.Printf("Gemini native forward failed: %v (user_name=%q user_id=%d account_id=%d%s)", err, userName, authSubject.UserID, account.ID, requestIDSuffix(c))
 			return
 		}
 

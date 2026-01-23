@@ -25,6 +25,7 @@ type OpenAIGatewayHandler struct {
 	usageQueueService   *service.UsageQueueService
 	concurrencyHelper   *ConcurrencyHelper
 	settingService      *service.SettingService
+	alertService        *service.AlertService
 }
 
 // NewOpenAIGatewayHandler creates a new OpenAIGatewayHandler
@@ -34,6 +35,7 @@ func NewOpenAIGatewayHandler(
 	billingCacheService *service.BillingCacheService,
 	usageQueueService *service.UsageQueueService,
 	settingService *service.SettingService,
+	alertService *service.AlertService,
 ) *OpenAIGatewayHandler {
 	return &OpenAIGatewayHandler{
 		gatewayService:      gatewayService,
@@ -41,6 +43,7 @@ func NewOpenAIGatewayHandler(
 		usageQueueService:   usageQueueService,
 		concurrencyHelper:   NewConcurrencyHelper(concurrencyService, SSEPingFormatNone),
 		settingService:      settingService,
+		alertService:        alertService,
 	}
 }
 
@@ -59,6 +62,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
+	userName := formatUserNameForLog(apiKey.User, subject.UserID)
 
 	// Read request body
 	body, err := io.ReadAll(c.Request.Body)
@@ -127,7 +131,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// 1. First acquire user concurrency slot
 	userReleaseFunc, err := h.concurrencyHelper.AcquireUserSlotWithWait(c, subject.UserID, subject.Concurrency, reqStream, &streamStarted)
 	if err != nil {
-		applog.Printf("User concurrency acquire failed: %v", err)
+		applog.Printf("User concurrency acquire failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 		h.handleConcurrencyError(c, err, "user", streamStarted)
 		return
 	}
@@ -147,7 +151,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	if shouldSwitchAccountOnRetry(c.Request.Context(), c.Request.Header, h.settingService) {
 		if sessionHash != "" {
 			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionHash); err != nil {
-				applog.Printf("Clear sticky session failed: %v", err)
+				applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 			}
 		}
 		sessionHash = ""
@@ -208,7 +212,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				if accountWaitRelease != nil {
 					accountWaitRelease()
 				}
-				applog.Printf("Account concurrency acquire failed: %v", err)
+				applog.Printf("Account concurrency acquire failed: %v (user_name=%q user_id=%d account_id=%d%s)", err, userName, subject.UserID, account.ID, requestIDSuffix(c))
 				h.handleConcurrencyError(c, err, "account", streamStarted)
 				return
 			}
@@ -229,7 +233,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
 				if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionHash); err != nil {
-					applog.Printf("Clear sticky session failed: %v", err)
+					applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 				}
 				failedAccountIDs[account.ID] = struct{}{}
 				if switchCount >= maxAccountSwitches {
@@ -244,9 +248,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			}
 			// Error response already handled in Forward, just log
 			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionHash); err != nil {
-				applog.Printf("Clear sticky session failed: %v", err)
+				applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 			}
-			applog.Printf("Account %d: Forward request failed: %v", account.ID, err)
+			applog.Printf("Account %d: Forward request failed: %v (user_name=%q user_id=%d%s)", account.ID, err, userName, subject.UserID, requestIDSuffix(c))
 			return
 		}
 
@@ -321,6 +325,7 @@ func (h *OpenAIGatewayHandler) mapUpstreamError(statusCode int) (int, string, st
 // handleStreamingAwareError handles errors that may occur after streaming has started
 func (h *OpenAIGatewayHandler) handleStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
 	if streamStarted {
+		maybeSendNoAvailableAccountsAlert(h.alertService, c, message)
 		// Stream already started, send error as SSE event then close
 		flusher, ok := c.Writer.(http.Flusher)
 		if ok {
@@ -340,6 +345,7 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareError(c *gin.Context, status 
 
 // errorResponse returns OpenAI API format error response
 func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
+	maybeSendNoAvailableAccountsAlert(h.alertService, c, message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"type":    errType,

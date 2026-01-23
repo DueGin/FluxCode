@@ -297,6 +297,14 @@ func (w *DailyUsageRefreshWorker) refreshAccountInternal(ctx context.Context, ac
 
 	action = "usage_refresh"
 	if !shouldFetchUsageFromUpstream(account) {
+		// 即使无法从上游获取 usage（例如某些 API Key 账号），也允许刷新任务自动恢复调度开关。
+		reqCtx, cancel := context.WithTimeout(ctx, w.perAccountTimeout)
+		defer cancel()
+		if changed, err := w.ensureSchedulable(reqCtx, account, "no_upstream_fetch"); err != nil {
+			return action, "error", "enable_schedulable_failed no_upstream_fetch"
+		} else if changed {
+			return action, "ok", "no_upstream_fetch schedulable_enabled"
+		}
 		return action, "skipped", "no_upstream_fetch"
 	}
 
@@ -312,12 +320,19 @@ func (w *DailyUsageRefreshWorker) refreshAccountInternal(ctx context.Context, ac
 	}
 
 	windows := formatUsageInfo(usage)
-	if usageExceeded(usage) {
+	threshold := float64(w.settingService.GetUsageWindowDisablePercent(reqCtx))
+	if threshold <= 0 {
+		threshold = defaultUsageWindowDisablePercent
+	}
+	exceeded := exceededWindows(usageWindowsFromUsageInfo(usage), threshold)
+	if len(exceeded) > 0 {
 		schedDetail := ""
-		if changed, err := w.ensureUnschedulable(reqCtx, account, action); err != nil {
-			return action, "error", "disable_schedulable_failed " + windows
-		} else if changed {
+		if account.Schedulable {
 			schedDetail = " schedulable_disabled"
+		}
+		reason := buildUsageExceededReason(account.Platform, exceeded)
+		if err := setUnschedulableWithReason(reqCtx, w.accountRepo, account, reason); err != nil {
+			return action, "error", "disable_schedulable_failed " + windows
 		}
 		return action, "ok", "usage_exceeded " + windows + schedDetail
 	}
@@ -359,6 +374,14 @@ func (w *DailyUsageRefreshWorker) refreshCodexUsage(ctx context.Context, account
 	}
 	if !attempted {
 		action = "codex_refresh"
+		// 非 OpenAI OAuth（如 API Key）无法 probe usage，但仍允许刷新任务自动恢复调度开关。
+		reqCtx, cancel := context.WithTimeout(ctx, w.perAccountTimeout)
+		defer cancel()
+		if changed, err := w.ensureSchedulable(reqCtx, account, "probe_not_applicable"); err != nil {
+			return action, "error", "enable_schedulable_failed probe_not_applicable"
+		} else if changed {
+			return action, "ok", "probe_not_applicable schedulable_enabled"
+		}
 		return action, "skipped", "probe_not_applicable"
 	}
 
@@ -382,7 +405,11 @@ func (w *DailyUsageRefreshWorker) refreshCodexUsage(ctx context.Context, account
 	}
 
 	now := time.Now()
-	windows, exceeded := codexUsageWindows(account, now)
+	threshold := float64(w.settingService.GetUsageWindowDisablePercent(ctx))
+	if threshold <= 0 {
+		threshold = defaultUsageWindowDisablePercent
+	}
+	windows, exceeded := codexUsageWindows(account, now, threshold)
 	windowSummary := formatUsageWindows(windows)
 	if len(windows) == 0 {
 		return action, "noop", fmt.Sprintf("probe_ok status=%d model=%s no_windows", statusCode, modelID)
@@ -416,22 +443,14 @@ func (w *DailyUsageRefreshWorker) refreshCodexUsage(ctx context.Context, account
 	schedDetail := ""
 	reqCtx, cancel := context.WithTimeout(ctx, w.perAccountTimeout)
 	defer cancel()
-	if changed, err := w.ensureUnschedulable(reqCtx, account, action); err != nil {
-		return action, "error", "disable_schedulable_failed " + windowSummary
-	} else if changed {
+	if account.Schedulable {
 		schedDetail = " schedulable_disabled"
 	}
-
-	if w.rateLimitService == nil {
-		return action, "ok", "rate_limit_service_nil " + windowSummary + schedDetail
-	}
-
-	until := selectLatestReset(exceeded, now, 5*time.Minute)
 	reason := buildUsageExceededReason(account.Platform, exceeded)
-	if err := w.rateLimitService.SetTempUnschedulableWithReason(reqCtx, account.ID, until, reason); err != nil {
-		return action, "error", "set_temp_unsched_failed " + windowSummary
+	if err := setUnschedulableWithReason(reqCtx, w.accountRepo, account, reason); err != nil {
+		return action, "error", "disable_schedulable_failed " + windowSummary
 	}
-	return action, "ok", "set_temp_unsched " + windowSummary + schedDetail
+	return action, "ok", "usage_exceeded " + windowSummary + schedDetail
 }
 
 func (w *DailyUsageRefreshWorker) probeCodexUsage(ctx context.Context, account *Account) (updates map[string]any, attempted bool, statusCode int, modelID string, err error) {
@@ -574,7 +593,14 @@ func (w *DailyUsageRefreshWorker) ensureSchedulable(ctx context.Context, account
 	if err := w.accountRepo.SetSchedulable(ctx, account.ID, true); err != nil {
 		return false, err
 	}
+	// 尽力清理调度开关旁的提示字段（temp_unschedulable_reason/until）。
+	// 这些字段在 schedulable=false 时用于展示“取消调度原因”，启用调度后不应继续残留。
+	if err := w.accountRepo.ClearTempUnschedulable(ctx, account.ID); err != nil {
+		applog.Printf("[DailyUsageRefreshWorker] ClearTempUnschedulable failed for account_id=%d: %v", account.ID, err)
+	}
 	account.Schedulable = true
+	account.TempUnschedulableUntil = nil
+	account.TempUnschedulableReason = ""
 	applog.Printf("[DailyUsageRefreshWorker] Enabled schedulable account_id=%d name=%q platform=%s reason=%s", account.ID, account.Name, account.Platform, reason)
 	return true, nil
 }
@@ -646,18 +672,24 @@ func shouldFetchUsageFromUpstream(account *Account) bool {
 	return account.Platform == PlatformAnthropic && account.Type == AccountTypeOAuth
 }
 
-func usageExceeded(usage *UsageInfo) bool {
+func usageExceeded(usage *UsageInfo, threshold float64) bool {
 	if usage == nil {
 		return false
 	}
-	if usageValue(usage.FiveHour) >= 100 {
+	if threshold <= 0 {
+		threshold = defaultUsageWindowDisablePercent
+	}
+	if usageValue(usage.FiveHour) >= threshold {
 		return true
 	}
-	if usageValue(usage.SevenDay) >= 100 {
+	if usageValue(usage.SevenDay) >= threshold {
 		return true
 	}
-	if usageValue(usage.SevenDaySonnet) >= 100 {
+	if usageValue(usage.SevenDaySonnet) >= threshold {
 		return true
 	}
 	return false
 }
+
+// 注意："schedulable=false + temp_unschedulable_reason" 仅作为调度开关的提示信息（系统/手动都会写入）。
+// 刷新任务在判定账号未超限（或无法获取 usage 的场景）时，会自动恢复 schedulable=true，并清空该提示字段。

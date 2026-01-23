@@ -69,7 +69,10 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		return false
 	}
 
-	tempMatched := s.tryTempUnschedulable(ctx, account, statusCode, responseBody)
+	tempMatched := false
+	if statusCode != 429 {
+		tempMatched = s.tryTempUnschedulable(ctx, account, statusCode, responseBody)
+	}
 
 	switch statusCode {
 	case 401:
@@ -95,12 +98,15 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		s.handleAuthError(ctx, account, s.buildAuthErrorMessage("Access forbidden (403): account may be suspended or lack permissions", headers, responseBody))
 		shouldDisable = true
 	case 429:
-		s.handle429(ctx, account, headers)
+		// 429 需要区分：
+		// - Quota exceeded：通常需要人工处理/充值，按“取消调度”处理（schedulable=false）。
+		// - Rate limit：短暂窗口，应该仅标记限流（rate_limit_reset_at），到期自动回到可调度集合。
 		if s.handleQuotaExceeded429(ctx, account, headers, responseBody) {
 			shouldDisable = true
-		} else {
-			shouldDisable = false
+			break
 		}
+		s.handle429(ctx, account, headers, responseBody)
+		shouldDisable = true
 	case 529:
 		s.handle529(ctx, account)
 		shouldDisable = false
@@ -558,6 +564,10 @@ func (s *RateLimitService) PreCheckUsage(ctx context.Context, account *Account, 
 				// NOTE:
 				// - This is a local precheck to reduce upstream 429s.
 				// - Do NOT mark the account as rate-limited here; rate_limit_reset_at should reflect real upstream 429s.
+				reason := buildGeminiUsageExceededReason("日", used, limit, resetAt)
+				if err := s.SetTempUnschedulableWithReason(ctx, account.ID, resetAt, reason); err != nil {
+					applog.Printf("[Gemini PreCheck] SetTempUnschedulable failed for account %d: %v", account.ID, err)
+				}
 				applog.Printf("[Gemini PreCheck] Account %d reached daily quota (%d/%d), skip until %v", account.ID, used, limit, resetAt)
 				return false, nil
 			}
@@ -601,6 +611,10 @@ func (s *RateLimitService) PreCheckUsage(ctx context.Context, account *Account, 
 			if used >= limit {
 				resetAt := start.Add(time.Minute)
 				// Do not persist "rate limited" status from local precheck. See note above.
+				reason := buildGeminiUsageExceededReason("分钟", used, limit, resetAt)
+				if err := s.SetTempUnschedulableWithReason(ctx, account.ID, resetAt, reason); err != nil {
+					applog.Printf("[Gemini PreCheck] SetTempUnschedulable failed for account %d: %v", account.ID, err)
+				}
 				applog.Printf("[Gemini PreCheck] Account %d reached minute quota (%d/%d), skip until %v", account.ID, used, limit, resetAt)
 				return false, nil
 			}
@@ -666,45 +680,42 @@ func (s *RateLimitService) handleAuthError(ctx context.Context, account *Account
 
 // handle429 处理429限流错误
 // 解析响应头获取重置时间，标记账号为限流状态
-func (s *RateLimitService) handle429(ctx context.Context, account *Account, headers http.Header) {
-	// 解析重置时间戳
-	resetTimestamp := headers.Get("anthropic-ratelimit-unified-reset")
-	if resetTimestamp == "" {
-		// 没有重置时间，使用默认5分钟
-		resetAt := time.Now().Add(5 * time.Minute)
-		if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
-			applog.Printf("SetRateLimited failed for account %d: %v", account.ID, err)
-		}
-		return
+func (s *RateLimitService) handle429(ctx context.Context, account *Account, headers http.Header, responseBody []byte) {
+	now := time.Now()
+	resetAt := now.Add(5 * time.Minute)
+	if parsed := parseRateLimitReset(headers); parsed != nil && parsed.After(now) {
+		resetAt = *parsed
 	}
-
-	// 解析Unix时间戳
-	ts, err := strconv.ParseInt(resetTimestamp, 10, 64)
-	if err != nil {
-		applog.Printf("Parse reset timestamp failed: %v", err)
-		resetAt := time.Now().Add(5 * time.Minute)
-		if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
-			applog.Printf("SetRateLimited failed for account %d: %v", account.ID, err)
-		}
-		return
-	}
-
-	resetAt := time.Unix(ts, 0)
 
 	// 标记限流状态
 	if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
 		applog.Printf("SetRateLimited failed for account %d: %v", account.ID, err)
 		return
 	}
-
-	// 根据重置时间反推5h窗口
-	windowEnd := resetAt
-	windowStart := resetAt.Add(-5 * time.Hour)
-	if err := s.accountRepo.UpdateSessionWindow(ctx, account.ID, &windowStart, &windowEnd, "rejected"); err != nil {
-		applog.Printf("UpdateSessionWindow failed for account %d: %v", account.ID, err)
+	if account != nil {
+		rateLimitedAt := now
+		account.RateLimitedAt = &rateLimitedAt
+		account.RateLimitResetAt = &resetAt
 	}
 
-	applog.Printf("Account %d rate limited until %v", account.ID, resetAt)
+	// 仅 Anthropic 的 unified-reset 能反推 5h 窗口。
+	if headers != nil && strings.TrimSpace(headers.Get("anthropic-ratelimit-unified-reset")) != "" {
+		windowEnd := resetAt
+		windowStart := resetAt.Add(-5 * time.Hour)
+		if err := s.accountRepo.UpdateSessionWindow(ctx, account.ID, &windowStart, &windowEnd, "rejected"); err != nil {
+			applog.Printf("UpdateSessionWindow failed for account %d: %v", account.ID, err)
+		}
+	}
+
+	reason := buildRateLimitReason(headers, responseBody)
+	applog.Printf(
+		"[RateLimit] account_id=%d platform=%s type=%s reset_at=%v reason=%q",
+		account.ID,
+		account.Platform,
+		account.Type,
+		resetAt,
+		truncateForLog([]byte(reason), 256),
+	)
 }
 
 func (s *RateLimitService) handleQuotaExceeded429(ctx context.Context, account *Account, headers http.Header, responseBody []byte) bool {
@@ -725,12 +736,19 @@ func (s *RateLimitService) handleQuotaExceeded429(ctx context.Context, account *
 	}
 
 	reason := buildQuotaExceededReason(code, msg, headers)
-	if err := s.SetTempUnschedulableWithReason(ctx, account.ID, *until, reason); err != nil {
-		applog.Printf("[QuotaExceeded] SetTempUnschedulable failed for account %d: %v", account.ID, err)
+	if err := setUnschedulableWithReason(ctx, s.accountRepo, account, reason); err != nil {
+		applog.Printf("[QuotaExceeded] SetUnschedulableWithReason failed for account %d: %v", account.ID, err)
 		return false
 	}
 
-	applog.Printf("[QuotaExceeded] account_id=%d until=%v", account.ID, until)
+	applog.Printf(
+		"[QuotaExceeded] account_id=%d platform=%s type=%s until=%v reason=%q",
+		account.ID,
+		account.Platform,
+		account.Type,
+		*until,
+		truncateForLog([]byte(reason), 256),
+	)
 	return true
 }
 
@@ -890,6 +908,45 @@ func buildQuotaExceededReason(code, msg string, headers http.Header) string {
 	return reason
 }
 
+func buildRateLimitReason(headers http.Header, responseBody []byte) string {
+	reqID := ""
+	if headers != nil {
+		reqID = firstNonEmptyHeader(headers, "x-request-id", "request-id", "anthropic-request-id")
+	}
+	msg := strings.TrimSpace(extractUpstreamErrorMessage(responseBody))
+	msg = sanitizeSensitiveText(msg)
+	reqID = sanitizeSensitiveText(strings.TrimSpace(reqID))
+
+	if msg != "" && len(msg) > 512 {
+		msg = msg[:512] + "..."
+	}
+	if reqID != "" && len(reqID) > 128 {
+		reqID = reqID[:128] + "..."
+	}
+
+	reason := "上游 429 限流，已进入限流冷却"
+	if resetAt := parseRateLimitReset(headers); resetAt != nil {
+		reason += "，预计 " + resetAt.Format(time.RFC3339) + " 恢复"
+	}
+	if msg != "" {
+		reason += "; upstream_message=" + msg
+	}
+	if reqID != "" {
+		reason += "; request_id=" + reqID
+	}
+	return reason
+}
+
+func buildGeminiUsageExceededReason(windowLabel string, used, limit int64, resetAt time.Time) string {
+	label := strings.TrimSpace(windowLabel)
+	if label == "" {
+		label = "使用"
+	}
+	return "Gemini " + label + "额度已超限：" +
+		strconv.FormatInt(used, 10) + "/" + strconv.FormatInt(limit, 10) +
+		"，预计 " + resetAt.Format(time.RFC3339) + " 恢复"
+}
+
 // handle529 处理529过载错误
 // 根据配置设置过载冷却时间
 func (s *RateLimitService) handle529(ctx context.Context, account *Account) {
@@ -1000,6 +1057,43 @@ func (s *RateLimitService) SetTempUnschedulableWithReason(ctx context.Context, a
 	return nil
 }
 
+func normalizeUnschedulableReason(reason string) string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return "调度已取消"
+	}
+	reason = sanitizeSensitiveText(reason)
+	if len(reason) > tempUnschedMessageMaxBytes {
+		reason = reason[:tempUnschedMessageMaxBytes] + "..."
+	}
+	return reason
+}
+
+func setUnschedulableWithReason(ctx context.Context, repo AccountRepository, account *Account, reason string) error {
+	if account == nil || repo == nil {
+		return nil
+	}
+	if account.ID <= 0 {
+		return nil
+	}
+	normalized := normalizeUnschedulableReason(reason)
+	if err := repo.SetUnschedulableWithReason(ctx, account.ID, normalized); err != nil {
+		return err
+	}
+	account.Schedulable = false
+	account.TempUnschedulableUntil = nil
+	account.TempUnschedulableReason = normalized
+	return nil
+}
+
+func setUnschedulableWithReasonByID(ctx context.Context, repo AccountRepository, accountID int64, reason string) error {
+	if repo == nil || accountID <= 0 {
+		return nil
+	}
+	normalized := normalizeUnschedulableReason(reason)
+	return repo.SetUnschedulableWithReason(ctx, accountID, normalized)
+}
+
 func (s *RateLimitService) GetTempUnschedStatus(ctx context.Context, accountID int64) (*TempUnschedState, error) {
 	now := time.Now().Unix()
 	if s.tempUnschedCache != nil {
@@ -1050,6 +1144,9 @@ func (s *RateLimitService) GetTempUnschedStatus(ctx context.Context, accountID i
 
 func (s *RateLimitService) HandleTempUnschedulable(ctx context.Context, account *Account, statusCode int, responseBody []byte) bool {
 	if account == nil {
+		return false
+	}
+	if statusCode == 429 {
 		return false
 	}
 	if !account.ShouldHandleErrorCode(statusCode) {

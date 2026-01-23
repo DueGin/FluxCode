@@ -39,12 +39,20 @@ type GenerateRedeemCodesRequest struct {
 
 // List handles listing all redeem codes with pagination
 // GET /api/v1/admin/redeem-codes
-func (h *RedeemHandler) List(c *gin.Context) {
-	page, pageSize := response.ParsePagination(c)
-	codeType := c.Query("type")
-	status := c.Query("status")
-	search := c.Query("search")
-	welfareNo := strings.TrimSpace(c.Query("welfare_no"))
+	func (h *RedeemHandler) List(c *gin.Context) {
+		page, pageSize := response.ParsePagination(c)
+		codeType := c.Query("type")
+		status := c.Query("status")
+		searchType := strings.TrimSpace(c.Query("search_type"))
+		if searchType == "" {
+			searchType = "code"
+		}
+		if searchType != "code" && searchType != "user" {
+			response.BadRequest(c, "Invalid search_type")
+			return
+		}
+		search := c.Query("search")
+		welfareNo := strings.TrimSpace(c.Query("welfare_no"))
 
 	var isWelfare *bool
 	if v := strings.TrimSpace(c.Query("is_welfare")); v != "" {
@@ -56,11 +64,11 @@ func (h *RedeemHandler) List(c *gin.Context) {
 		isWelfare = &parsed
 	}
 
-	codes, total, err := h.adminService.ListRedeemCodes(c.Request.Context(), page, pageSize, codeType, status, search, isWelfare, welfareNo)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
+		codes, total, err := h.adminService.ListRedeemCodes(c.Request.Context(), page, pageSize, codeType, status, searchType, search, isWelfare, welfareNo)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
 
 	out := make([]dto.RedeemCode, 0, len(codes))
 	for i := range codes {
@@ -220,16 +228,16 @@ func (h *RedeemHandler) GetStats(c *gin.Context) {
 
 // Export handles exporting redeem codes to CSV
 // GET /api/v1/admin/redeem-codes/export
-func (h *RedeemHandler) Export(c *gin.Context) {
-	codeType := c.Query("type")
-	status := c.Query("status")
+	func (h *RedeemHandler) Export(c *gin.Context) {
+		codeType := c.Query("type")
+		status := c.Query("status")
 
-	// Get all codes without pagination (use large page size)
-	codes, _, err := h.adminService.ListRedeemCodes(c.Request.Context(), 1, 10000, codeType, status, "", nil, "")
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
+		// Get all codes without pagination (use large page size)
+		codes, _, err := h.adminService.ListRedeemCodes(c.Request.Context(), 1, 10000, codeType, status, "code", "", nil, "")
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
 
 	// Create CSV buffer
 	var buf bytes.Buffer

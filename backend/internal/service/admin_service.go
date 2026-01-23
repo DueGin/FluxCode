@@ -59,12 +59,12 @@ type AdminService interface {
 	CheckProxyExists(ctx context.Context, host string, port int, username, password string) (bool, error)
 	TestProxy(ctx context.Context, id int64) (*ProxyTestResult, error)
 
-	// Redeem code management
-	ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error)
-	GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
-	GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error)
-	DeleteRedeemCode(ctx context.Context, id int64) error
-	BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error)
+		// Redeem code management
+		ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error)
+		GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
+		GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error)
+		DeleteRedeemCode(ctx context.Context, id int64) error
+		BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error)
 	ExpireRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
 	ListRedeemWelfareNos(ctx context.Context) ([]string, error)
 }
@@ -891,8 +891,18 @@ func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Ac
 }
 
 func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error) {
-	if err := s.accountRepo.SetSchedulable(ctx, id, schedulable); err != nil {
-		return nil, err
+	if schedulable {
+		if err := s.accountRepo.SetSchedulable(ctx, id, true); err != nil {
+			return nil, err
+		}
+		if err := s.accountRepo.ClearTempUnschedulable(ctx, id); err != nil {
+			return nil, err
+		}
+	} else {
+		// 手动关闭调度也记录提示（写入 schedulable=false + reason；后续刷新任务满足可恢复条件时会自动恢复并清空提示）。
+		if err := setUnschedulableWithReasonByID(ctx, s.accountRepo, id, "已手动关闭调度开关"); err != nil {
+			return nil, err
+		}
 	}
 	return s.accountRepo.GetByID(ctx, id)
 }
@@ -916,13 +926,29 @@ func (s *adminServiceImpl) BulkSetAccountSchedulable(ctx context.Context, ids []
 		seen[id] = struct{}{}
 
 		entry := BulkUpdateAccountResult{AccountID: id}
-		if err := s.accountRepo.SetSchedulable(ctx, id, schedulable); err != nil {
-			entry.Success = false
-			entry.Error = err.Error()
-			result.Failed++
+		if schedulable {
+			if err := s.accountRepo.SetSchedulable(ctx, id, true); err != nil {
+				entry.Success = false
+				entry.Error = err.Error()
+				result.Failed++
+			} else if err := s.accountRepo.ClearTempUnschedulable(ctx, id); err != nil {
+				entry.Success = false
+				entry.Error = err.Error()
+				result.Failed++
+			} else {
+				entry.Success = true
+				result.Success++
+			}
 		} else {
-			entry.Success = true
-			result.Success++
+			// 手动关闭调度也记录提示（写入 schedulable=false + reason；后续刷新任务满足可恢复条件时会自动恢复并清空提示）。
+			if err := setUnschedulableWithReasonByID(ctx, s.accountRepo, id, "已手动关闭调度开关"); err != nil {
+				entry.Success = false
+				entry.Error = err.Error()
+				result.Failed++
+			} else {
+				entry.Success = true
+				result.Success++
+			}
 		}
 		result.Results = append(result.Results, entry)
 	}
@@ -1016,14 +1042,14 @@ func (s *adminServiceImpl) CheckProxyExists(ctx context.Context, host string, po
 }
 
 // Redeem code management implementations
-func (s *adminServiceImpl) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error) {
-	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
-	codes, result, err := s.redeemCodeRepo.ListWithFilters(ctx, params, codeType, status, search, isWelfare, welfareNo)
-	if err != nil {
-		return nil, 0, err
+	func (s *adminServiceImpl) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error) {
+		params := pagination.PaginationParams{Page: page, PageSize: pageSize}
+		codes, result, err := s.redeemCodeRepo.ListWithFilters(ctx, params, codeType, status, searchType, search, isWelfare, welfareNo)
+		if err != nil {
+			return nil, 0, err
+		}
+		return codes, result.Total, nil
 	}
-	return codes, result.Total, nil
-}
 
 func (s *adminServiceImpl) GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error) {
 	return s.redeemCodeRepo.GetByID(ctx, id)

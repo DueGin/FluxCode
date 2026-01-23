@@ -362,7 +362,11 @@
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <ModelDistributionChart :model-stats="modelStats" :loading="chartsLoading" split />
             <div class="lg:col-span-2">
-              <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+              <TokenUsageTrend
+                :trend-data="trendData"
+                :loading="chartsLoading"
+                :granularity="granularity"
+              />
             </div>
           </div>
 
@@ -509,6 +513,26 @@ const chartColors = computed(() => ({
   grid: isDarkMode.value ? '#374151' : '#e5e7eb'
 }))
 
+const formatHourMinuteLabel = (label: string): string => {
+  const trimmed = label.trim()
+  if (!trimmed) return ''
+  const splitter = trimmed.includes(' ') ? ' ' : trimmed.includes('T') ? 'T' : ''
+  const timePart = splitter ? trimmed.split(splitter).pop() || '' : trimmed
+  const cleaned = timePart.replace(/Z|[+-]\d{2}:?\d{2}$/, '')
+  return cleaned.slice(0, 5)
+}
+
+const formatXAxisLabel = (label: string): string => {
+  if (granularity.value !== 'hour') return label
+  return formatHourMinuteLabel(label)
+}
+
+const getXAxisLabel = (value: string | number): string => {
+  if (typeof value === 'string') return value
+  const label = userTrendChartData.value?.labels?.[Number(value)]
+  return typeof label === 'string' ? label : String(value)
+}
+
 // Line chart options (for user trend chart)
 const lineOptions = computed(() => ({
   responsive: true,
@@ -554,6 +578,10 @@ const lineOptions = computed(() => ({
         color: chartColors.value.text,
         font: {
           size: 10
+        },
+        callback: (value: string | number) => {
+          const label = getXAxisLabel(value)
+          return formatXAxisLabel(label)
         }
       }
     },

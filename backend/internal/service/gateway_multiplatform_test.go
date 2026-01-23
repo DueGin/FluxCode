@@ -136,6 +136,9 @@ func (m *mockAccountRepoForPlatform) SetRateLimited(ctx context.Context, id int6
 func (m *mockAccountRepoForPlatform) SetOverloaded(ctx context.Context, id int64, until time.Time) error {
 	return nil
 }
+func (m *mockAccountRepoForPlatform) SetUnschedulableWithReason(ctx context.Context, id int64, reason string) error {
+	return nil
+}
 func (m *mockAccountRepoForPlatform) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
 	return nil
 }

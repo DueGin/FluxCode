@@ -237,7 +237,7 @@ func (s *redeemRepoStub) List(ctx context.Context, params pagination.PaginationP
 	panic("unexpected List call")
 }
 
-func (s *redeemRepoStub) ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, *pagination.PaginationResult, error) {
+func (s *redeemRepoStub) ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, *pagination.PaginationResult, error) {
 	panic("unexpected ListWithFilters call")
 }
 

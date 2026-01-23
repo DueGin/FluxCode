@@ -49,10 +49,16 @@ ChartJS.register(
 
 const { t } = useI18n()
 
-const props = defineProps<{
-  trendData: TrendDataPoint[]
-  loading?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    trendData: TrendDataPoint[]
+    loading?: boolean
+    granularity?: 'day' | 'hour'
+  }>(),
+  {
+    granularity: 'day'
+  }
+)
 
 const isDarkMode = computed(() => {
   return document.documentElement.classList.contains('dark')
@@ -69,6 +75,20 @@ const chartColors = computed(() => ({
 const toNonNegativeToken = (value: number): number => {
   if (!Number.isFinite(value)) return 0
   return Math.max(0, value)
+}
+
+const formatHourMinuteLabel = (label: string): string => {
+  const trimmed = label.trim()
+  if (!trimmed) return ''
+  const splitter = trimmed.includes(' ') ? ' ' : trimmed.includes('T') ? 'T' : ''
+  const timePart = splitter ? trimmed.split(splitter).pop() || '' : trimmed
+  const cleaned = timePart.replace(/Z|[+-]\d{2}:?\d{2}$/, '')
+  return cleaned.slice(0, 5)
+}
+
+const formatXAxisLabel = (label: string): string => {
+  if (props.granularity !== 'hour') return label
+  return formatHourMinuteLabel(label)
 }
 
 const shouldUseKUnitByDefault = computed(() => {
@@ -170,6 +190,15 @@ const lineOptions = computed(() => ({
         color: chartColors.value.text,
         font: {
           size: 10
+        },
+        callback: function (value: string | number) {
+          const label =
+            typeof value === 'string'
+              ? value
+              : (this as { getLabelForValue?: (v: string | number) => string }).getLabelForValue?.(
+                  value
+                ) ?? String(value)
+          return formatXAxisLabel(label)
         }
       }
     },

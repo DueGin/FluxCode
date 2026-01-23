@@ -155,6 +155,7 @@ func (s *RedeemCodeRepoSuite) TestListWithFilters_Type() {
 		pagination.PaginationParams{Page: 1, PageSize: 10},
 		service.RedeemTypeSubscription,
 		"",
+		"code",
 		"",
 		nil,
 		"",
@@ -173,6 +174,7 @@ func (s *RedeemCodeRepoSuite) TestListWithFilters_Status() {
 		pagination.PaginationParams{Page: 1, PageSize: 10},
 		"",
 		service.StatusUsed,
+		"code",
 		"",
 		nil,
 		"",
@@ -191,6 +193,7 @@ func (s *RedeemCodeRepoSuite) TestListWithFilters_Search() {
 		pagination.PaginationParams{Page: 1, PageSize: 10},
 		"",
 		"",
+		"code",
 		"alpha",
 		nil,
 		"",
@@ -198,6 +201,36 @@ func (s *RedeemCodeRepoSuite) TestListWithFilters_Search() {
 	s.Require().NoError(err)
 	s.Require().Len(codes, 1)
 	s.Require().Contains(codes[0].Code, "ALPHA")
+}
+
+func (s *RedeemCodeRepoSuite) TestListWithFilters_SearchUserEmail() {
+	userA := s.createUser("alice@example.com")
+	userB := s.createUser("bob@example.com")
+	userAID := userA.ID
+	userBID := userB.ID
+
+	s.Require().NoError(
+		s.repo.Create(s.ctx, &service.RedeemCode{Code: "USER-ALICE", Type: service.RedeemTypeBalance, Value: 0, Status: service.StatusUsed, UsedBy: &userAID}),
+	)
+	s.Require().NoError(
+		s.repo.Create(s.ctx, &service.RedeemCode{Code: "USER-BOB", Type: service.RedeemTypeBalance, Value: 0, Status: service.StatusUsed, UsedBy: &userBID}),
+	)
+
+	codes, _, err := s.repo.ListWithFilters(
+		s.ctx,
+		pagination.PaginationParams{Page: 1, PageSize: 10},
+		"",
+		"",
+		"user",
+		"alice",
+		nil,
+		"",
+	)
+	s.Require().NoError(err)
+	s.Require().Len(codes, 1)
+	s.Require().Equal("USER-ALICE", codes[0].Code)
+	s.Require().NotNil(codes[0].User)
+	s.Require().Equal("alice@example.com", codes[0].User.Email)
 }
 
 func (s *RedeemCodeRepoSuite) TestListWithFilters_GroupPreload() {
@@ -218,6 +251,7 @@ func (s *RedeemCodeRepoSuite) TestListWithFilters_GroupPreload() {
 		pagination.PaginationParams{Page: 1, PageSize: 10},
 		"",
 		"",
+		"code",
 		"",
 		nil,
 		"",
@@ -401,15 +435,16 @@ func (s *RedeemCodeRepoSuite) TestCreateBatch_Filters_Use_Idempotency_ListByUser
 	}
 	s.Require().NoError(s.repo.CreateBatch(s.ctx, codes), "CreateBatch")
 
-	list, page, err := s.repo.ListWithFilters(
-		s.ctx,
-		pagination.PaginationParams{Page: 1, PageSize: 10},
-		service.RedeemTypeSubscription,
-		service.StatusUnused,
-		"code",
-		nil,
-		"",
-	)
+		list, page, err := s.repo.ListWithFilters(
+			s.ctx,
+			pagination.PaginationParams{Page: 1, PageSize: 10},
+			service.RedeemTypeSubscription,
+			service.StatusUnused,
+			"code",
+			"code",
+			nil,
+			"",
+		)
 	s.Require().NoError(err, "ListWithFilters")
 	s.Require().Equal(int64(1), page.Total)
 	s.Require().Len(list, 1)

@@ -1,16 +1,17 @@
 package repository
 
-import (
-	"context"
-	"time"
+	import (
+		"context"
+		"time"
 
-	dbent "github.com/DueGin/FluxCode/ent"
-	dbpredicate "github.com/DueGin/FluxCode/ent/predicate"
-	"github.com/DueGin/FluxCode/ent/redeemcode"
-	"github.com/DueGin/FluxCode/internal/pkg/pagination"
-	"github.com/DueGin/FluxCode/internal/service"
-	entsql "entgo.io/ent/dialect/sql"
-)
+		dbent "github.com/DueGin/FluxCode/ent"
+		dbpredicate "github.com/DueGin/FluxCode/ent/predicate"
+		"github.com/DueGin/FluxCode/ent/redeemcode"
+		"github.com/DueGin/FluxCode/ent/user"
+		"github.com/DueGin/FluxCode/internal/pkg/pagination"
+		"github.com/DueGin/FluxCode/internal/service"
+		entsql "entgo.io/ent/dialect/sql"
+	)
 
 type redeemCodeRepository struct {
 	client *dbent.Client
@@ -96,12 +97,12 @@ func (r *redeemCodeRepository) Delete(ctx context.Context, id int64) error {
 	return err
 }
 
-func (r *redeemCodeRepository) List(ctx context.Context, params pagination.PaginationParams) ([]service.RedeemCode, *pagination.PaginationResult, error) {
-	return r.ListWithFilters(ctx, params, "", "", "", nil, "")
-}
+	func (r *redeemCodeRepository) List(ctx context.Context, params pagination.PaginationParams) ([]service.RedeemCode, *pagination.PaginationResult, error) {
+		return r.ListWithFilters(ctx, params, "", "", "", "", nil, "")
+	}
 
-func (r *redeemCodeRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, search string, isWelfare *bool, welfareNo string) ([]service.RedeemCode, *pagination.PaginationResult, error) {
-	q := r.client.RedeemCode.Query()
+	func (r *redeemCodeRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]service.RedeemCode, *pagination.PaginationResult, error) {
+		q := r.client.RedeemCode.Query()
 
 	if codeType != "" {
 		q = q.Where(redeemcode.TypeEQ(codeType))
@@ -120,12 +121,16 @@ func (r *redeemCodeRepository) ListWithFilters(ctx context.Context, params pagin
 			q = q.Where(redeemcode.WelfareNoIsNil())
 		}
 	}
-	if status != "" {
-		q = q.Where(redeemcode.StatusEQ(status))
-	}
-	if search != "" {
-		q = q.Where(redeemcode.CodeContainsFold(search))
-	}
+		if status != "" {
+			q = q.Where(redeemcode.StatusEQ(status))
+		}
+		if search != "" {
+			if searchType == "user" {
+				q = q.Where(redeemcode.HasUserWith(user.EmailContainsFold(search)))
+			} else {
+				q = q.Where(redeemcode.CodeContainsFold(search))
+			}
+		}
 
 	total, err := q.Count(ctx)
 	if err != nil {

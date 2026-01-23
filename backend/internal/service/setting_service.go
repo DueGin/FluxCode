@@ -22,9 +22,10 @@ var (
 )
 
 const (
-	defaultGatewayRetrySwitchAfter = 2
-	defaultDailyUsageRefreshTime   = "03:00"
-	defaultAuth401CooldownSeconds  = 300
+	defaultGatewayRetrySwitchAfter   = 2
+	defaultDailyUsageRefreshTime     = "03:00"
+	defaultAuth401CooldownSeconds    = 300
+	defaultUsageWindowDisablePercent = 100
 )
 
 type SettingRepository interface {
@@ -150,6 +151,13 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyRegistrationEnabled] = strconv.FormatBool(settings.RegistrationEnabled)
 	updates[SettingKeyEmailVerifyEnabled] = strconv.FormatBool(settings.EmailVerifyEnabled)
 
+	// 告警设置
+	updates[SettingKeyAlertEmails] = s.marshalStringList(settings.AlertEmails)
+	if settings.AlertCooldownMinutes < 0 {
+		settings.AlertCooldownMinutes = 0
+	}
+	updates[SettingKeyAlertCooldownMinutes] = strconv.Itoa(settings.AlertCooldownMinutes)
+
 	// 邮件服务设置（只有非空才更新密码）
 	updates[SettingKeySMTPHost] = settings.SMTPHost
 	updates[SettingKeySMTPPort] = strconv.Itoa(settings.SMTPPort)
@@ -192,6 +200,8 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 		settings.Auth401CooldownSeconds = defaultAuth401CooldownSeconds
 	}
 	updates[SettingKeyAuth401CooldownSeconds] = strconv.Itoa(settings.Auth401CooldownSeconds)
+	settings.UsageWindowDisablePercent = normalizeUsageWindowDisablePercent(settings.UsageWindowDisablePercent)
+	updates[SettingKeyUsageWindowDisablePercent] = strconv.Itoa(settings.UsageWindowDisablePercent)
 
 	// Model fallback configuration
 	updates[SettingKeyEnableModelFallback] = strconv.FormatBool(settings.EnableModelFallback)
@@ -315,6 +325,21 @@ func (s *SettingService) GetAuth401CooldownSeconds(ctx context.Context) int {
 	return defaultAuth401CooldownSeconds
 }
 
+func (s *SettingService) GetUsageWindowDisablePercent(ctx context.Context) int {
+	if s == nil || s.settingRepo == nil {
+		return defaultUsageWindowDisablePercent
+	}
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyUsageWindowDisablePercent)
+	if err != nil {
+		return defaultUsageWindowDisablePercent
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return defaultUsageWindowDisablePercent
+	}
+	return normalizeUsageWindowDisablePercent(v)
+}
+
 // InitializeDefaultSettings 初始化默认设置
 func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	// 检查是否已有设置
@@ -329,18 +354,21 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 	// 初始化默认设置
 	defaults := map[string]string{
-		SettingKeyRegistrationEnabled:     "true",
-		SettingKeyEmailVerifyEnabled:      "false",
-		SettingKeySiteName:                s.webTitleDefault(),
-		SettingKeySiteLogo:                "",
-		SettingKeyAfterSaleContact:        "[]",
-		SettingKeyDefaultConcurrency:      strconv.Itoa(s.cfg.Default.UserConcurrency),
-		SettingKeyDefaultBalance:          strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
-		SettingKeyGatewayRetrySwitchAfter: strconv.Itoa(defaultGatewayRetrySwitchAfter),
-		SettingKeyDailyUsageRefreshTime:   defaultDailyUsageRefreshTime,
-		SettingKeyAuth401CooldownSeconds:  strconv.Itoa(defaultAuth401CooldownSeconds),
-		SettingKeySMTPPort:                "587",
-		SettingKeySMTPUseTLS:              "false",
+		SettingKeyRegistrationEnabled:       "true",
+		SettingKeyEmailVerifyEnabled:        "false",
+		SettingKeyAlertEmails:               "[]",
+		SettingKeyAlertCooldownMinutes:      strconv.Itoa(defaultAlertCooldownMinutes),
+		SettingKeySiteName:                  s.webTitleDefault(),
+		SettingKeySiteLogo:                  "",
+		SettingKeyAfterSaleContact:          "[]",
+		SettingKeyDefaultConcurrency:        strconv.Itoa(s.cfg.Default.UserConcurrency),
+		SettingKeyDefaultBalance:            strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
+		SettingKeyGatewayRetrySwitchAfter:   strconv.Itoa(defaultGatewayRetrySwitchAfter),
+		SettingKeyDailyUsageRefreshTime:     defaultDailyUsageRefreshTime,
+		SettingKeyAuth401CooldownSeconds:    strconv.Itoa(defaultAuth401CooldownSeconds),
+		SettingKeyUsageWindowDisablePercent: strconv.Itoa(defaultUsageWindowDisablePercent),
+		SettingKeySMTPPort:                  "587",
+		SettingKeySMTPUseTLS:                "false",
 		// Model fallback defaults
 		SettingKeyEnableModelFallback:      "false",
 		SettingKeyFallbackModelAnthropic:   "claude-3-5-sonnet-20241022",
@@ -362,6 +390,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	result := &SystemSettings{
 		RegistrationEnabled: settings[SettingKeyRegistrationEnabled] == "true",
 		EmailVerifyEnabled:  settings[SettingKeyEmailVerifyEnabled] == "true",
+		AlertEmails:         s.parseStringList(settings[SettingKeyAlertEmails]),
 		SMTPHost:            settings[SettingKeySMTPHost],
 		SMTPUsername:        settings[SettingKeySMTPUsername],
 		SMTPFrom:            settings[SettingKeySMTPFrom],
@@ -376,6 +405,17 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		ContactInfo:         settings[SettingKeyContactInfo],
 		AfterSaleContact:    s.parseKVItems(settings[SettingKeyAfterSaleContact]),
 		DocURL:              settings[SettingKeyDocURL],
+	}
+
+	// 告警冷却时间（分钟）：默认 5 分钟；允许 0 表示不限制
+	result.AlertCooldownMinutes = defaultAlertCooldownMinutes
+	if raw := strings.TrimSpace(settings[SettingKeyAlertCooldownMinutes]); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			if v < 0 {
+				v = 0
+			}
+			result.AlertCooldownMinutes = v
+		}
 	}
 
 	// 解析整数类型
@@ -401,6 +441,11 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		result.Auth401CooldownSeconds = v
 	} else {
 		result.Auth401CooldownSeconds = defaultAuth401CooldownSeconds
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(settings[SettingKeyUsageWindowDisablePercent])); err == nil {
+		result.UsageWindowDisablePercent = normalizeUsageWindowDisablePercent(v)
+	} else {
+		result.UsageWindowDisablePercent = defaultUsageWindowDisablePercent
 	}
 
 	// 解析浮点数类型
@@ -458,12 +503,70 @@ func (s *SettingService) marshalKVItems(items []KVItem) string {
 	return string(b)
 }
 
+func (s *SettingService) parseStringList(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return []string{}
+	}
+	var items []string
+	if err := json.Unmarshal([]byte(raw), &items); err == nil {
+		return s.normalizeStringList(items)
+	}
+	// Backward/compat: allow comma/space/newline separated values.
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		switch r {
+		case ',', ';', ' ', '\n', '\r', '\t':
+			return true
+		default:
+			return false
+		}
+	})
+	return s.normalizeStringList(parts)
+}
+
+func (s *SettingService) normalizeStringList(items []string) []string {
+	out := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		v := strings.TrimSpace(item)
+		if v == "" {
+			continue
+		}
+		key := strings.ToLower(v)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+func (s *SettingService) marshalStringList(items []string) string {
+	normalized := s.normalizeStringList(items)
+	b, err := json.Marshal(normalized)
+	if err != nil {
+		return "[]"
+	}
+	return string(b)
+}
+
 // getStringOrDefault 获取字符串值或默认值
 func (s *SettingService) getStringOrDefault(settings map[string]string, key, defaultValue string) string {
 	if value, ok := settings[key]; ok && value != "" {
 		return value
 	}
 	return defaultValue
+}
+
+func normalizeUsageWindowDisablePercent(value int) int {
+	if value <= 0 {
+		return defaultUsageWindowDisablePercent
+	}
+	if value > 100 {
+		return 100
+	}
+	return value
 }
 
 // IsTurnstileEnabled 检查是否启用 Turnstile 验证

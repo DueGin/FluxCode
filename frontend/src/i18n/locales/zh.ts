@@ -1773,6 +1773,10 @@ export default {
       unused: '未使用',
       used: '已使用',
       searchCodes: '搜索兑换码...',
+      filterSettings: '筛选设置',
+      searchTypeCode: '兑换码',
+      searchTypeUser: '用户',
+      searchUsers: '搜索用户邮箱...',
       exportCsv: '导出 CSV',
       deleteAllUnused: '删除全部未使用',
       deleteCodeConfirm: '确定要删除此兑换码吗？此操作无法撤销。',
@@ -1881,7 +1885,21 @@ export default {
         auth401CooldownSeconds: '401 鉴权冷却时间（秒）',
         auth401CooldownSecondsHint: '当上游返回 401（token/鉴权异常）时，将账号临时冷却该秒数后再参与调度（默认 300）',
         dailyUsageRefreshTime: '每日用量检查时间',
-        dailyUsageRefreshTimeHint: '每日在此时间对启用账号刷新上游用量窗口（HH:MM）'
+        dailyUsageRefreshTimeHint: '每日在此时间对启用账号刷新上游用量窗口（HH:MM）',
+        usageWindowDisablePercent: '窗口超限取消调度阈值（%）',
+        usageWindowDisablePercentHint: '当窗口使用率达到该比例时，账号将取消调度（范围 1-100，默认 100），窗口恢复后会自动启用'
+      },
+      alert: {
+        title: '告警配置',
+        description: '配置系统异常时的告警通知收件人',
+        cooldownMinutes: '告警冷却时间（分钟）',
+        cooldownMinutesPlaceholder: '5',
+        cooldownMinutesHint: '同一类告警在冷却时间内最多发送 1 次；填 0 表示不限制（谨慎使用）',
+        emailPlaceholder: "alert{'@'}example.com",
+        add: '添加邮箱',
+        remove: '删除',
+        hint: '当系统出现“号池异常/无可用账号”时，将发送告警邮件到以下地址（支持多个）',
+        smtpRequiredHint: '提示：需要先在下方配置 SMTP 才能发送告警邮件'
       },
       site: {
         title: '站点设置',

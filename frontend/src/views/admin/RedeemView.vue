@@ -29,43 +29,101 @@
             </button>
           </div>
 
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div class="w-full sm:w-72">
-              <input
-                v-model="searchQuery"
-                type="text"
-                :placeholder="t('admin.redeem.searchCodes')"
-                class="input"
-                @input="handleSearch"
-              />
-            </div>
-            <div class="flex gap-2">
-              <Select
-                v-model="filters.type"
-                :options="filterTypeOptions"
-                class="w-36"
-                @change="loadCodes"
-              />
-              <Select
-                v-model="filters.welfare_no"
-                :options="filterWelfareNoOptions"
-                class="w-44"
-                searchable
-                @change="loadCodes"
-              />
-              <Select
-                v-model="filters.status"
-                :options="filterStatusOptions"
-                class="w-36"
-                @change="loadCodes"
-              />
-              <button @click="handleExportCodes" class="btn btn-secondary">
-                {{ t('admin.redeem.exportCsv') }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </template>
+	          <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+	            <div class="w-full sm:w-96">
+	              <div class="flex gap-2">
+	                <Select
+	                  v-model="searchType"
+	                  :options="searchTypeOptions"
+	                  class="w-28"
+	                />
+	                <input
+	                  v-model="searchQuery"
+	                  type="text"
+	                  :placeholder="searchPlaceholder"
+	                  class="input flex-1"
+	                  @input="handleSearch"
+	                />
+	              </div>
+	            </div>
+	
+		            <div class="flex items-center justify-end gap-2">
+		              <Select
+		                v-model="filters.status"
+		                :options="filterStatusOptions"
+		                class="w-36"
+		                @change="loadCodes"
+		              />
+		              <!-- Filter Settings Dropdown -->
+		              <div class="relative" ref="filterDropdownRef">
+		                <button @click="showFilterDropdown = !showFilterDropdown" class="btn btn-secondary">
+	                  <svg
+	                    class="mr-1.5 h-4 w-4"
+	                    fill="none"
+	                    stroke="currentColor"
+	                    viewBox="0 0 24 24"
+	                    stroke-width="1.5"
+	                  >
+	                    <path
+	                      stroke-linecap="round"
+	                      stroke-linejoin="round"
+	                      d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"
+	                    />
+	                  </svg>
+	                  {{ t('admin.redeem.filterSettings') }}
+	                </button>
+	
+	                <div
+	                  v-if="showFilterDropdown"
+	                  class="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-dark-600 dark:bg-dark-800"
+	                >
+	                  <button
+	                    v-for="filter in builtInFilters"
+	                    :key="filter.key"
+	                    @click="toggleBuiltInFilter(filter.key)"
+	                    class="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
+	                  >
+	                    <span>{{ filter.name }}</span>
+	                    <svg
+	                      v-if="visibleFilters.has(filter.key)"
+	                      class="h-4 w-4 text-primary-500"
+	                      fill="none"
+	                      stroke="currentColor"
+	                      viewBox="0 0 24 24"
+	                      stroke-width="2"
+	                    >
+	                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+	                    </svg>
+	                  </button>
+	                </div>
+	              </div>
+	
+	              <button @click="handleExportCodes" class="btn btn-secondary">
+	                {{ t('admin.redeem.exportCsv') }}
+	              </button>
+	            </div>
+	          </div>
+	
+		          <!-- Active Filters (shown below search row) -->
+		          <div class="flex flex-wrap items-center justify-end gap-2">
+		            <Select
+		              v-if="visibleFilters.has('type')"
+	              v-model="filters.type"
+	              :options="filterTypeOptions"
+	              class="w-36"
+	              @change="loadCodes"
+	            />
+	            <Select
+	              v-if="visibleFilters.has('welfare_no')"
+	              v-model="filters.welfare_no"
+	              :options="filterWelfareNoOptions"
+	              class="w-44"
+		              searchable
+		              @change="loadCodes"
+		            />
+		          </div>
+		        </div>
+		      </template>
 
       <template #table>
         <DataTable :columns="columns" :data="codes" :loading="loading">
@@ -164,9 +222,9 @@
             </span>
           </template>
 
-          <template #cell-used_by="{ value }">
+          <template #cell-used_by="{ value, row }">
             <span class="text-sm text-gray-500 dark:text-dark-400">
-              {{ value ? t('admin.redeem.userPrefix', { id: value }) : '-' }}
+              {{ row.user?.email || (value ? t('admin.redeem.userPrefix', { id: value }) : '-') }}
             </span>
           </template>
 
@@ -452,30 +510,62 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useAppStore } from '@/stores/app'
-import { useClipboard } from '@/composables/useClipboard'
-import { adminAPI } from '@/api/admin'
-import { formatDateTime } from '@/utils/format'
-import type { RedeemCode, RedeemCodeType, Group } from '@/types'
-import type { Column } from '@/components/common/types'
-import AppLayout from '@/components/layout/AppLayout.vue'
-import TablePageLayout from '@/components/layout/TablePageLayout.vue'
-import DataTable from '@/components/common/DataTable.vue'
-import Pagination from '@/components/common/Pagination.vue'
-import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import Select from '@/components/common/Select.vue'
-import Toggle from '@/components/common/Toggle.vue'
+	import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+	import { useI18n } from 'vue-i18n'
+	import { useAppStore } from '@/stores/app'
+	import { useClipboard } from '@/composables/useClipboard'
+	import { adminAPI } from '@/api/admin'
+	import { formatDateTime } from '@/utils/format'
+	import type { RedeemCode, RedeemCodeType, Group } from '@/types'
+	import type { Column } from '@/components/common/types'
+	import AppLayout from '@/components/layout/AppLayout.vue'
+	import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+	import DataTable from '@/components/common/DataTable.vue'
+	import Pagination from '@/components/common/Pagination.vue'
+	import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+	import Select from '@/components/common/Select.vue'
+	import Toggle from '@/components/common/Toggle.vue'
 
-const { t } = useI18n()
-const appStore = useAppStore()
-const { copyToClipboard: clipboardCopy } = useClipboard()
+	const { t } = useI18n()
+	const appStore = useAppStore()
+	const { copyToClipboard: clipboardCopy } = useClipboard()
 
-const showGenerateDialog = ref(false)
-const showResultDialog = ref(false)
-const generatedCodes = ref<RedeemCode[]>([])
-const subscriptionGroups = ref<Group[]>([])
+	// Filter settings dropdown
+	const showFilterDropdown = ref(false)
+	const filterDropdownRef = ref<HTMLElement | null>(null)
+	const visibleFilters = reactive<Set<string>>(new Set())
+	const builtInFilters = computed(() => [
+	  { key: 'type', name: t('admin.redeem.columns.type') },
+	  { key: 'welfare_no', name: t('admin.redeem.columns.welfare') }
+	])
+
+	const toggleBuiltInFilter = (key: string) => {
+	  if (visibleFilters.has(key)) {
+	    visibleFilters.delete(key)
+	    if (key === 'type') {
+	      filters.type = ''
+	    }
+	    if (key === 'welfare_no') {
+	      filters.welfare_no = ''
+	    }
+	    pagination.page = 1
+	    loadCodes()
+	  } else {
+	    visibleFilters.add(key)
+	  }
+	}
+
+	const handleClickOutside = (event: MouseEvent) => {
+	  const target = event.target as HTMLElement
+	  if (filterDropdownRef.value && !filterDropdownRef.value.contains(target)) {
+	    showFilterDropdown.value = false
+	  }
+	}
+
+	const showGenerateDialog = ref(false)
+	const showResultDialog = ref(false)
+	const generatedCodes = ref<RedeemCode[]>([])
+	const subscriptionGroups = ref<Group[]>([])
 
 // 订阅类型分组选项
 const subscriptionGroupOptions = computed(() => {
@@ -589,11 +679,21 @@ let abortController: AbortController | null = null
 const showDeleteDialog = ref(false)
 const showDeleteUnusedDialog = ref(false)
 const deletingCode = ref<RedeemCode | null>(null)
-const copiedCode = ref<string | null>(null)
+	const copiedCode = ref<string | null>(null)
 
-const generateForm = reactive({
-  type: 'balance' as RedeemCodeType,
-  value: 10,
+	type RedeemSearchType = 'code' | 'user'
+	const searchType = ref<RedeemSearchType>('code')
+	const searchTypeOptions = computed(() => [
+	  { value: 'code', label: t('admin.redeem.searchTypeCode') },
+	  { value: 'user', label: t('admin.redeem.searchTypeUser') }
+	])
+	const searchPlaceholder = computed(() =>
+	  searchType.value === 'user' ? t('admin.redeem.searchUsers') : t('admin.redeem.searchCodes')
+	)
+
+	const generateForm = reactive({
+	  type: 'balance' as RedeemCodeType,
+	  value: 10,
   count: 1,
   group_id: null as number | null,
   validity_days: 30,
@@ -609,18 +709,19 @@ const loadCodes = async () => {
   abortController = currentController
   loading.value = true
   try {
-    const response = await adminAPI.redeem.list(
-      pagination.page,
-      pagination.page_size,
-      {
-        type: filters.type as RedeemCodeType,
-        status: filters.status as any,
-        welfare_no: filters.welfare_no || undefined,
-        search: searchQuery.value || undefined
-      },
-      {
-        signal: currentController.signal
-      }
+	    const response = await adminAPI.redeem.list(
+	      pagination.page,
+	      pagination.page_size,
+	      {
+	        type: filters.type as RedeemCodeType,
+	        status: filters.status as any,
+	        welfare_no: filters.welfare_no || undefined,
+	        search_type: searchType.value,
+	        search: searchQuery.value || undefined
+	      },
+	      {
+	        signal: currentController.signal
+	      }
     )
     if (currentController.signal.aborted) {
       return
@@ -802,9 +903,14 @@ const loadSubscriptionGroups = async () => {
   }
 }
 
-onMounted(() => {
-  loadCodes()
-  loadSubscriptionGroups()
-  loadWelfareNos()
-})
+	onMounted(() => {
+	  document.addEventListener('click', handleClickOutside)
+	  loadCodes()
+	  loadSubscriptionGroups()
+	  loadWelfareNos()
+	})
+
+	onUnmounted(() => {
+	  document.removeEventListener('click', handleClickOutside)
+	})
 </script>

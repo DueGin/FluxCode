@@ -86,6 +86,7 @@ type OpenAIGatewayService struct {
 	concurrencyService  *ConcurrencyService
 	billingService      *BillingService
 	rateLimitService    *RateLimitService
+	settingService      *SettingService
 	openaiOAuthService  *OpenAIOAuthService
 	billingCacheService *BillingCacheService
 	httpUpstream        HTTPUpstream
@@ -105,6 +106,7 @@ func NewOpenAIGatewayService(
 	concurrencyService *ConcurrencyService,
 	billingService *BillingService,
 	rateLimitService *RateLimitService,
+	settingService *SettingService,
 	openaiOAuthService *OpenAIOAuthService,
 	billingCacheService *BillingCacheService,
 	httpUpstream HTTPUpstream,
@@ -120,6 +122,7 @@ func NewOpenAIGatewayService(
 		concurrencyService:  concurrencyService,
 		billingService:      billingService,
 		rateLimitService:    rateLimitService,
+		settingService:      settingService,
 		openaiOAuthService:  openaiOAuthService,
 		billingCacheService: billingCacheService,
 		httpUpstream:        httpUpstream,
@@ -1278,14 +1281,17 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 		}
 		now := time.Now()
 		tempAccount := &Account{Extra: updates}
-		_, exceeded := codexUsageWindows(tempAccount, now)
+		threshold := float64(s.settingService.GetUsageWindowDisablePercent(updateCtx))
+		if threshold <= 0 {
+			threshold = defaultUsageWindowDisablePercent
+		}
+		_, exceeded := codexUsageWindows(tempAccount, now, threshold)
 		if len(exceeded) == 0 {
 			return
 		}
-		until := selectLatestReset(exceeded, now, 5*time.Minute)
 		reason := buildCodexExceededReason(exceeded)
-		if err := s.rateLimitService.SetTempUnschedulableWithReason(updateCtx, accountID, until, reason); err != nil {
-			applog.Printf("[CodexQuota] SetTempUnschedulable failed for account %d: %v", accountID, err)
+		if err := setUnschedulableWithReasonByID(updateCtx, s.accountRepo, accountID, reason); err != nil {
+			applog.Printf("[CodexQuota] SetUnschedulableWithReason failed for account %d: %v", accountID, err)
 		}
 	}()
 }

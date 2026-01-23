@@ -368,6 +368,88 @@
                   {{ t('admin.settings.scheduling.dailyUsageRefreshTimeHint') }}
                 </p>
               </div>
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.scheduling.usageWindowDisablePercent') }}
+                </label>
+                <input
+                  v-model.number="form.usage_window_disable_percent"
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="1"
+                  class="input"
+                  placeholder="100"
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.scheduling.usageWindowDisablePercentHint') }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alert Settings -->
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.settings.alert.title') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.settings.alert.description') }}
+            </p>
+          </div>
+          <div class="space-y-4 p-6">
+            <div class="space-y-3">
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.alert.cooldownMinutes') }}
+                </label>
+                <input
+                  v-model.number="form.alert_cooldown_minutes"
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="input"
+                  :placeholder="t('admin.settings.alert.cooldownMinutesPlaceholder')"
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.alert.cooldownMinutesHint') }}
+                </p>
+              </div>
+
+              <div
+                v-for="(_, index) in form.alert_emails"
+                :key="index"
+                class="flex flex-col gap-3 md:flex-row md:items-center"
+              >
+                <input
+                  v-model="form.alert_emails[index]"
+                  type="email"
+                  class="input flex-1"
+                  :placeholder="t('admin.settings.alert.emailPlaceholder')"
+                />
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm self-end md:self-auto"
+                  @click="removeAlertEmailRow(index)"
+                >
+                  {{ t('admin.settings.alert.remove') }}
+                </button>
+              </div>
+
+              <div>
+                <button type="button" class="btn btn-secondary btn-sm" @click="addAlertEmailRow">
+                  {{ t('admin.settings.alert.add') }}
+                </button>
+              </div>
+
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.settings.alert.hint') }}
+              </p>
+              <p v-if="!form.smtp_host" class="text-xs text-amber-700 dark:text-amber-300">
+                {{ t('admin.settings.alert.smtpRequiredHint') }}
+              </p>
             </div>
           </div>
         </div>
@@ -597,8 +679,8 @@
           </div>
         </div>
 
-        <!-- SMTP Settings - Only show when email verification is enabled -->
-        <div v-if="form.email_verify_enabled" class="card">
+        <!-- SMTP Settings -->
+        <div class="card">
           <div
             class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700"
           >
@@ -730,8 +812,8 @@
           </div>
         </div>
 
-        <!-- Send Test Email - Only show when email verification is enabled -->
-        <div v-if="form.email_verify_enabled" class="card">
+        <!-- Send Test Email -->
+        <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.testEmail.title') }}
@@ -844,11 +926,14 @@ const newAdminApiKey = ref('')
 const form = reactive<SystemSettings>({
   registration_enabled: true,
   email_verify_enabled: false,
+  alert_emails: [],
+  alert_cooldown_minutes: 5,
   default_balance: 0,
   default_concurrency: 1,
   gateway_retry_switch_after: 2,
   daily_usage_refresh_time: '03:00',
   auth_401_cooldown_seconds: 300,
+  usage_window_disable_percent: 100,
   site_name: 'FluxCode',
   site_logo: '',
   site_subtitle: 'Subscription to API Conversion Platform',
@@ -875,6 +960,14 @@ function addAfterSaleContactRow() {
 
 function removeAfterSaleContactRow(index: number) {
   form.after_sale_contact.splice(index, 1)
+}
+
+function addAlertEmailRow() {
+  form.alert_emails.push('')
+}
+
+function removeAlertEmailRow(index: number) {
+  form.alert_emails.splice(index, 1)
 }
 
 function handleLogoUpload(event: Event) {
@@ -921,6 +1014,9 @@ async function loadSettings() {
     const settings = await adminAPI.settings.getSettings()
     Object.assign(form, settings)
     form.after_sale_contact = Array.isArray(settings.after_sale_contact) ? settings.after_sale_contact : []
+    form.alert_emails = Array.isArray(settings.alert_emails) ? settings.alert_emails : []
+    form.alert_cooldown_minutes =
+      typeof settings.alert_cooldown_minutes === 'number' ? settings.alert_cooldown_minutes : 5
   } catch (error: any) {
     appStore.showError(
       t('admin.settings.failedToLoad') + ': ' + (error.message || t('common.unknownError'))

@@ -97,19 +97,6 @@ func ProvideAccountExpirationWorker(db *sql.DB, timingWheel *TimingWheelService)
 	return svc
 }
 
-func ProvideTempUnschedRecoveryWorker(
-	db *sql.DB,
-	timingWheel *TimingWheelService,
-	accountRepo AccountRepository,
-	usageService *AccountUsageService,
-	rateLimitService *RateLimitService,
-	cache TempUnschedRecoveryCache,
-) *TempUnschedRecoveryWorker {
-	svc := NewTempUnschedRecoveryWorker(db, timingWheel, accountRepo, usageService, rateLimitService, cache, time.Hour, 5*time.Minute)
-	svc.Start()
-	return svc
-}
-
 func ProvideDailyUsageRefreshWorker(
 	db *sql.DB,
 	settingService *SettingService,
@@ -168,6 +155,7 @@ var ProviderSet = wire.NewSet(
 	NewAccountTestService,
 	NewSettingService,
 	NewEmailService,
+	NewAlertService,
 	ProvideEmailQueueService,
 	ProvideUsageQueueService,
 	NewTurnstileService,

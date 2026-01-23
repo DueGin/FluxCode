@@ -968,9 +968,15 @@ const isExpired = (expiresAt: string | null): boolean => {
   return new Date(expiresAt) <= new Date()
 }
 
+const hasSchedulableReason = (account: Account): boolean => {
+  if (account.schedulable) return false
+  return (account.temp_unschedulable_reason || '').trim().length > 0
+}
+
 const shouldShowSchedulableHint = (account: Account): boolean => {
   if (isExpired(account.expires_at)) return true
   if (account.status === 'inactive' || account.status === 'error') return true
+  if (hasSchedulableReason(account)) return true
   if (isTempUnschedulable(account)) return true
   if (isRateLimited(account)) return true
   if (isOverloaded(account)) return true
@@ -1008,7 +1014,8 @@ const getSchedulableHint = (account: Account): string => {
     return t('admin.accounts.schedulableReason.error')
   }
   if (!account.schedulable) {
-    return t('admin.accounts.schedulableReason.manualOff')
+    const reason = formatTempUnschedReason(account.temp_unschedulable_reason)
+    return reason ? reason : t('admin.accounts.schedulableReason.manualOff')
   }
   if (isTempUnschedulable(account)) {
     const reason = formatTempUnschedReason(account.temp_unschedulable_reason)

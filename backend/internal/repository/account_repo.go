@@ -679,6 +679,19 @@ func (r *accountRepository) SetOverloaded(ctx context.Context, id int64, until t
 	return err
 }
 
+func (r *accountRepository) SetUnschedulableWithReason(ctx context.Context, id int64, reason string) error {
+	_, err := r.sql.ExecContext(ctx, `
+		UPDATE accounts
+		SET schedulable = FALSE,
+			temp_unschedulable_until = NULL,
+			temp_unschedulable_reason = $1,
+			updated_at = NOW()
+		WHERE id = $2
+			AND deleted_at IS NULL
+	`, reason, id)
+	return err
+}
+
 func (r *accountRepository) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
 	_, err := r.sql.ExecContext(ctx, `
 		UPDATE accounts

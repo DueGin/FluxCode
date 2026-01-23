@@ -154,7 +154,11 @@
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ModelDistributionChart :model-stats="modelStats" :loading="chartsLoading" split />
           <div class="lg:col-span-2">
-            <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+            <TokenUsageTrend
+              :trend-data="trendData"
+              :loading="chartsLoading"
+              :granularity="granularity"
+            />
           </div>
         </div>
       </div>

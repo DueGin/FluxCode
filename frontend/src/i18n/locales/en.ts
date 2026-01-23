@@ -1749,6 +1749,10 @@ export default {
       description: 'Generate and manage redeem codes',
       generateCodes: 'Generate Codes',
       searchCodes: 'Search codes...',
+      filterSettings: 'Filter Settings',
+      searchTypeCode: 'Code',
+      searchTypeUser: 'User',
+      searchUsers: 'Search user email...',
       allTypes: 'All Types',
       allStatus: 'All Status',
       balance: 'Balance',
@@ -1878,7 +1882,23 @@ export default {
         auth401CooldownSecondsHint:
           'When upstream returns 401 (token/auth issues), temporarily cool down the account for this many seconds before rescheduling (default: 300)',
         dailyUsageRefreshTime: 'Daily usage refresh time',
-        dailyUsageRefreshTimeHint: 'Refresh usage windows for active accounts at HH:MM each day'
+        dailyUsageRefreshTimeHint: 'Refresh usage windows for active accounts at HH:MM each day',
+        usageWindowDisablePercent: 'Usage window disable threshold (%)',
+        usageWindowDisablePercentHint:
+          'When window utilization reaches this percentage, scheduling will be turned off (range: 1-100, default: 100) and auto-enabled after the window resets'
+      },
+      alert: {
+        title: 'Alerting',
+        description: 'Configure alert recipient emails for system exceptions',
+        cooldownMinutes: 'Alert cooldown (minutes)',
+        cooldownMinutesPlaceholder: '5',
+        cooldownMinutesHint:
+          'At most 1 alert will be sent per cooldown window for the same alert type; set to 0 for no limit (use with caution).',
+        emailPlaceholder: "alert{'@'}example.com",
+        add: 'Add email',
+        remove: 'Remove',
+        hint: 'When the system reports "no available accounts", an alert email will be sent to these recipients (supports multiple).',
+        smtpRequiredHint: 'Note: You must configure SMTP below to send alert emails'
       },
       site: {
         title: 'Site Settings',

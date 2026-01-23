@@ -13,12 +13,16 @@ export interface SystemSettings {
   // Registration settings
   registration_enabled: boolean
   email_verify_enabled: boolean
+  // Alerting
+  alert_emails: string[]
+  alert_cooldown_minutes: number
   // Default settings
   default_balance: number
   default_concurrency: number
   gateway_retry_switch_after: number
   daily_usage_refresh_time: string
   auth_401_cooldown_seconds: number
+  usage_window_disable_percent: number
   // OEM settings
   site_name: string
   site_logo: string

@@ -87,11 +87,12 @@ const (
 	SettingKeyDocURL           = "doc_url"            // 文档链接
 
 	// 默认配置
-	SettingKeyDefaultConcurrency      = "default_concurrency"        // 新用户默认并发量
-	SettingKeyDefaultBalance          = "default_balance"            // 新用户默认余额
-	SettingKeyGatewayRetrySwitchAfter = "gateway_retry_switch_after" // 重试多少次后切换账号调度
-	SettingKeyDailyUsageRefreshTime   = "daily_usage_refresh_time"   // 每日用量刷新时间（HH:MM）
-	SettingKeyAuth401CooldownSeconds  = "auth_401_cooldown_seconds"  // 上游鉴权401临时冷却时间（秒）
+	SettingKeyDefaultConcurrency        = "default_concurrency"          // 新用户默认并发量
+	SettingKeyDefaultBalance            = "default_balance"              // 新用户默认余额
+	SettingKeyGatewayRetrySwitchAfter   = "gateway_retry_switch_after"   // 重试多少次后切换账号调度
+	SettingKeyDailyUsageRefreshTime     = "daily_usage_refresh_time"     // 每日用量刷新时间（HH:MM）
+	SettingKeyAuth401CooldownSeconds    = "auth_401_cooldown_seconds"    // 上游鉴权401临时冷却时间（秒）
+	SettingKeyUsageWindowDisablePercent = "usage_window_disable_percent" // 用量窗口达到多少百分比取消调度
 
 	// 管理员 API Key
 	SettingKeyAdminAPIKey = "admin_api_key" // 全局管理员 API Key（用于外部系统集成）
@@ -105,6 +106,10 @@ const (
 	SettingKeyFallbackModelOpenAI      = "fallback_model_openai"
 	SettingKeyFallbackModelGemini      = "fallback_model_gemini"
 	SettingKeyFallbackModelAntigravity = "fallback_model_antigravity"
+
+	// 告警设置
+	SettingKeyAlertEmails          = "alert_emails"           // JSON array of recipient emails
+	SettingKeyAlertCooldownMinutes = "alert_cooldown_minutes" // int minutes, 0 means no cooldown
 )
 
 // AdminAPIKeyPrefix is the prefix for admin API keys (distinct from user "sk-" keys).

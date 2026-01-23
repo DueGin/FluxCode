@@ -164,6 +164,7 @@ type AccountUsageService struct {
 	usageFetcher            ClaudeUsageFetcher
 	geminiQuotaService      *GeminiQuotaService
 	antigravityQuotaFetcher *AntigravityQuotaFetcher
+	settingService          *SettingService
 	cache                   *UsageCache
 }
 
@@ -174,6 +175,7 @@ func NewAccountUsageService(
 	usageFetcher ClaudeUsageFetcher,
 	geminiQuotaService *GeminiQuotaService,
 	antigravityQuotaFetcher *AntigravityQuotaFetcher,
+	settingService *SettingService,
 	cache *UsageCache,
 ) *AccountUsageService {
 	return &AccountUsageService{
@@ -182,6 +184,7 @@ func NewAccountUsageService(
 		usageFetcher:            usageFetcher,
 		geminiQuotaService:      geminiQuotaService,
 		antigravityQuotaFetcher: antigravityQuotaFetcher,
+		settingService:          settingService,
 		cache:                   cache,
 	}
 }
@@ -256,7 +259,7 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 		// 4. 添加窗口统计（有独立缓存，1 分钟）
 		s.addWindowStats(ctx, account, usage)
 
-		// 5. 超限检测：5h/7d 达到或超过 100% 时，将账号置为“临时不可调度”，并写入提示信息
+		// 5. 超限检测：5h/7d 达到或超过配置阈值时，取消调度并写入提示信息（非临时不可调度，窗口恢复后可被刷新任务自动启用）
 		s.enforceUsageWindows(ctx, account, usage)
 
 		return usage, nil
@@ -615,35 +618,20 @@ func (s *AccountUsageService) enforceUsageWindows(ctx context.Context, account *
 		{name: "7d_sonnet", used: usageValue(usage.SevenDaySonnet), reset: usageResetAt(usage.SevenDaySonnet)},
 	}
 
+	threshold := float64(s.settingService.GetUsageWindowDisablePercent(ctx))
+	if threshold <= 0 {
+		threshold = defaultUsageWindowDisablePercent
+	}
+
 	var exceeded []window
 	for _, w := range windows {
-		if w.used >= 100 {
+		if w.used >= threshold {
 			w.exceed = true
 			exceeded = append(exceeded, w)
 		}
 	}
 	if len(exceeded) == 0 {
 		return
-	}
-
-	now := time.Now()
-	var until *time.Time
-	for _, w := range exceeded {
-		if w.reset == nil {
-			continue
-		}
-		if !w.reset.After(now) {
-			continue
-		}
-		if until == nil || w.reset.After(*until) {
-			u := *w.reset
-			until = &u
-		}
-	}
-	// 兜底：没有 resetAt 时，先短暂冷却，避免被持续选中打爆上游
-	if until == nil {
-		u := now.Add(30 * time.Minute)
-		until = &u
 	}
 
 	platformLabel := "账号"
@@ -677,9 +665,9 @@ func (s *AccountUsageService) enforceUsageWindows(ctx context.Context, account *
 		}
 	}
 
-	// 仅延长不缩短：不会覆盖更长的临时不可调度窗口
-	if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, *until, strings.TrimSpace(b.String())); err != nil {
-		applog.Printf("[UsageLimit] SetTempUnschedulable failed for account %d: %v", account.ID, err)
+	reason := strings.TrimSpace(b.String())
+	if err := setUnschedulableWithReason(ctx, s.accountRepo, account, reason); err != nil {
+		applog.Printf("[UsageLimit] SetUnschedulableWithReason failed for account %d: %v", account.ID, err)
 	}
 }
 
