@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/DueGin/FluxCode/internal/config"
 	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
@@ -22,10 +23,11 @@ var (
 )
 
 const (
-	defaultGatewayRetrySwitchAfter   = 2
-	defaultDailyUsageRefreshTime     = "03:00"
-	defaultAuth401CooldownSeconds    = 300
-	defaultUsageWindowDisablePercent = 100
+	defaultGatewayRetrySwitchAfter           = 2
+	defaultDailyUsageRefreshTime             = "03:00"
+	defaultAuth401CooldownSeconds            = 300
+	defaultUsageWindowDisablePercent         = 100
+	defaultUserConcurrencyWaitTimeoutSeconds = 30
 )
 
 type SettingRepository interface {
@@ -40,9 +42,10 @@ type SettingRepository interface {
 
 // SettingService 系统设置服务
 type SettingService struct {
-	settingRepo SettingRepository
-	cfg         *config.Config
-	listenersMu sync.Mutex
+	settingRepo  SettingRepository
+	settingCache SettingCache
+	cfg          *config.Config
+	listenersMu  sync.Mutex
 
 	dailyUsageRefreshListeners []func()
 }
@@ -55,10 +58,11 @@ func (s *SettingService) webTitleDefault() string {
 }
 
 // NewSettingService 创建系统设置服务实例
-func NewSettingService(settingRepo SettingRepository, cfg *config.Config) *SettingService {
+func NewSettingService(settingRepo SettingRepository, settingCache SettingCache, cfg *config.Config) *SettingService {
 	return &SettingService{
-		settingRepo: settingRepo,
-		cfg:         cfg,
+		settingRepo:  settingRepo,
+		settingCache: settingCache,
+		cfg:          cfg,
 	}
 }
 
@@ -136,15 +140,25 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 
 // UpdateSettings 更新系统设置
 func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSettings) error {
-	previousDaily := defaultDailyUsageRefreshTime
-	if s != nil && s.settingRepo != nil {
-		if value, err := s.settingRepo.GetValue(ctx, SettingKeyDailyUsageRefreshTime); err == nil {
-			previousDaily = strings.TrimSpace(value)
+	if s == nil || s.settingRepo == nil {
+		return infraerrors.InternalServer("SETTING_SERVICE_NOT_READY", "setting service not initialized")
+	}
+
+	if s.settingCache != nil {
+		token, ok, err := s.settingCache.AcquireUpdateLock(ctx, 30*time.Second)
+		if err != nil {
+			return infraerrors.ServiceUnavailable("SETTING_CACHE_UNAVAILABLE", "failed to acquire settings update lock").WithCause(err)
 		}
+		if !ok {
+			return infraerrors.TooManyRequests("SETTINGS_UPDATE_BUSY", "settings are being updated, please retry later")
+		}
+		defer func(token string) {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_ = s.settingCache.ReleaseUpdateLock(bgCtx, token)
+		}(token)
 	}
-	if strings.TrimSpace(previousDaily) == "" {
-		previousDaily = defaultDailyUsageRefreshTime
-	}
+
 	updates := make(map[string]string)
 
 	// 注册设置
@@ -202,6 +216,10 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyAuth401CooldownSeconds] = strconv.Itoa(settings.Auth401CooldownSeconds)
 	settings.UsageWindowDisablePercent = normalizeUsageWindowDisablePercent(settings.UsageWindowDisablePercent)
 	updates[SettingKeyUsageWindowDisablePercent] = strconv.Itoa(settings.UsageWindowDisablePercent)
+	if settings.UserConcurrencyWaitTimeoutSeconds <= 0 {
+		settings.UserConcurrencyWaitTimeoutSeconds = defaultUserConcurrencyWaitTimeoutSeconds
+	}
+	updates[SettingKeyUserConcurrencyWaitTimeoutSeconds] = strconv.Itoa(settings.UserConcurrencyWaitTimeoutSeconds)
 
 	// Model fallback configuration
 	updates[SettingKeyEnableModelFallback] = strconv.FormatBool(settings.EnableModelFallback)
@@ -210,8 +228,46 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyFallbackModelGemini] = settings.FallbackModelGemini
 	updates[SettingKeyFallbackModelAntigravity] = settings.FallbackModelAntigravity
 
+	updateKeys := make([]string, 0, len(updates))
+	for key := range updates {
+		updateKeys = append(updateKeys, key)
+	}
+	previousValues, err := s.settingRepo.GetMultiple(ctx, updateKeys)
+	if err != nil {
+		return fmt.Errorf("snapshot settings: %w", err)
+	}
+	previouslyMissing := make(map[string]struct{}, len(updateKeys))
+	for _, key := range updateKeys {
+		if _, ok := previousValues[key]; !ok {
+			previouslyMissing[key] = struct{}{}
+		}
+	}
+
+	previousDaily := strings.TrimSpace(previousValues[SettingKeyDailyUsageRefreshTime])
+	if previousDaily == "" {
+		previousDaily = defaultDailyUsageRefreshTime
+	}
+
 	if err := s.settingRepo.SetMultiple(ctx, updates); err != nil {
 		return err
+	}
+
+	if s.settingCache != nil {
+		cacheUpdates := map[string]string{
+			SettingKeyGatewayRetrySwitchAfter:           updates[SettingKeyGatewayRetrySwitchAfter],
+			SettingKeyDailyUsageRefreshTime:             updates[SettingKeyDailyUsageRefreshTime],
+			SettingKeyAuth401CooldownSeconds:            updates[SettingKeyAuth401CooldownSeconds],
+			SettingKeyUsageWindowDisablePercent:         updates[SettingKeyUsageWindowDisablePercent],
+			SettingKeyUserConcurrencyWaitTimeoutSeconds: updates[SettingKeyUserConcurrencyWaitTimeoutSeconds],
+		}
+		if err := s.settingCache.SetMultiple(ctx, cacheUpdates); err != nil {
+			rollbackErr := s.rollbackSettings(ctx, previousValues, previouslyMissing)
+			if rollbackErr != nil {
+				return infraerrors.ServiceUnavailable("SETTING_UPDATE_ROLLBACK_FAILED", "settings cache update failed; rollback failed").WithCause(fmt.Errorf("cache=%v rollback=%w", err, rollbackErr))
+			}
+			_ = s.bestEffortRestoreSettingsCache(ctx, previousValues)
+			return infraerrors.ServiceUnavailable("SETTING_CACHE_UPDATE_FAILED", "failed to update settings cache").WithCause(err)
+		}
 	}
 
 	newDaily := strings.TrimSpace(settings.DailyUsageRefreshTime)
@@ -223,6 +279,54 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	}
 
 	return nil
+}
+
+func (s *SettingService) rollbackSettings(ctx context.Context, previousValues map[string]string, previouslyMissing map[string]struct{}) error {
+	if s == nil || s.settingRepo == nil {
+		return errors.New("nil setting repo")
+	}
+
+	if len(previousValues) > 0 {
+		if err := s.settingRepo.SetMultiple(ctx, previousValues); err != nil {
+			return err
+		}
+	}
+
+	for key := range previouslyMissing {
+		// Best-effort: if deletion fails, continue so we at least restore existing keys.
+		_ = s.settingRepo.Delete(ctx, key)
+	}
+
+	return nil
+}
+
+func (s *SettingService) bestEffortRestoreSettingsCache(ctx context.Context, previousValues map[string]string) error {
+	if s == nil || s.settingCache == nil {
+		return nil
+	}
+	if previousValues == nil {
+		return nil
+	}
+	restore := map[string]string{}
+	if v, ok := previousValues[SettingKeyGatewayRetrySwitchAfter]; ok {
+		restore[SettingKeyGatewayRetrySwitchAfter] = v
+	}
+	if v, ok := previousValues[SettingKeyDailyUsageRefreshTime]; ok {
+		restore[SettingKeyDailyUsageRefreshTime] = v
+	}
+	if v, ok := previousValues[SettingKeyAuth401CooldownSeconds]; ok {
+		restore[SettingKeyAuth401CooldownSeconds] = v
+	}
+	if v, ok := previousValues[SettingKeyUsageWindowDisablePercent]; ok {
+		restore[SettingKeyUsageWindowDisablePercent] = v
+	}
+	if v, ok := previousValues[SettingKeyUserConcurrencyWaitTimeoutSeconds]; ok {
+		restore[SettingKeyUserConcurrencyWaitTimeoutSeconds] = v
+	}
+	if len(restore) == 0 {
+		return nil
+	}
+	return s.settingCache.SetMultiple(ctx, restore)
 }
 
 // IsRegistrationEnabled 检查是否开放注册
@@ -282,62 +386,160 @@ func (s *SettingService) GetDefaultBalance(ctx context.Context) float64 {
 
 // GetGatewayRetrySwitchAfter returns how many client retries trigger account switching.
 func (s *SettingService) GetGatewayRetrySwitchAfter(ctx context.Context) int {
-	if s == nil || s.settingRepo == nil {
+	if s == nil {
 		return defaultGatewayRetrySwitchAfter
 	}
+	if s.settingCache != nil {
+		if value, err := s.settingCache.GetValue(ctx, SettingKeyGatewayRetrySwitchAfter); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
+				return v
+			}
+		}
+	}
+
+	if s.settingRepo == nil {
+		return defaultGatewayRetrySwitchAfter
+	}
+
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyGatewayRetrySwitchAfter)
 	if err != nil {
 		return defaultGatewayRetrySwitchAfter
 	}
-	if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
-		return v
+	v, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || v <= 0 {
+		v = defaultGatewayRetrySwitchAfter
 	}
-	return defaultGatewayRetrySwitchAfter
+	if s.settingCache != nil {
+		_ = s.settingCache.Set(ctx, SettingKeyGatewayRetrySwitchAfter, strconv.Itoa(v))
+	}
+	return v
 }
 
 // GetDailyUsageRefreshTime returns the daily refresh time in HH:MM format.
 func (s *SettingService) GetDailyUsageRefreshTime(ctx context.Context) string {
-	if s == nil || s.settingRepo == nil {
+	if s == nil {
 		return defaultDailyUsageRefreshTime
 	}
+	if s.settingCache != nil {
+		if value, err := s.settingCache.GetValue(ctx, SettingKeyDailyUsageRefreshTime); err == nil {
+			value = strings.TrimSpace(value)
+			if value != "" {
+				return value
+			}
+		}
+	}
+
+	if s.settingRepo == nil {
+		return defaultDailyUsageRefreshTime
+	}
+
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyDailyUsageRefreshTime)
 	if err != nil {
 		return defaultDailyUsageRefreshTime
 	}
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return defaultDailyUsageRefreshTime
+		value = defaultDailyUsageRefreshTime
+	}
+	if s.settingCache != nil {
+		_ = s.settingCache.Set(ctx, SettingKeyDailyUsageRefreshTime, value)
 	}
 	return value
 }
 
 func (s *SettingService) GetAuth401CooldownSeconds(ctx context.Context) int {
-	if s == nil || s.settingRepo == nil {
+	if s == nil {
 		return defaultAuth401CooldownSeconds
 	}
+	if s.settingCache != nil {
+		if value, err := s.settingCache.GetValue(ctx, SettingKeyAuth401CooldownSeconds); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
+				return v
+			}
+		}
+	}
+
+	if s.settingRepo == nil {
+		return defaultAuth401CooldownSeconds
+	}
+
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyAuth401CooldownSeconds)
 	if err != nil {
 		return defaultAuth401CooldownSeconds
 	}
-	if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
-		return v
+	v, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || v <= 0 {
+		v = defaultAuth401CooldownSeconds
 	}
-	return defaultAuth401CooldownSeconds
+	if s.settingCache != nil {
+		_ = s.settingCache.Set(ctx, SettingKeyAuth401CooldownSeconds, strconv.Itoa(v))
+	}
+	return v
 }
 
 func (s *SettingService) GetUsageWindowDisablePercent(ctx context.Context) int {
-	if s == nil || s.settingRepo == nil {
+	if s == nil {
 		return defaultUsageWindowDisablePercent
 	}
+	if s.settingCache != nil {
+		if value, err := s.settingCache.GetValue(ctx, SettingKeyUsageWindowDisablePercent); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil {
+				return normalizeUsageWindowDisablePercent(v)
+			}
+		}
+	}
+
+	if s.settingRepo == nil {
+		return defaultUsageWindowDisablePercent
+	}
+
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyUsageWindowDisablePercent)
 	if err != nil {
 		return defaultUsageWindowDisablePercent
 	}
 	v, err := strconv.Atoi(strings.TrimSpace(value))
 	if err != nil {
-		return defaultUsageWindowDisablePercent
+		v = defaultUsageWindowDisablePercent
 	}
-	return normalizeUsageWindowDisablePercent(v)
+	v = normalizeUsageWindowDisablePercent(v)
+	if s.settingCache != nil {
+		_ = s.settingCache.Set(ctx, SettingKeyUsageWindowDisablePercent, strconv.Itoa(v))
+	}
+	return v
+}
+
+func (s *SettingService) GetUserConcurrencyWaitTimeoutSeconds(ctx context.Context) int {
+	if s == nil {
+		return defaultUserConcurrencyWaitTimeoutSeconds
+	}
+	if s.settingCache != nil {
+		if value, err := s.settingCache.GetValue(ctx, SettingKeyUserConcurrencyWaitTimeoutSeconds); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
+				return v
+			}
+		}
+	}
+
+	if s.settingRepo == nil {
+		return defaultUserConcurrencyWaitTimeoutSeconds
+	}
+
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyUserConcurrencyWaitTimeoutSeconds)
+	if err != nil {
+		return defaultUserConcurrencyWaitTimeoutSeconds
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || v <= 0 {
+		v = defaultUserConcurrencyWaitTimeoutSeconds
+	}
+	if s.settingCache != nil {
+		_ = s.settingCache.Set(ctx, SettingKeyUserConcurrencyWaitTimeoutSeconds, strconv.Itoa(v))
+	}
+	return v
+}
+
+func (s *SettingService) GetUserConcurrencyWaitTimeout(ctx context.Context) time.Duration {
+	return time.Duration(s.GetUserConcurrencyWaitTimeoutSeconds(ctx)) * time.Second
 }
 
 // InitializeDefaultSettings 初始化默认设置
@@ -354,21 +556,22 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 	// 初始化默认设置
 	defaults := map[string]string{
-		SettingKeyRegistrationEnabled:       "true",
-		SettingKeyEmailVerifyEnabled:        "false",
-		SettingKeyAlertEmails:               "[]",
-		SettingKeyAlertCooldownMinutes:      strconv.Itoa(defaultAlertCooldownMinutes),
-		SettingKeySiteName:                  s.webTitleDefault(),
-		SettingKeySiteLogo:                  "",
-		SettingKeyAfterSaleContact:          "[]",
-		SettingKeyDefaultConcurrency:        strconv.Itoa(s.cfg.Default.UserConcurrency),
-		SettingKeyDefaultBalance:            strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
-		SettingKeyGatewayRetrySwitchAfter:   strconv.Itoa(defaultGatewayRetrySwitchAfter),
-		SettingKeyDailyUsageRefreshTime:     defaultDailyUsageRefreshTime,
-		SettingKeyAuth401CooldownSeconds:    strconv.Itoa(defaultAuth401CooldownSeconds),
-		SettingKeyUsageWindowDisablePercent: strconv.Itoa(defaultUsageWindowDisablePercent),
-		SettingKeySMTPPort:                  "587",
-		SettingKeySMTPUseTLS:                "false",
+		SettingKeyRegistrationEnabled:               "true",
+		SettingKeyEmailVerifyEnabled:                "false",
+		SettingKeyAlertEmails:                       "[]",
+		SettingKeyAlertCooldownMinutes:              strconv.Itoa(defaultAlertCooldownMinutes),
+		SettingKeySiteName:                          s.webTitleDefault(),
+		SettingKeySiteLogo:                          "",
+		SettingKeyAfterSaleContact:                  "[]",
+		SettingKeyDefaultConcurrency:                strconv.Itoa(s.cfg.Default.UserConcurrency),
+		SettingKeyDefaultBalance:                    strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
+		SettingKeyGatewayRetrySwitchAfter:           strconv.Itoa(defaultGatewayRetrySwitchAfter),
+		SettingKeyDailyUsageRefreshTime:             defaultDailyUsageRefreshTime,
+		SettingKeyAuth401CooldownSeconds:            strconv.Itoa(defaultAuth401CooldownSeconds),
+		SettingKeyUsageWindowDisablePercent:         strconv.Itoa(defaultUsageWindowDisablePercent),
+		SettingKeyUserConcurrencyWaitTimeoutSeconds: strconv.Itoa(defaultUserConcurrencyWaitTimeoutSeconds),
+		SettingKeySMTPPort:                          "587",
+		SettingKeySMTPUseTLS:                        "false",
 		// Model fallback defaults
 		SettingKeyEnableModelFallback:      "false",
 		SettingKeyFallbackModelAnthropic:   "claude-3-5-sonnet-20241022",
@@ -377,7 +580,19 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyFallbackModelAntigravity: "gemini-2.5-pro",
 	}
 
-	return s.settingRepo.SetMultiple(ctx, defaults)
+	if err := s.settingRepo.SetMultiple(ctx, defaults); err != nil {
+		return err
+	}
+	if s.settingCache != nil {
+		_ = s.settingCache.SetMultiple(ctx, map[string]string{
+			SettingKeyGatewayRetrySwitchAfter:           defaults[SettingKeyGatewayRetrySwitchAfter],
+			SettingKeyDailyUsageRefreshTime:             defaults[SettingKeyDailyUsageRefreshTime],
+			SettingKeyAuth401CooldownSeconds:            defaults[SettingKeyAuth401CooldownSeconds],
+			SettingKeyUsageWindowDisablePercent:         defaults[SettingKeyUsageWindowDisablePercent],
+			SettingKeyUserConcurrencyWaitTimeoutSeconds: defaults[SettingKeyUserConcurrencyWaitTimeoutSeconds],
+		})
+	}
+	return nil
 }
 
 // parseSettings 解析设置到结构体
@@ -446,6 +661,11 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		result.UsageWindowDisablePercent = normalizeUsageWindowDisablePercent(v)
 	} else {
 		result.UsageWindowDisablePercent = defaultUsageWindowDisablePercent
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(settings[SettingKeyUserConcurrencyWaitTimeoutSeconds])); err == nil && v > 0 {
+		result.UserConcurrencyWaitTimeoutSeconds = v
+	} else {
+		result.UserConcurrencyWaitTimeoutSeconds = defaultUserConcurrencyWaitTimeoutSeconds
 	}
 
 	// 解析浮点数类型

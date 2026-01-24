@@ -44,6 +44,7 @@ type UsageRefreshResult struct {
 }
 
 const dailyUsageRefreshAdvisoryLockID int64 = 74298347003
+const dailyUsageRefreshSchedulePollInterval = 30 * time.Second
 
 func NewDailyUsageRefreshWorker(
 	db *sql.DB,
@@ -171,38 +172,78 @@ func (w *DailyUsageRefreshWorker) RefreshAccounts(ctx context.Context, accounts 
 
 func (w *DailyUsageRefreshWorker) loop() {
 	defer w.wg.Done()
+nextIteration:
 	for {
-		nextRun := w.nextRun(time.Now())
+		scheduleCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		schedule := w.currentSchedule(scheduleCtx)
+		cancel()
+
+		nextRun := w.nextRunAt(time.Now(), schedule)
 		delay := time.Until(nextRun)
 		if delay < 0 {
 			delay = 0
 		}
 		timer := time.NewTimer(delay)
-		select {
-		case <-timer.C:
-			applog.Printf("[DailyUsageRefreshWorker] Tick next_run=%s", nextRun.Format(time.RFC3339))
-			w.runOnce()
-		case <-w.resetCh:
-			if !timer.Stop() {
-				select {
-				case <-timer.C:
-				default:
+		ticker := time.NewTicker(dailyUsageRefreshSchedulePollInterval)
+
+		for {
+			select {
+			case <-timer.C:
+				ticker.Stop()
+				applog.Printf("[DailyUsageRefreshWorker] Tick next_run=%s", nextRun.Format(time.RFC3339))
+				w.runOnce()
+				continue nextIteration
+
+			case <-ticker.C:
+				checkCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				current := w.currentSchedule(checkCtx)
+				cancel()
+				if current != schedule {
+					if !timer.Stop() {
+						select {
+						case <-timer.C:
+						default:
+						}
+					}
+					ticker.Stop()
+					applog.Printf("[DailyUsageRefreshWorker] Schedule changed: old=%s new=%s", schedule, current)
+					continue nextIteration
 				}
+
+			case <-w.resetCh:
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				ticker.Stop()
+				applog.Printf("[DailyUsageRefreshWorker] Schedule reset")
+				continue nextIteration
+
+			case <-w.stopCh:
+				timer.Stop()
+				ticker.Stop()
+				return
 			}
-			applog.Printf("[DailyUsageRefreshWorker] Schedule reset")
-		case <-w.stopCh:
-			timer.Stop()
-			return
 		}
 	}
 }
 
-func (w *DailyUsageRefreshWorker) nextRun(now time.Time) time.Time {
+func (w *DailyUsageRefreshWorker) currentSchedule(ctx context.Context) string {
 	schedule := defaultDailyUsageRefreshTime
 	if w.settingService != nil {
-		schedule = w.settingService.GetDailyUsageRefreshTime(context.Background())
+		schedule = w.settingService.GetDailyUsageRefreshTime(ctx)
 	}
-	hour, minute, ok := parseDailyTime(schedule)
+	schedule = strings.TrimSpace(schedule)
+	if schedule == "" {
+		schedule = defaultDailyUsageRefreshTime
+	}
+	return schedule
+}
+
+func (w *DailyUsageRefreshWorker) nextRunAt(now time.Time, schedule string) time.Time {
+	hour, minute, ok := parseDailyTime(strings.TrimSpace(schedule))
 	if !ok {
 		hour, minute, _ = parseDailyTime(defaultDailyUsageRefreshTime)
 	}

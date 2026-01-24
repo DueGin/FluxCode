@@ -85,7 +85,7 @@ func newAuthService(repo *userRepoStub, settings map[string]string, emailCache E
 
 	var settingService *SettingService
 	if settings != nil {
-		settingService = NewSettingService(&settingRepoStub{values: settings}, cfg)
+		settingService = NewSettingService(&settingRepoStub{values: settings}, nil, cfg)
 	}
 
 	var emailService *EmailService

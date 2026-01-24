@@ -23,6 +23,7 @@ export interface SystemSettings {
   daily_usage_refresh_time: string
   auth_401_cooldown_seconds: number
   usage_window_disable_percent: number
+  user_concurrency_wait_timeout_seconds: number
   // OEM settings
   site_name: string
   site_logo: string

@@ -33,12 +33,13 @@ type SystemSettings struct {
 	AfterSaleContact []KVItem `json:"after_sale_contact"`
 	DocURL           string   `json:"doc_url"`
 
-	DefaultConcurrency        int     `json:"default_concurrency"`
-	DefaultBalance            float64 `json:"default_balance"`
-	GatewayRetrySwitchAfter   int     `json:"gateway_retry_switch_after"`
-	DailyUsageRefreshTime     string  `json:"daily_usage_refresh_time"`
-	Auth401CooldownSeconds    int     `json:"auth_401_cooldown_seconds"`
-	UsageWindowDisablePercent int     `json:"usage_window_disable_percent"`
+	DefaultConcurrency                int     `json:"default_concurrency"`
+	DefaultBalance                    float64 `json:"default_balance"`
+	GatewayRetrySwitchAfter           int     `json:"gateway_retry_switch_after"`
+	DailyUsageRefreshTime             string  `json:"daily_usage_refresh_time"`
+	Auth401CooldownSeconds            int     `json:"auth_401_cooldown_seconds"`
+	UsageWindowDisablePercent         int     `json:"usage_window_disable_percent"`
+	UserConcurrencyWaitTimeoutSeconds int     `json:"user_concurrency_wait_timeout_seconds"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`

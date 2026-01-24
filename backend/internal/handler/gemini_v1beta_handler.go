@@ -182,7 +182,11 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 
 	// 1) user concurrency slot
 	streamStarted := false
-	userReleaseFunc, err := geminiConcurrency.AcquireUserSlotWithWait(c, authSubject.UserID, authSubject.Concurrency, stream, &streamStarted)
+	userWaitTimeout := maxConcurrencyWait
+	if h.settingService != nil {
+		userWaitTimeout = h.settingService.GetUserConcurrencyWaitTimeout(c.Request.Context())
+	}
+	userReleaseFunc, err := geminiConcurrency.AcquireUserSlotWithWaitTimeout(c, authSubject.UserID, authSubject.Concurrency, userWaitTimeout, stream, &streamStarted)
 	if err != nil {
 		applog.Printf("User concurrency acquire failed: %v (user_name=%q user_id=%d%s)", err, userName, authSubject.UserID, requestIDSuffix(c))
 		googleError(c, http.StatusTooManyRequests, err.Error())

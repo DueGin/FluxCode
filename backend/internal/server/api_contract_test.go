@@ -311,6 +311,13 @@ func TestAPIContracts(t *testing.T) {
 					"doc_url": "https://docs.example.com",
 					"default_concurrency": 5,
 					"default_balance": 1.25,
+					"gateway_retry_switch_after": 2,
+					"daily_usage_refresh_time": "03:00",
+					"auth_401_cooldown_seconds": 300,
+					"usage_window_disable_percent": 100,
+					"user_concurrency_wait_timeout_seconds": 30,
+					"alert_emails": [],
+					"alert_cooldown_minutes": 5,
 					"enable_model_fallback": false,
 					"fallback_model_anthropic": "claude-3-5-sonnet-20241022",
 					"fallback_model_antigravity": "gemini-2.5-pro",
@@ -396,7 +403,7 @@ func newContractDeps(t *testing.T) *contractDeps {
 	usageService := service.NewUsageService(usageRepo, userRepo, nil)
 
 	settingRepo := newStubSettingRepo()
-	settingService := service.NewSettingService(settingRepo, cfg)
+	settingService := service.NewSettingService(settingRepo, nil, cfg)
 
 	authHandler := handler.NewAuthHandler(cfg, nil, userService)
 	apiKeyHandler := handler.NewAPIKeyHandler(apiKeyService)

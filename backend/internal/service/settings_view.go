@@ -32,12 +32,13 @@ type SystemSettings struct {
 	AfterSaleContact []KVItem
 	DocURL           string
 
-	DefaultConcurrency        int
-	DefaultBalance            float64
-	GatewayRetrySwitchAfter   int
-	DailyUsageRefreshTime     string
-	Auth401CooldownSeconds    int
-	UsageWindowDisablePercent int
+	DefaultConcurrency                int
+	DefaultBalance                    float64
+	GatewayRetrySwitchAfter           int
+	DailyUsageRefreshTime             string
+	Auth401CooldownSeconds            int
+	UsageWindowDisablePercent         int
+	UserConcurrencyWaitTimeoutSeconds int
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`

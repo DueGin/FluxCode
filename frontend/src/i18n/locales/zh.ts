@@ -172,6 +172,7 @@ export default {
     close: '关闭',
     enabled: '已启用',
     disabled: '已禁用',
+    banned: '已封号',
     total: '总计',
     balance: '余额',
     available: '可用',
@@ -1126,6 +1127,7 @@ export default {
         expired: '账号已过期，系统已自动关闭调度开关。',
         inactive: '账号已停用，无法参与调度。',
         error: '账号处于错误状态，无法参与调度。',
+        banned: '账号已封号，无法参与调度。',
         tempUnsched: '账号处于临时不可调度状态。',
         tempUnschedWithReason: '账号处于临时不可调度状态：{reason}',
         rateLimitedUntil: '账号触发限流，预计 {time} 后恢复调度。',
@@ -1887,7 +1889,10 @@ export default {
         dailyUsageRefreshTime: '每日用量检查时间',
         dailyUsageRefreshTimeHint: '每日在此时间对启用账号刷新上游用量窗口（HH:MM）',
         usageWindowDisablePercent: '窗口超限取消调度阈值（%）',
-        usageWindowDisablePercentHint: '当窗口使用率达到该比例时，账号将取消调度（范围 1-100，默认 100），窗口恢复后会自动启用'
+        usageWindowDisablePercentHint: '当窗口使用率达到该比例时，账号将取消调度（范围 1-100，默认 100），窗口恢复后会自动启用',
+        userConcurrencyWaitTimeoutSeconds: '用户并发等待超时（秒）',
+        userConcurrencyWaitTimeoutSecondsHint:
+          '当请求达到用户并发上限时，最多等待该秒数获取并发槽位（默认 30）'
       },
       alert: {
         title: '告警配置',

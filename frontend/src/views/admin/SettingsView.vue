@@ -385,6 +385,22 @@
                   {{ t('admin.settings.scheduling.usageWindowDisablePercentHint') }}
                 </p>
               </div>
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.scheduling.userConcurrencyWaitTimeoutSeconds') }}
+                </label>
+                <input
+                  v-model.number="form.user_concurrency_wait_timeout_seconds"
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="input"
+                  placeholder="30"
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.scheduling.userConcurrencyWaitTimeoutSecondsHint') }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -934,6 +950,7 @@ const form = reactive<SystemSettings>({
   daily_usage_refresh_time: '03:00',
   auth_401_cooldown_seconds: 300,
   usage_window_disable_percent: 100,
+  user_concurrency_wait_timeout_seconds: 30,
   site_name: 'FluxCode',
   site_logo: '',
   site_subtitle: 'Subscription to API Conversion Platform',

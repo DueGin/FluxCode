@@ -26,7 +26,10 @@ import (
 // 2. 添加 ±20% 的随机抖动，分散重试时间点
 // 3. 减少 Redis 压力，避免惊群效应
 const (
-	// maxConcurrencyWait 等待并发槽位的最大时间
+	// maxConcurrencyWait 等待并发槽位的默认超时时间（兜底值）。
+	//
+	// 注意：用户并发槽位等待超时已支持在系统设置中配置（见 SettingService.GetUserConcurrencyWaitTimeout），
+	// 这里只作为未传入自定义 timeout 的默认值；账号并发等待也可能走自定义的 WaitPlan.Timeout。
 	maxConcurrencyWait = 30 * time.Second
 	// pingInterval 流式响应等待时发送 ping 的间隔
 	pingInterval = 15 * time.Second
@@ -97,7 +100,7 @@ func (h *ConcurrencyHelper) DecrementAccountWaitCount(ctx context.Context, accou
 	h.concurrencyService.DecrementAccountWaitCount(ctx, accountID)
 }
 
-// AcquireUserSlotWithWait acquires a user concurrency slot, waiting if necessary.
+// AcquireUserSlotWithWait acquires a user concurrency slot, waiting if necessary (uses default timeout).
 // For streaming requests, sends ping events during the wait.
 // streamStarted is updated if streaming response has begun.
 func (h *ConcurrencyHelper) AcquireUserSlotWithWait(c *gin.Context, userID int64, maxConcurrency int, isStream bool, streamStarted *bool) (func(), error) {
@@ -117,7 +120,27 @@ func (h *ConcurrencyHelper) AcquireUserSlotWithWait(c *gin.Context, userID int64
 	return h.waitForSlotWithPing(c, "user", userID, maxConcurrency, isStream, streamStarted)
 }
 
-// AcquireAccountSlotWithWait acquires an account concurrency slot, waiting if necessary.
+// AcquireUserSlotWithWaitTimeout acquires a user concurrency slot with a custom timeout.
+// For streaming requests, sends ping events during the wait.
+// streamStarted is updated if streaming response has begun.
+func (h *ConcurrencyHelper) AcquireUserSlotWithWaitTimeout(c *gin.Context, userID int64, maxConcurrency int, timeout time.Duration, isStream bool, streamStarted *bool) (func(), error) {
+	ctx := c.Request.Context()
+
+	// Try to acquire immediately
+	result, err := h.concurrencyService.AcquireUserSlot(ctx, userID, maxConcurrency)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Acquired {
+		return result.ReleaseFunc, nil
+	}
+
+	// Need to wait - handle streaming ping if needed
+	return h.waitForSlotWithPingTimeout(c, "user", userID, maxConcurrency, timeout, isStream, streamStarted)
+}
+
+// AcquireAccountSlotWithWait acquires an account concurrency slot, waiting if necessary (uses default timeout).
 // For streaming requests, sends ping events during the wait.
 // streamStarted is updated if streaming response has begun.
 func (h *ConcurrencyHelper) AcquireAccountSlotWithWait(c *gin.Context, accountID int64, maxConcurrency int, isStream bool, streamStarted *bool) (func(), error) {

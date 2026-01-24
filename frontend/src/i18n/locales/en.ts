@@ -174,6 +174,7 @@ export default {
     close: 'Close',
     enabled: 'Enabled',
     disabled: 'Disabled',
+    banned: 'Banned',
     total: 'Total',
     balance: 'Balance',
     available: 'Available',
@@ -1104,6 +1105,7 @@ export default {
         expired: 'This account has expired; scheduling was turned off automatically.',
         inactive: 'This account is inactive and cannot be scheduled.',
         error: 'This account is in error state and cannot be scheduled.',
+        banned: 'This account is banned and cannot be scheduled.',
         tempUnsched: 'This account is temporarily unschedulable.',
         tempUnschedWithReason: 'This account is temporarily unschedulable: {reason}',
         rateLimitedUntil: 'Rate limited; expected to recover after {time}.',
@@ -1885,7 +1887,10 @@ export default {
         dailyUsageRefreshTimeHint: 'Refresh usage windows for active accounts at HH:MM each day',
         usageWindowDisablePercent: 'Usage window disable threshold (%)',
         usageWindowDisablePercentHint:
-          'When window utilization reaches this percentage, scheduling will be turned off (range: 1-100, default: 100) and auto-enabled after the window resets'
+          'When window utilization reaches this percentage, scheduling will be turned off (range: 1-100, default: 100) and auto-enabled after the window resets',
+        userConcurrencyWaitTimeoutSeconds: 'User concurrency wait timeout (seconds)',
+        userConcurrencyWaitTimeoutSecondsHint:
+          'When user concurrency is maxed out, wait up to this many seconds for a slot (default: 30)'
       },
       alert: {
         title: 'Alerting',

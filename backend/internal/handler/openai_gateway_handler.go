@@ -129,7 +129,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	defer h.concurrencyHelper.DecrementWaitCount(c.Request.Context(), subject.UserID)
 
 	// 1. First acquire user concurrency slot
-	userReleaseFunc, err := h.concurrencyHelper.AcquireUserSlotWithWait(c, subject.UserID, subject.Concurrency, reqStream, &streamStarted)
+	userWaitTimeout := maxConcurrencyWait
+	if h.settingService != nil {
+		userWaitTimeout = h.settingService.GetUserConcurrencyWaitTimeout(c.Request.Context())
+	}
+	userReleaseFunc, err := h.concurrencyHelper.AcquireUserSlotWithWaitTimeout(c, subject.UserID, subject.Concurrency, userWaitTimeout, reqStream, &streamStarted)
 	if err != nil {
 		applog.Printf("User concurrency acquire failed: %v (user_name=%q user_id=%d%s)", err, userName, subject.UserID, requestIDSuffix(c))
 		h.handleConcurrencyError(c, err, "user", streamStarted)
