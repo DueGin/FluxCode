@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $apiKey = $env:OPENAI_API_KEY
 if ([string]::IsNullOrWhiteSpace($apiKey)) {
-  Write-Error 'OPENAI_API_KEY 未设置或为空。请先设置环境变量 OPENAI_API_KEY。'
+  Write-Error 'OPENAI_API_KEY is not set or empty. Please set OPENAI_API_KEY first.'
   exit 1
 }
 
@@ -38,7 +38,6 @@ requires_openai_auth = true
 [System.IO.File]::WriteAllText($configFile, $configToml, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host '==========='
-Write-Host 'Codex FluxCode 初始化完成！'
-Write-Host "文件位置: $codexDir"
+Write-Host 'Codex FluxCode initialization complete!'
+Write-Host "Config dir: $codexDir"
 Write-Host '==========='
-

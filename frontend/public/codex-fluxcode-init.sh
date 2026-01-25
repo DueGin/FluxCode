@@ -2,7 +2,7 @@
 set -eu
 
 if [ -z "${OPENAI_API_KEY:-}" ]; then
-  echo "[错误] OPENAI_API_KEY 未设置或为空。请先设置环境变量 OPENAI_API_KEY。" >&2
+  echo "[error] OPENAI_API_KEY is not set or empty. Please set OPENAI_API_KEY first." >&2
   exit 1
 fi
 
@@ -30,7 +30,6 @@ requires_openai_auth = true
 EOF
 
 echo "==========="
-echo "Codex FluxCode 初始化完成！"
-echo "文件位置: $codex_dir"
+echo "Codex FluxCode initialization complete!"
+echo "Config dir: $codex_dir"
 echo "==========="
-
