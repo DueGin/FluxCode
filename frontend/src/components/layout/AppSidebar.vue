@@ -153,6 +153,7 @@ import {
   Squares2X2Icon as DashboardIcon,
   KeyIcon,
   ChartBarIcon as ChartIcon,
+  DocumentTextIcon as DocsIcon,
   GiftIcon,
   UserIcon,
   UsersIcon,
@@ -194,6 +195,7 @@ const userNavItems = computed(() => {
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
+    { path: '/docs', label: t('nav.docs'), icon: DocsIcon },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon }
   ]
   return authStore.isSimpleMode ? items.filter(item => !item.hideInSimpleMode) : items
@@ -206,6 +208,7 @@ const personalNavItems = computed(() => {
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
+    { path: '/docs', label: t('nav.docs'), icon: DocsIcon },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon }
   ]
   return authStore.isSimpleMode ? items.filter(item => !item.hideInSimpleMode) : items
