@@ -6,6 +6,7 @@ import (
 	"log"
 
 	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 )
 
 var (
@@ -64,15 +65,15 @@ func (s *TurnstileService) VerifyToken(ctx context.Context, token string, remote
 		return ErrTurnstileVerificationFailed
 	}
 
-	log.Printf("[Turnstile] Verifying token for IP: %s", remoteIP)
+	applog.Printf("[Turnstile] Verifying token for IP: %s", remoteIP)
 	result, err := s.verifier.VerifyToken(ctx, secretKey, token, remoteIP)
 	if err != nil {
-		log.Printf("[Turnstile] Request failed: %v", err)
+		applog.Printf("[Turnstile] Request failed: %v", err)
 		return fmt.Errorf("send request: %w", err)
 	}
 
 	if !result.Success {
-		log.Printf("[Turnstile] Verification failed, error codes: %v", result.ErrorCodes)
+		applog.Printf("[Turnstile] Verification failed, error codes: %v", result.ErrorCodes)
 		return ErrTurnstileVerificationFailed
 	}
 

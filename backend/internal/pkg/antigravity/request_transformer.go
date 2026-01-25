@@ -3,9 +3,10 @@ package antigravity
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+
 	"strings"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/google/uuid"
 )
 
@@ -209,7 +210,7 @@ func buildParts(content json.RawMessage, toolIDToName map[string]string, allowDu
 				part.ThoughtSignature = block.Signature
 			} else if !allowDummyThought {
 				// Claude 模型需要有效 signature，跳过无 signature 的 thinking block
-				log.Printf("Warning: skipping thinking block without signature for Claude model")
+				applog.Printf("Warning: skipping thinking block without signature for Claude model")
 				continue
 			} else {
 				// Gemini 模型使用 dummy signature
@@ -392,7 +393,7 @@ func buildTools(tools []ClaudeTool) []GeminiToolDeclaration {
 	for _, tool := range tools {
 		// 跳过无效工具名称
 		if strings.TrimSpace(tool.Name) == "" {
-			log.Printf("Warning: skipping tool with empty name")
+			applog.Printf("Warning: skipping tool with empty name")
 			continue
 		}
 
@@ -402,7 +403,7 @@ func buildTools(tools []ClaudeTool) []GeminiToolDeclaration {
 		// 检查是否为 custom 类型工具 (MCP)
 		if tool.Type == "custom" {
 			if tool.Custom == nil || tool.Custom.InputSchema == nil {
-				log.Printf("[Warning] Skipping invalid custom tool '%s': missing custom spec or input_schema", tool.Name)
+				applog.Printf("[Warning] Skipping invalid custom tool '%s': missing custom spec or input_schema", tool.Name)
 				continue
 			}
 			description = tool.Custom.Description

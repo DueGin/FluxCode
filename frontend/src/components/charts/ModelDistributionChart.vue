@@ -44,7 +44,7 @@
       <div v-if="loading" class="flex h-48 items-center justify-center">
         <LoadingSpinner />
       </div>
-      <div v-else-if="modelStats.length > 0" class="max-h-48 overflow-y-auto">
+      <div v-else-if="modelStats.length > 0" class="overflow-y-auto">
         <table class="w-full text-xs">
           <thead>
             <tr class="text-gray-500 dark:text-gray-400">
@@ -103,7 +103,7 @@
       <div class="h-48 w-48">
         <Doughnut :data="modelChartData" :options="doughnutOptions" />
       </div>
-      <div class="max-h-48 flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-y-auto">
         <table class="w-full text-xs">
           <thead>
             <tr class="text-gray-500 dark:text-gray-400">

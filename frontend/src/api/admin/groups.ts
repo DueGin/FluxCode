@@ -9,6 +9,7 @@ import type {
   GroupPlatform,
   CreateGroupRequest,
   UpdateGroupRequest,
+  BulkAdjustSubscriptionExpiryResult,
   PaginatedResponse
 } from '@/types'
 
@@ -152,6 +153,23 @@ export async function getGroupApiKeys(
   return data
 }
 
+/**
+ * Bulk adjust expiry days for all unexpired subscriptions under a subscription group.
+ * @param id - Group ID
+ * @param days - Days to add (positive) or subtract (negative), cannot be 0
+ * @returns Updated count
+ */
+export async function adjustSubscriptionExpiry(
+  id: number,
+  days: number
+): Promise<BulkAdjustSubscriptionExpiryResult> {
+  const { data } = await apiClient.post<BulkAdjustSubscriptionExpiryResult>(
+    `/admin/groups/${id}/subscriptions/adjust-expiry`,
+    { days }
+  )
+  return data
+}
+
 export const groupsAPI = {
   list,
   getAll,
@@ -162,7 +180,8 @@ export const groupsAPI = {
   delete: deleteGroup,
   toggleStatus,
   getStats,
-  getGroupApiKeys
+  getGroupApiKeys,
+  adjustSubscriptionExpiry
 }
 
 export default groupsAPI

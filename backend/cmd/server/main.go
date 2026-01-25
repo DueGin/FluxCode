@@ -18,6 +18,7 @@ import (
 	_ "github.com/DueGin/FluxCode/ent/runtime"
 	"github.com/DueGin/FluxCode/internal/config"
 	"github.com/DueGin/FluxCode/internal/handler"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/server/middleware"
 	"github.com/DueGin/FluxCode/internal/setup"
 	"github.com/DueGin/FluxCode/internal/web"
@@ -45,13 +46,15 @@ func init() {
 }
 
 func main() {
+	applog.Setup()
+
 	// Parse command line flags
 	setupMode := flag.Bool("setup", false, "Run setup wizard in CLI mode")
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
 	if *showVersion {
-		log.Printf("FluxCode %s (commit: %s, built: %s)\n", Version, Commit, Date)
+		applog.Printf("FluxCode %s (commit: %s, built: %s)\n", Version, Commit, Date)
 		return
 	}
 
@@ -99,7 +102,7 @@ func runSetupServer() {
 	// Get server address from config.yaml or environment variables (SERVER_HOST, SERVER_PORT)
 	// This allows users to run setup on a different address if needed
 	addr := config.GetServerAddress()
-	log.Printf("Setup wizard available at http://%s", addr)
+	applog.Printf("Setup wizard available at http://%s", addr)
 	log.Println("Complete the setup wizard to configure FluxCode")
 
 	if err := r.Run(addr); err != nil {
@@ -134,7 +137,7 @@ func runMainServer() {
 		}
 	}()
 
-	log.Printf("Server started on %s", app.Server.Addr)
+	applog.Printf("Server started on %s", app.Server.Addr)
 
 	// 等待中断信号
 	quit := make(chan os.Signal, 1)

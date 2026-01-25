@@ -50,6 +50,9 @@ func RegisterAdminRoutes(
 		// 系统管理
 		registerSystemRoutes(admin, h)
 
+		// 定价方案管理
+		registerPricingPlanRoutes(admin, h)
+
 		// 订阅管理
 		registerSubscriptionRoutes(admin, h)
 
@@ -126,7 +129,10 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		accounts.POST("/:id/clear-rate-limit", h.Admin.Account.ClearRateLimit)
 		accounts.GET("/:id/temp-unschedulable", h.Admin.Account.GetTempUnschedulable)
 		accounts.DELETE("/:id/temp-unschedulable", h.Admin.Account.ClearTempUnschedulable)
+		accounts.POST("/bulk-clear-temp-unschedulable", h.Admin.Account.BulkClearTempUnschedulable)
 		accounts.POST("/:id/schedulable", h.Admin.Account.SetSchedulable)
+		accounts.POST("/bulk-schedulable", h.Admin.Account.BulkSetSchedulable)
+		accounts.POST("/bulk-refresh-usage", h.Admin.Account.BulkRefreshUsage)
 		accounts.GET("/:id/models", h.Admin.Account.GetAvailableModels)
 		accounts.POST("/batch", h.Admin.Account.BatchCreate)
 		accounts.POST("/batch-update-credentials", h.Admin.Account.BatchUpdateCredentials)
@@ -193,6 +199,7 @@ func registerRedeemCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		codes.GET("", h.Admin.Redeem.List)
 		codes.GET("/stats", h.Admin.Redeem.GetStats)
 		codes.GET("/export", h.Admin.Redeem.Export)
+		codes.GET("/welfare-nos", h.Admin.Redeem.ListWelfareNos)
 		codes.GET("/:id", h.Admin.Redeem.GetByID)
 		codes.POST("/generate", h.Admin.Redeem.Generate)
 		codes.DELETE("/:id", h.Admin.Redeem.Delete)
@@ -226,6 +233,20 @@ func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
+func registerPricingPlanRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	pricing := admin.Group("/pricing")
+	{
+		pricing.GET("/plan-groups", h.Admin.PricingPlan.ListGroups)
+		pricing.POST("/plan-groups", h.Admin.PricingPlan.CreateGroup)
+		pricing.PUT("/plan-groups/:id", h.Admin.PricingPlan.UpdateGroup)
+		pricing.DELETE("/plan-groups/:id", h.Admin.PricingPlan.DeleteGroup)
+
+		pricing.POST("/plans", h.Admin.PricingPlan.CreatePlan)
+		pricing.PUT("/plans/:id", h.Admin.PricingPlan.UpdatePlan)
+		pricing.DELETE("/plans/:id", h.Admin.PricingPlan.DeletePlan)
+	}
+}
+
 func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	subscriptions := admin.Group("/subscriptions")
 	{
@@ -240,6 +261,7 @@ func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 	// 分组下的订阅列表
 	admin.GET("/groups/:id/subscriptions", h.Admin.Subscription.ListByGroup)
+	admin.POST("/groups/:id/subscriptions/adjust-expiry", h.Admin.Subscription.BulkAdjustExpiry)
 
 	// 用户下的订阅列表
 	admin.GET("/users/:id/subscriptions", h.Admin.Subscription.ListByUser)

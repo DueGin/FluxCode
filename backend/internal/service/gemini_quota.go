@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
+
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/config"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/pkg/usagestats"
 )
 
@@ -117,7 +118,7 @@ func (s *GeminiQuotaService) Policy(ctx context.Context) *GeminiQuotaPolicy {
 			} else {
 				var overridesV1 geminiQuotaOverridesV1
 				if err := json.Unmarshal(raw, &overridesV1); err != nil {
-					log.Printf("gemini quota: parse config policy failed: %v", err)
+					applog.Printf("gemini quota: parse config policy failed: %v", err)
 				} else {
 					policy.ApplyOverrides(overridesV1.Tiers)
 				}
@@ -128,7 +129,7 @@ func (s *GeminiQuotaService) Policy(ctx context.Context) *GeminiQuotaPolicy {
 	if s.settingRepo != nil {
 		value, err := s.settingRepo.GetValue(ctx, SettingKeyGeminiQuotaPolicy)
 		if err != nil && !errors.Is(err, ErrSettingNotFound) {
-			log.Printf("gemini quota: load setting failed: %v", err)
+			applog.Printf("gemini quota: load setting failed: %v", err)
 		} else if strings.TrimSpace(value) != "" {
 			raw := []byte(value)
 			var overridesV2 geminiQuotaOverridesV2
@@ -137,7 +138,7 @@ func (s *GeminiQuotaService) Policy(ctx context.Context) *GeminiQuotaPolicy {
 			} else {
 				var overridesV1 geminiQuotaOverridesV1
 				if err := json.Unmarshal(raw, &overridesV1); err != nil {
-					log.Printf("gemini quota: parse setting failed: %v", err)
+					applog.Printf("gemini quota: parse setting failed: %v", err)
 				} else {
 					policy.ApplyOverrides(overridesV1.Tiers)
 				}

@@ -94,7 +94,7 @@
             {{ t('admin.accounts.tempUnschedulable.errorMessage') }}
           </p>
           <div class="mt-2 rounded bg-gray-50 p-2 text-xs text-gray-700 dark:bg-dark-700 dark:text-gray-300">
-            {{ state?.error_message || '-' }}
+            {{ errorMessageText }}
           </div>
         </div>
       </div>
@@ -145,7 +145,7 @@ import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
 import type { Account, TempUnschedulableStatus } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
-import { formatDateTime } from '@/utils/format'
+import { formatDateTime, formatRFC3339InText } from '@/utils/format'
 
 const props = defineProps<{
   show: boolean
@@ -184,6 +184,12 @@ const triggeredAtText = computed(() => {
 const untilText = computed(() => {
   if (!state.value?.until_unix) return '-'
   return formatDateTime(new Date(state.value.until_unix * 1000))
+})
+
+const errorMessageText = computed(() => {
+  if (!state.value?.error_message) return '-'
+  const formatted = formatRFC3339InText(state.value.error_message)
+  return formatted || '-'
 })
 
 const remainingText = computed(() => {

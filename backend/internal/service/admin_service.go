@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+
 	"strings"
 	"time"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 )
 
@@ -43,6 +44,7 @@ type AdminService interface {
 	RefreshAccountCredentials(ctx context.Context, id int64) (*Account, error)
 	ClearAccountError(ctx context.Context, id int64) (*Account, error)
 	SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error)
+	BulkSetAccountSchedulable(ctx context.Context, ids []int64, schedulable bool) (*BulkUpdateAccountsResult, error)
 	BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error)
 
 	// Proxy management
@@ -57,13 +59,14 @@ type AdminService interface {
 	CheckProxyExists(ctx context.Context, host string, port int, username, password string) (bool, error)
 	TestProxy(ctx context.Context, id int64) (*ProxyTestResult, error)
 
-	// Redeem code management
-	ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string) ([]RedeemCode, int64, error)
-	GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
-	GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error)
-	DeleteRedeemCode(ctx context.Context, id int64) error
-	BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error)
+		// Redeem code management
+		ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error)
+		GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
+		GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error)
+		DeleteRedeemCode(ctx context.Context, id int64) error
+		BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error)
 	ExpireRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
+	ListRedeemWelfareNos(ctx context.Context) ([]string, error)
 }
 
 // CreateUserInput represents input for creating a new user via admin operations.
@@ -123,6 +126,7 @@ type CreateAccountInput struct {
 	Concurrency int
 	Priority    int
 	GroupIDs    []int64
+	ExpiresAt   *time.Time
 	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
 	// This should only be set when the caller has explicitly confirmed the risk.
 	SkipMixedChannelCheck bool
@@ -139,21 +143,25 @@ type UpdateAccountInput struct {
 	Priority              *int // 使用指针区分"未提供"和"设置为0"
 	Status                string
 	GroupIDs              *[]int64
+	ExpiresAt             *time.Time
+	ExpiresAtSet          bool
 	SkipMixedChannelCheck bool // 跳过混合渠道检查（用户已确认风险）
 }
 
 // BulkUpdateAccountsInput describes the payload for bulk updating accounts.
 type BulkUpdateAccountsInput struct {
-	AccountIDs  []int64
-	Name        string
-	ProxyID     *int64
-	ProxyIDSet  bool // true=更新(允许置空)，false=不更新
-	Concurrency *int
-	Priority    *int
-	Status      string
-	GroupIDs    *[]int64
-	Credentials map[string]any
-	Extra       map[string]any
+	AccountIDs   []int64
+	Name         string
+	ProxyID      *int64
+	ProxyIDSet   bool // true=更新(允许置空)，false=不更新
+	Concurrency  *int
+	Priority     *int
+	Status       string
+	GroupIDs     *[]int64
+	Credentials  map[string]any
+	Extra        map[string]any
+	ExpiresAt    *time.Time
+	ExpiresAtSet bool
 	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
 	// This should only be set when the caller has explicitly confirmed the risk.
 	SkipMixedChannelCheck bool
@@ -198,6 +206,7 @@ type GenerateRedeemCodesInput struct {
 	Value        float64
 	GroupID      *int64 // 订阅类型专用：关联的分组ID
 	ValidityDays int    // 订阅类型专用：有效天数
+	WelfareNo    *string
 }
 
 // ProxyTestResult represents the result of testing a proxy
@@ -342,7 +351,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if concurrencyDiff != 0 {
 		code, err := GenerateRedeemCode()
 		if err != nil {
-			log.Printf("failed to generate adjustment redeem code: %v", err)
+			applog.Printf("failed to generate adjustment redeem code: %v", err)
 			return user, nil
 		}
 		adjustmentRecord := &RedeemCode{
@@ -355,7 +364,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		now := time.Now()
 		adjustmentRecord.UsedAt = &now
 		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
-			log.Printf("failed to create concurrency adjustment redeem code: %v", err)
+			applog.Printf("failed to create concurrency adjustment redeem code: %v", err)
 		}
 	}
 
@@ -372,7 +381,7 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 		return errors.New("cannot delete admin user")
 	}
 	if err := s.userRepo.Delete(ctx, id); err != nil {
-		log.Printf("delete user failed: user_id=%d err=%v", id, err)
+		applog.Printf("delete user failed: user_id=%d err=%v", id, err)
 		return err
 	}
 	return nil
@@ -408,7 +417,7 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := s.billingCacheService.InvalidateUserBalance(cacheCtx, userID); err != nil {
-				log.Printf("invalidate user balance cache failed: user_id=%d err=%v", userID, err)
+				applog.Printf("invalidate user balance cache failed: user_id=%d err=%v", userID, err)
 			}
 		}()
 	}
@@ -417,7 +426,7 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 	if balanceDiff != 0 {
 		code, err := GenerateRedeemCode()
 		if err != nil {
-			log.Printf("failed to generate adjustment redeem code: %v", err)
+			applog.Printf("failed to generate adjustment redeem code: %v", err)
 			return user, nil
 		}
 
@@ -433,7 +442,7 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 		adjustmentRecord.UsedAt = &now
 
 		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
-			log.Printf("failed to create balance adjustment redeem code: %v", err)
+			applog.Printf("failed to create balance adjustment redeem code: %v", err)
 		}
 	}
 
@@ -584,7 +593,7 @@ func (s *adminServiceImpl) DeleteGroup(ctx context.Context, id int64) error {
 			defer cancel()
 			for _, userID := range affectedUserIDs {
 				if err := s.billingCacheService.InvalidateSubscription(cacheCtx, userID, groupID); err != nil {
-					log.Printf("invalidate subscription cache failed: user_id=%d group_id=%d err=%v", userID, groupID, err)
+					applog.Printf("invalidate subscription cache failed: user_id=%d group_id=%d err=%v", userID, groupID, err)
 				}
 			}
 		}()
@@ -664,6 +673,7 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		Priority:    input.Priority,
 		Status:      StatusActive,
 		Schedulable: true,
+		ExpiresAt:   input.ExpiresAt,
 	}
 	if err := s.accountRepo.Create(ctx, account); err != nil {
 		return nil, err
@@ -711,6 +721,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	if input.Status != "" {
 		account.Status = input.Status
+	}
+	if input.ExpiresAtSet {
+		account.ExpiresAt = input.ExpiresAt
 	}
 
 	// 先验证分组是否存在（在任何写操作之前）
@@ -793,6 +806,13 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	if input.Status != "" {
 		repoUpdates.Status = &input.Status
 	}
+	if input.ExpiresAtSet {
+		if input.ExpiresAt == nil {
+			repoUpdates.ClearExpiresAt = true
+		} else {
+			repoUpdates.ExpiresAt = input.ExpiresAt
+		}
+	}
 
 	// Run bulk update for column/jsonb fields first.
 	if _, err := s.accountRepo.BulkUpdate(ctx, input.AccountIDs, repoUpdates); err != nil {
@@ -871,10 +891,69 @@ func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Ac
 }
 
 func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error) {
-	if err := s.accountRepo.SetSchedulable(ctx, id, schedulable); err != nil {
-		return nil, err
+	if schedulable {
+		if err := s.accountRepo.SetSchedulable(ctx, id, true); err != nil {
+			return nil, err
+		}
+		if err := s.accountRepo.ClearTempUnschedulable(ctx, id); err != nil {
+			return nil, err
+		}
+	} else {
+		// 手动关闭调度也记录提示（写入 schedulable=false + reason；后续刷新任务满足可恢复条件时会自动恢复并清空提示）。
+		if err := setUnschedulableWithReasonByID(ctx, s.accountRepo, id, "已手动关闭调度开关"); err != nil {
+			return nil, err
+		}
 	}
 	return s.accountRepo.GetByID(ctx, id)
+}
+
+func (s *adminServiceImpl) BulkSetAccountSchedulable(ctx context.Context, ids []int64, schedulable bool) (*BulkUpdateAccountsResult, error) {
+	result := &BulkUpdateAccountsResult{
+		Results: make([]BulkUpdateAccountResult, 0, len(ids)),
+	}
+	if len(ids) == 0 {
+		return result, nil
+	}
+
+	seen := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+
+		entry := BulkUpdateAccountResult{AccountID: id}
+		if schedulable {
+			if err := s.accountRepo.SetSchedulable(ctx, id, true); err != nil {
+				entry.Success = false
+				entry.Error = err.Error()
+				result.Failed++
+			} else if err := s.accountRepo.ClearTempUnschedulable(ctx, id); err != nil {
+				entry.Success = false
+				entry.Error = err.Error()
+				result.Failed++
+			} else {
+				entry.Success = true
+				result.Success++
+			}
+		} else {
+			// 手动关闭调度也记录提示（写入 schedulable=false + reason；后续刷新任务满足可恢复条件时会自动恢复并清空提示）。
+			if err := setUnschedulableWithReasonByID(ctx, s.accountRepo, id, "已手动关闭调度开关"); err != nil {
+				entry.Success = false
+				entry.Error = err.Error()
+				result.Failed++
+			} else {
+				entry.Success = true
+				result.Success++
+			}
+		}
+		result.Results = append(result.Results, entry)
+	}
+
+	return result, nil
 }
 
 // Proxy management implementations
@@ -963,14 +1042,14 @@ func (s *adminServiceImpl) CheckProxyExists(ctx context.Context, host string, po
 }
 
 // Redeem code management implementations
-func (s *adminServiceImpl) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string) ([]RedeemCode, int64, error) {
-	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
-	codes, result, err := s.redeemCodeRepo.ListWithFilters(ctx, params, codeType, status, search)
-	if err != nil {
-		return nil, 0, err
+	func (s *adminServiceImpl) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error) {
+		params := pagination.PaginationParams{Page: page, PageSize: pageSize}
+		codes, result, err := s.redeemCodeRepo.ListWithFilters(ctx, params, codeType, status, searchType, search, isWelfare, welfareNo)
+		if err != nil {
+			return nil, 0, err
+		}
+		return codes, result.Total, nil
 	}
-	return codes, result.Total, nil
-}
 
 func (s *adminServiceImpl) GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error) {
 	return s.redeemCodeRepo.GetByID(ctx, id)
@@ -992,6 +1071,14 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 		}
 	}
 
+	if input.WelfareNo != nil {
+		trimmed := strings.TrimSpace(*input.WelfareNo)
+		if trimmed == "" {
+			return nil, errors.New("welfare_no cannot be empty")
+		}
+		input.WelfareNo = &trimmed
+	}
+
 	codes := make([]RedeemCode, 0, input.Count)
 	for i := 0; i < input.Count; i++ {
 		codeValue, err := GenerateRedeemCode()
@@ -999,10 +1086,11 @@ func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *Gener
 			return nil, err
 		}
 		code := RedeemCode{
-			Code:   codeValue,
-			Type:   input.Type,
-			Value:  input.Value,
-			Status: StatusUnused,
+			Code:      codeValue,
+			Type:      input.Type,
+			Value:     input.Value,
+			Status:    StatusUnused,
+			WelfareNo: input.WelfareNo,
 		}
 		// 订阅类型专用字段
 		if input.Type == RedeemTypeSubscription {
@@ -1044,6 +1132,10 @@ func (s *adminServiceImpl) ExpireRedeemCode(ctx context.Context, id int64) (*Red
 		return nil, err
 	}
 	return code, nil
+}
+
+func (s *adminServiceImpl) ListRedeemWelfareNos(ctx context.Context) ([]string, error) {
+	return s.redeemCodeRepo.ListWelfareNos(ctx)
 }
 
 func (s *adminServiceImpl) TestProxy(ctx context.Context, id int64) (*ProxyTestResult, error) {

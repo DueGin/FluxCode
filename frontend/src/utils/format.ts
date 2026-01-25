@@ -5,6 +5,46 @@
 
 import { i18n } from '@/i18n'
 
+const BEIJING_TIME_ZONE = 'Asia/Shanghai'
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+const beijingDateTimeFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: BEIJING_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false
+})
+
+const beijingDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: BEIJING_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+})
+
+const getBeijingParts = (date: Date) => {
+  const parts = beijingDateTimeFormatter.formatToParts(date)
+  const data: Record<string, string> = {}
+  for (const part of parts) {
+    if (part.type !== 'literal') {
+      data[part.type] = part.value
+    }
+  }
+  return {
+    year: data.year || '',
+    month: data.month || '',
+    day: data.day || '',
+    hour: data.hour || '00',
+    minute: data.minute || '00',
+    second: data.second || '00'
+  }
+}
+
 /**
  * 格式化相对时间
  * @param date 日期字符串或 Date 对象
@@ -133,6 +173,79 @@ export function formatDateOnly(date: string | Date | null | undefined): string {
  */
 export function formatDateTime(date: string | Date | null | undefined): string {
   return formatDate(date, 'YYYY-MM-DD HH:mm:ss')
+}
+
+/**
+ * 将文本中的 RFC3339 时间戳（如 2026-01-21T07:00:00Z）格式化为 YYYY-MM-DD HH:mm:ss（本地时区）
+ */
+export function formatRFC3339InText(text: string | null | undefined): string {
+  const raw = (text ?? '').toString()
+  if (!raw) return ''
+  const re = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?\b/g
+  return raw.replace(re, (match) => {
+    const parsed = new Date(match)
+    if (isNaN(parsed.getTime())) return match
+    return formatDateTime(parsed)
+  })
+}
+
+export function formatDateOnlyBeijing(date: string | Date | null | undefined): string {
+  if (!date) return ''
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return ''
+  const parts = beijingDateFormatter.formatToParts(d)
+  const data: Record<string, string> = {}
+  for (const part of parts) {
+    if (part.type !== 'literal') {
+      data[part.type] = part.value
+    }
+  }
+  return `${data.year || ''}-${data.month || ''}-${data.day || ''}`
+}
+
+export function formatDateTimeBeijing(date: string | Date | null | undefined): string {
+  if (!date) return ''
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return ''
+  const parts = getBeijingParts(d)
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`
+}
+
+export function formatDateTimeLocalBeijing(date: Date): string {
+  const parts = getBeijingParts(date)
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
+}
+
+export function parseBeijingDateTimeLocal(value: string): Date | null {
+  if (!value) return null
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/)
+  if (!match) return null
+  const [, year, month, day, hour, minute, second] = match
+  const utcMs =
+    Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second || '0')
+    ) - BEIJING_OFFSET_MS
+  const parsed = new Date(utcMs)
+  if (isNaN(parsed.getTime())) return null
+  return parsed
+}
+
+export function diffBeijingDays(from: Date, to: Date): number {
+  const fromParts = getBeijingParts(from)
+  const toParts = getBeijingParts(to)
+  if (!fromParts.year || !toParts.year) return 0
+  const fromUTC = Date.UTC(
+    Number(fromParts.year),
+    Number(fromParts.month) - 1,
+    Number(fromParts.day)
+  )
+  const toUTC = Date.UTC(Number(toParts.year), Number(toParts.month) - 1, Number(toParts.day))
+  return Math.round((toUTC - fromUTC) / MS_PER_DAY)
 }
 
 /**

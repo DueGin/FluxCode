@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
+
 	"net/http"
 	"strings"
 	"time"
@@ -15,6 +15,7 @@ import (
 	"github.com/DueGin/FluxCode/internal/server/middleware"
 	"github.com/DueGin/FluxCode/internal/service"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -130,6 +131,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		googleError(c, http.StatusInternalServerError, "User context not found")
 		return
 	}
+	userName := formatUserNameForLog(apiKey.User, authSubject.UserID)
 
 	// 检查平台：优先使用强制平台（/antigravity 路由，中间件已设置 request.Context），否则要求 gemini 分组
 	if !middleware.HasForcePlatform(c) {
@@ -171,7 +173,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	maxWait := service.CalculateMaxWait(authSubject.Concurrency)
 	canWait, err := geminiConcurrency.IncrementWaitCount(c.Request.Context(), authSubject.UserID, maxWait)
 	if err != nil {
-		log.Printf("Increment wait count failed: %v", err)
+		applog.Printf("Increment wait count failed: %v", err)
 	} else if !canWait {
 		googleError(c, http.StatusTooManyRequests, "Too many pending requests, please retry later")
 		return
@@ -180,8 +182,13 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 
 	// 1) user concurrency slot
 	streamStarted := false
-	userReleaseFunc, err := geminiConcurrency.AcquireUserSlotWithWait(c, authSubject.UserID, authSubject.Concurrency, stream, &streamStarted)
+	userWaitTimeout := maxConcurrencyWait
+	if h.settingService != nil {
+		userWaitTimeout = h.settingService.GetUserConcurrencyWaitTimeout(c.Request.Context())
+	}
+	userReleaseFunc, err := geminiConcurrency.AcquireUserSlotWithWaitTimeout(c, authSubject.UserID, authSubject.Concurrency, userWaitTimeout, stream, &streamStarted)
 	if err != nil {
+		applog.Printf("User concurrency acquire failed: %v (user_name=%q user_id=%d%s)", err, userName, authSubject.UserID, requestIDSuffix(c))
 		googleError(c, http.StatusTooManyRequests, err.Error())
 		return
 	}
@@ -201,6 +208,14 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	sessionKey := sessionHash
 	if sessionHash != "" {
 		sessionKey = "gemini:" + sessionHash
+	}
+	if shouldSwitchAccountOnRetry(c.Request.Context(), c.Request.Header, h.settingService) {
+		if sessionKey != "" {
+			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+				applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, authSubject.UserID, requestIDSuffix(c))
+			}
+		}
+		sessionKey = ""
 	}
 	const maxAccountSwitches = 3
 	switchCount := 0
@@ -229,9 +244,9 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			}
 			canWait, err := geminiConcurrency.IncrementAccountWaitCount(c.Request.Context(), account.ID, selection.WaitPlan.MaxWaiting)
 			if err != nil {
-				log.Printf("Increment account wait count failed: %v", err)
+				applog.Printf("Increment account wait count failed: %v", err)
 			} else if !canWait {
-				log.Printf("Account wait queue full: account=%d", account.ID)
+				applog.Printf("Account wait queue full: account=%d", account.ID)
 				googleError(c, http.StatusTooManyRequests, "Too many pending requests, please retry later")
 				return
 			} else {
@@ -253,11 +268,12 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				if accountWaitRelease != nil {
 					accountWaitRelease()
 				}
+				applog.Printf("Account concurrency acquire failed: %v (user_name=%q user_id=%d account_id=%d%s)", err, userName, authSubject.UserID, account.ID, requestIDSuffix(c))
 				googleError(c, http.StatusTooManyRequests, err.Error())
 				return
 			}
 			if err := h.gatewayService.BindStickySession(c.Request.Context(), sessionKey, account.ID); err != nil {
-				log.Printf("Bind sticky session failed: %v", err)
+				applog.Printf("Bind sticky session failed: %v", err)
 			}
 		}
 
@@ -277,6 +293,9 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 		if err != nil {
 			var failoverErr *service.UpstreamFailoverError
 			if errors.As(err, &failoverErr) {
+				if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+					applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, authSubject.UserID, requestIDSuffix(c))
+				}
 				failedAccountIDs[account.ID] = struct{}{}
 				if switchCount >= maxAccountSwitches {
 					lastFailoverStatus = failoverErr.StatusCode
@@ -285,28 +304,53 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				}
 				lastFailoverStatus = failoverErr.StatusCode
 				switchCount++
-				log.Printf("Gemini account %d: upstream error %d, switching account %d/%d", account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches)
+				applog.Printf("Gemini account %d: upstream error %d, switching account %d/%d", account.ID, failoverErr.StatusCode, switchCount, maxAccountSwitches)
 				continue
 			}
 			// ForwardNative already wrote the response
-			log.Printf("Gemini native forward failed: %v", err)
+			if err := h.gatewayService.ClearStickySession(c.Request.Context(), sessionKey); err != nil {
+				applog.Printf("Clear sticky session failed: %v (user_name=%q user_id=%d%s)", err, userName, authSubject.UserID, requestIDSuffix(c))
+			}
+			applog.Printf("Gemini native forward failed: %v (user_name=%q user_id=%d account_id=%d%s)", err, userName, authSubject.UserID, account.ID, requestIDSuffix(c))
 			return
 		}
 
-		// 6) record usage async
-		go func(result *service.ForwardResult, usedAccount *service.Account) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
-				Result:       result,
-				APIKey:       apiKey,
-				User:         apiKey.User,
-				Account:      usedAccount,
-				Subscription: subscription,
-			}); err != nil {
-				log.Printf("Record usage failed: %v", err)
+		// 6) record usage async: Redis 持久化队列（失败则回退到本地 goroutine best-effort）
+		if h.usageQueueService != nil {
+			enqueueCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			_, enqueueErr := h.usageQueueService.EnqueueClaudeUsage(enqueueCtx, result, apiKey, account, subscription)
+			cancel()
+			if enqueueErr != nil {
+				applog.Printf("Enqueue usage failed, fallback to local goroutine: %v", enqueueErr)
+				go func(result *service.ForwardResult, usedAccount *service.Account) {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+						Result:       result,
+						APIKey:       apiKey,
+						User:         apiKey.User,
+						Account:      usedAccount,
+						Subscription: subscription,
+					}); err != nil {
+						applog.Printf("Record usage failed: %v", err)
+					}
+				}(result, account)
 			}
-		}(result, account)
+		} else {
+			go func(result *service.ForwardResult, usedAccount *service.Account) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+					Result:       result,
+					APIKey:       apiKey,
+					User:         apiKey.User,
+					Account:      usedAccount,
+					Subscription: subscription,
+				}); err != nil {
+					applog.Printf("Record usage failed: %v", err)
+				}
+			}(result, account)
+		}
 		return
 	}
 }

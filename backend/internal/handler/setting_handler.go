@@ -31,6 +31,11 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		return
 	}
 
+	afterSaleContact := make([]dto.KVItem, 0, len(settings.AfterSaleContact))
+	for _, item := range settings.AfterSaleContact {
+		afterSaleContact = append(afterSaleContact, dto.KVItem{K: item.K, V: item.V})
+	}
+
 	response.Success(c, dto.PublicSettings{
 		RegistrationEnabled: settings.RegistrationEnabled,
 		EmailVerifyEnabled:  settings.EmailVerifyEnabled,
@@ -41,6 +46,7 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		SiteSubtitle:        settings.SiteSubtitle,
 		APIBaseURL:          settings.APIBaseURL,
 		ContactInfo:         settings.ContactInfo,
+		AfterSaleContact:    afterSaleContact,
 		DocURL:              settings.DocURL,
 		Version:             h.version,
 	})

@@ -432,7 +432,7 @@ async function handleRegister(): Promise<void> {
     appStore.showSuccess(t('auth.accountCreatedSuccess', { siteName: siteName.value }))
 
     // Redirect to dashboard
-    await router.push('/dashboard')
+    await router.push(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
   } catch (error: unknown) {
     // Reset Turnstile on error
     if (turnstileRef.value) {

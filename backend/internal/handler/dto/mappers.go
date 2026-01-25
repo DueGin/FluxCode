@@ -116,6 +116,7 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		Status:                  a.Status,
 		ErrorMessage:            a.ErrorMessage,
 		LastUsedAt:              a.LastUsedAt,
+		ExpiresAt:               a.ExpiresAt,
 		CreatedAt:               a.CreatedAt,
 		UpdatedAt:               a.UpdatedAt,
 		Schedulable:             a.Schedulable,
@@ -208,12 +209,70 @@ func RedeemCodeFromService(rc *service.RedeemCode) *RedeemCode {
 		UsedBy:       rc.UsedBy,
 		UsedAt:       rc.UsedAt,
 		Notes:        rc.Notes,
+		WelfareNo:    rc.WelfareNo,
 		CreatedAt:    rc.CreatedAt,
 		GroupID:      rc.GroupID,
 		ValidityDays: rc.ValidityDays,
 		User:         UserFromServiceShallow(rc.User),
 		Group:        GroupFromServiceShallow(rc.Group),
 	}
+}
+
+func PricingPlanFromService(p *service.PricingPlan) *PricingPlan {
+	if p == nil {
+		return nil
+	}
+	contactMethods := make([]PricingPlanContactMethod, 0, len(p.ContactMethods))
+	for i := range p.ContactMethods {
+		m := p.ContactMethods[i]
+		contactMethods = append(contactMethods, PricingPlanContactMethod{
+			Type:  m.Type,
+			Value: m.Value,
+		})
+	}
+	return &PricingPlan{
+		ID:             p.ID,
+		GroupID:        p.GroupID,
+		Name:           p.Name,
+		Description:    p.Description,
+		IconURL:        p.IconURL,
+		BadgeText:      p.BadgeText,
+		Tagline:        p.Tagline,
+		PriceAmount:    p.PriceAmount,
+		PriceCurrency:  p.PriceCurrency,
+		PricePeriod:    p.PricePeriod,
+		PriceText:      p.PriceText,
+		Features:       p.Features,
+		ContactMethods: contactMethods,
+		IsFeatured:     p.IsFeatured,
+		SortOrder:      p.SortOrder,
+		Status:         p.Status,
+		CreatedAt:      p.CreatedAt,
+		UpdatedAt:      p.UpdatedAt,
+	}
+}
+
+func PricingPlanGroupFromService(g *service.PricingPlanGroup) *PricingPlanGroup {
+	if g == nil {
+		return nil
+	}
+	out := &PricingPlanGroup{
+		ID:          g.ID,
+		Name:        g.Name,
+		Description: g.Description,
+		SortOrder:   g.SortOrder,
+		Status:      g.Status,
+		CreatedAt:   g.CreatedAt,
+		UpdatedAt:   g.UpdatedAt,
+	}
+	if len(g.Plans) > 0 {
+		out.Plans = make([]PricingPlan, 0, len(g.Plans))
+		for i := range g.Plans {
+			p := g.Plans[i]
+			out.Plans = append(out.Plans, *PricingPlanFromService(&p))
+		}
+	}
+	return out
 }
 
 func UsageLogFromService(l *service.UsageLog) *UsageLog {
@@ -308,5 +367,14 @@ func BulkAssignResultFromService(r *service.BulkAssignResult) *BulkAssignResult 
 		FailedCount:   r.FailedCount,
 		Subscriptions: subs,
 		Errors:        r.Errors,
+	}
+}
+
+func BulkAdjustSubscriptionExpiryResultFromService(r *service.BulkAdjustSubscriptionExpiryResult) *BulkAdjustSubscriptionExpiryResult {
+	if r == nil {
+		return nil
+	}
+	return &BulkAdjustSubscriptionExpiryResult{
+		UpdatedCount: r.UpdatedCount,
 	}
 }

@@ -83,6 +83,9 @@ func (r *accountRepository) Create(ctx context.Context, account *service.Account
 	if account.LastUsedAt != nil {
 		builder.SetLastUsedAt(*account.LastUsedAt)
 	}
+	if account.ExpiresAt != nil {
+		builder.SetExpiresAt(*account.ExpiresAt)
+	}
 	if account.RateLimitedAt != nil {
 		builder.SetRateLimitedAt(*account.RateLimitedAt)
 	}
@@ -205,6 +208,9 @@ func (r *accountRepository) GetByIDs(ctx context.Context, ids []int64) ([]*servi
 			out.TempUnschedulableUntil = snap.until
 			out.TempUnschedulableReason = snap.reason
 		}
+		if out.IsExpired() {
+			out.Schedulable = false
+		}
 		outByID[entAcc.ID] = out
 	}
 
@@ -289,6 +295,11 @@ func (r *accountRepository) Update(ctx context.Context, account *service.Account
 		builder.SetLastUsedAt(*account.LastUsedAt)
 	} else {
 		builder.ClearLastUsedAt()
+	}
+	if account.ExpiresAt != nil {
+		builder.SetExpiresAt(*account.ExpiresAt)
+	} else {
+		builder.ClearExpiresAt()
 	}
 	if account.RateLimitedAt != nil {
 		builder.SetRateLimitedAt(*account.RateLimitedAt)
@@ -565,6 +576,7 @@ func (r *accountRepository) ListSchedulable(ctx context.Context) ([]service.Acco
 			dbaccount.StatusEQ(service.StatusActive),
 			dbaccount.SchedulableEQ(true),
 			tempUnschedulablePredicate(),
+			notExpiredPredicate(),
 			dbaccount.Or(dbaccount.OverloadUntilIsNil(), dbaccount.OverloadUntilLTE(now)),
 			dbaccount.Or(dbaccount.RateLimitResetAtIsNil(), dbaccount.RateLimitResetAtLTE(now)),
 		).
@@ -591,6 +603,7 @@ func (r *accountRepository) ListSchedulableByPlatform(ctx context.Context, platf
 			dbaccount.StatusEQ(service.StatusActive),
 			dbaccount.SchedulableEQ(true),
 			tempUnschedulablePredicate(),
+			notExpiredPredicate(),
 			dbaccount.Or(dbaccount.OverloadUntilIsNil(), dbaccount.OverloadUntilLTE(now)),
 			dbaccount.Or(dbaccount.RateLimitResetAtIsNil(), dbaccount.RateLimitResetAtLTE(now)),
 		).
@@ -624,6 +637,7 @@ func (r *accountRepository) ListSchedulableByPlatforms(ctx context.Context, plat
 			dbaccount.StatusEQ(service.StatusActive),
 			dbaccount.SchedulableEQ(true),
 			tempUnschedulablePredicate(),
+			notExpiredPredicate(),
 			dbaccount.Or(dbaccount.OverloadUntilIsNil(), dbaccount.OverloadUntilLTE(now)),
 			dbaccount.Or(dbaccount.RateLimitResetAtIsNil(), dbaccount.RateLimitResetAtLTE(now)),
 		).
@@ -662,6 +676,19 @@ func (r *accountRepository) SetOverloaded(ctx context.Context, id int64, until t
 		Where(dbaccount.IDEQ(id)).
 		SetOverloadUntil(until).
 		Save(ctx)
+	return err
+}
+
+func (r *accountRepository) SetUnschedulableWithReason(ctx context.Context, id int64, reason string) error {
+	_, err := r.sql.ExecContext(ctx, `
+		UPDATE accounts
+		SET schedulable = FALSE,
+			temp_unschedulable_until = NULL,
+			temp_unschedulable_reason = $1,
+			updated_at = NOW()
+		WHERE id = $2
+			AND deleted_at IS NULL
+	`, reason, id)
 	return err
 }
 
@@ -794,6 +821,14 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		args = append(args, *updates.Status)
 		idx++
 	}
+	if updates.ClearExpiresAt {
+		setClauses = append(setClauses, "expires_at = NULL")
+	}
+	if updates.ExpiresAt != nil {
+		setClauses = append(setClauses, "expires_at = $"+itoa(idx))
+		args = append(args, *updates.ExpiresAt)
+		idx++
+	}
 	// JSONB 需要合并而非覆盖，使用 raw SQL 保持旧行为。
 	if len(updates.Credentials) > 0 {
 		payload, err := json.Marshal(updates.Credentials)
@@ -858,6 +893,7 @@ func (r *accountRepository) queryAccountsByGroup(ctx context.Context, groupID in
 		preds = append(preds,
 			dbaccount.SchedulableEQ(true),
 			tempUnschedulablePredicate(),
+			notExpiredPredicate(),
 			dbaccount.Or(dbaccount.OverloadUntilIsNil(), dbaccount.OverloadUntilLTE(now)),
 			dbaccount.Or(dbaccount.RateLimitResetAtIsNil(), dbaccount.RateLimitResetAtLTE(now)),
 		)
@@ -952,6 +988,9 @@ func (r *accountRepository) accountsToService(ctx context.Context, accounts []*d
 			out.TempUnschedulableUntil = snap.until
 			out.TempUnschedulableReason = snap.reason
 		}
+		if out.IsExpired() {
+			out.Schedulable = false
+		}
 		outAccounts = append(outAccounts, *out)
 	}
 
@@ -964,6 +1003,16 @@ func tempUnschedulablePredicate() dbpredicate.Account {
 		s.Where(entsql.Or(
 			entsql.IsNull(col),
 			entsql.LTE(col, entsql.Expr("NOW()")),
+		))
+	})
+}
+
+func notExpiredPredicate() dbpredicate.Account {
+	return dbpredicate.Account(func(s *entsql.Selector) {
+		col := s.C("expires_at")
+		s.Where(entsql.Or(
+			entsql.IsNull(col),
+			entsql.GT(col, entsql.Expr("NOW()")),
 		))
 	})
 }
@@ -1082,6 +1131,7 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 		Status:              m.Status,
 		ErrorMessage:        derefString(m.ErrorMessage),
 		LastUsedAt:          m.LastUsedAt,
+		ExpiresAt:           m.ExpiresAt,
 		CreatedAt:           m.CreatedAt,
 		UpdatedAt:           m.UpdatedAt,
 		Schedulable:         m.Schedulable,

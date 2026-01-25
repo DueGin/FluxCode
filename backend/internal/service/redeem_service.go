@@ -17,6 +17,7 @@ import (
 var (
 	ErrRedeemCodeNotFound  = infraerrors.NotFound("REDEEM_CODE_NOT_FOUND", "redeem code not found")
 	ErrRedeemCodeUsed      = infraerrors.Conflict("REDEEM_CODE_USED", "redeem code already used")
+	ErrWelfareRedeemed     = infraerrors.Conflict("WELFARE_ALREADY_REDEEMED", "welfare number already redeemed")
 	ErrInsufficientBalance = infraerrors.BadRequest("INSUFFICIENT_BALANCE", "insufficient balance")
 	ErrRedeemRateLimited   = infraerrors.TooManyRequests("REDEEM_RATE_LIMITED", "too many failed attempts, please try again later")
 	ErrRedeemCodeLocked    = infraerrors.Conflict("REDEEM_CODE_LOCKED", "redeem code is being processed, please try again")
@@ -44,12 +45,13 @@ type RedeemCodeRepository interface {
 	GetByCode(ctx context.Context, code string) (*RedeemCode, error)
 	Update(ctx context.Context, code *RedeemCode) error
 	Delete(ctx context.Context, id int64) error
-	Use(ctx context.Context, id, userID int64) error
+		Use(ctx context.Context, id, userID int64) error
 
-	List(ctx context.Context, params pagination.PaginationParams) ([]RedeemCode, *pagination.PaginationResult, error)
-	ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, search string) ([]RedeemCode, *pagination.PaginationResult, error)
-	ListByUser(ctx context.Context, userID int64, limit int) ([]RedeemCode, error)
-}
+		List(ctx context.Context, params pagination.PaginationParams) ([]RedeemCode, *pagination.PaginationResult, error)
+		ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, *pagination.PaginationResult, error)
+		ListByUser(ctx context.Context, userID int64, limit int) ([]RedeemCode, error)
+		ListWelfareNos(ctx context.Context) ([]string, error)
+	}
 
 // GenerateCodesRequest 生成兑换码请求
 type GenerateCodesRequest struct {
@@ -188,27 +190,28 @@ func (s *RedeemService) incrementRedeemErrorCount(ctx context.Context, userID in
 }
 
 // acquireRedeemLock 尝试获取兑换码的分布式锁
-// 返回 true 表示获取成功，false 表示锁已被占用
-func (s *RedeemService) acquireRedeemLock(ctx context.Context, code string) bool {
+// 返回：
+// - canProceed: 是否继续兑换流程
+// - unlock: best-effort 解锁函数（可安全多次调用）
+func (s *RedeemService) acquireRedeemLock(ctx context.Context, code string) (canProceed bool, unlock func()) {
 	if s.cache == nil {
-		return true // 无 Redis 时降级为不加锁
+		return true, func() {}
 	}
 
 	ok, err := s.cache.AcquireRedeemLock(ctx, code, redeemLockDuration)
 	if err != nil {
-		// Redis 出错时不阻止操作，依赖数据库层面的状态检查
-		return true
+		// Redis 出错时允许继续，但不能尝试解锁（否则可能误删其他实例的锁）
+		return true, func() {}
 	}
-	return ok
-}
-
-// releaseRedeemLock 释放兑换码的分布式锁
-func (s *RedeemService) releaseRedeemLock(ctx context.Context, code string) {
-	if s.cache == nil {
-		return
+	if !ok {
+		return false, nil
 	}
 
-	_ = s.cache.ReleaseRedeemLock(ctx, code)
+	return true, func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = s.cache.ReleaseRedeemLock(bgCtx, code)
+	}
 }
 
 // Redeem 使用兑换码
@@ -219,10 +222,13 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 	}
 
 	// 获取分布式锁，防止同一兑换码并发使用
-	if !s.acquireRedeemLock(ctx, code) {
+	canProceed, unlock := s.acquireRedeemLock(ctx, code)
+	if !canProceed {
 		return nil, ErrRedeemCodeLocked
 	}
-	defer s.releaseRedeemLock(ctx, code)
+	if unlock != nil {
+		defer unlock()
+	}
 
 	// 查找兑换码
 	redeemCode, err := s.redeemRepo.GetByCode(ctx, code)

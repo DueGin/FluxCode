@@ -5,6 +5,7 @@ const (
 	StatusActive   = "active"
 	StatusDisabled = "disabled"
 	StatusError    = "error"
+	StatusBanned   = "banned"
 	StatusUnused   = "unused"
 	StatusUsed     = "used"
 	StatusExpired  = "expired"
@@ -78,16 +79,22 @@ const (
 	SettingKeyTurnstileSecretKey = "turnstile_secret_key" // Turnstile Secret Key
 
 	// OEM设置
-	SettingKeySiteName     = "site_name"     // 网站名称
-	SettingKeySiteLogo     = "site_logo"     // 网站Logo (base64)
-	SettingKeySiteSubtitle = "site_subtitle" // 网站副标题
-	SettingKeyAPIBaseURL   = "api_base_url"  // API端点地址（用于客户端配置和导入）
-	SettingKeyContactInfo  = "contact_info"  // 客服联系方式
-	SettingKeyDocURL       = "doc_url"       // 文档链接
+	SettingKeySiteName         = "site_name"          // 网站名称
+	SettingKeySiteLogo         = "site_logo"          // 网站Logo (base64)
+	SettingKeySiteSubtitle     = "site_subtitle"      // 网站副标题
+	SettingKeyAPIBaseURL       = "api_base_url"       // API端点地址（用于客户端配置和导入）
+	SettingKeyContactInfo      = "contact_info"       // 客服联系方式
+	SettingKeyAfterSaleContact = "after_sale_contact" // 售后联系方式（KV JSON 数组）
+	SettingKeyDocURL           = "doc_url"            // 文档链接
 
 	// 默认配置
-	SettingKeyDefaultConcurrency = "default_concurrency" // 新用户默认并发量
-	SettingKeyDefaultBalance     = "default_balance"     // 新用户默认余额
+	SettingKeyDefaultConcurrency                = "default_concurrency"                   // 新用户默认并发量
+	SettingKeyDefaultBalance                    = "default_balance"                       // 新用户默认余额
+	SettingKeyGatewayRetrySwitchAfter           = "gateway_retry_switch_after"            // 重试多少次后切换账号调度
+	SettingKeyDailyUsageRefreshTime             = "daily_usage_refresh_time"              // 每日用量刷新时间（HH:MM）
+	SettingKeyAuth401CooldownSeconds            = "auth_401_cooldown_seconds"             // 上游鉴权401临时冷却时间（秒）
+	SettingKeyUsageWindowDisablePercent         = "usage_window_disable_percent"          // 用量窗口达到多少百分比取消调度
+	SettingKeyUserConcurrencyWaitTimeoutSeconds = "user_concurrency_wait_timeout_seconds" // 用户并发槽位等待超时（秒）
 
 	// 管理员 API Key
 	SettingKeyAdminAPIKey = "admin_api_key" // 全局管理员 API Key（用于外部系统集成）
@@ -101,6 +108,10 @@ const (
 	SettingKeyFallbackModelOpenAI      = "fallback_model_openai"
 	SettingKeyFallbackModelGemini      = "fallback_model_gemini"
 	SettingKeyFallbackModelAntigravity = "fallback_model_antigravity"
+
+	// 告警设置
+	SettingKeyAlertEmails          = "alert_emails"           // JSON array of recipient emails
+	SettingKeyAlertCooldownMinutes = "alert_cooldown_minutes" // int minutes, 0 means no cooldown
 )
 
 // AdminAPIKeyPrefix is the prefix for admin API keys (distinct from user "sk-" keys).

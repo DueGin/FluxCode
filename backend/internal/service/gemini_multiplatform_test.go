@@ -121,6 +121,9 @@ func (m *mockAccountRepoForGemini) SetRateLimited(ctx context.Context, id int64,
 func (m *mockAccountRepoForGemini) SetOverloaded(ctx context.Context, id int64, until time.Time) error {
 	return nil
 }
+func (m *mockAccountRepoForGemini) SetUnschedulableWithReason(ctx context.Context, id int64, reason string) error {
+	return nil
+}
 func (m *mockAccountRepoForGemini) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
 	return nil
 }
@@ -203,6 +206,13 @@ func (m *mockGatewayCacheForGemini) SetSessionAccountID(ctx context.Context, ses
 }
 
 func (m *mockGatewayCacheForGemini) RefreshSessionTTL(ctx context.Context, sessionHash string, ttl time.Duration) error {
+	return nil
+}
+
+func (m *mockGatewayCacheForGemini) DeleteSessionAccountID(ctx context.Context, sessionHash string) error {
+	if m.sessionBindings != nil {
+		delete(m.sessionBindings, sessionHash)
+	}
 	return nil
 }
 

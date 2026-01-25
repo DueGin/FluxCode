@@ -42,8 +42,13 @@ type SendVerifyCodeRequest struct {
 
 // SendVerifyCodeResponse 发送验证码响应
 type SendVerifyCodeResponse struct {
-	Message   string `json:"message"`
-	Countdown int    `json:"countdown"` // 倒计时秒数
+	Message        string `json:"message"`
+	Countdown      int    `json:"countdown"` // 倒计时秒数
+	TaskID         string `json:"task_id"`
+	QueueMessageID string `json:"queue_message_id"`
+	SendAck        bool   `json:"send_ack"`
+	ConsumeAck     bool   `json:"consume_ack"`
+	DeliveryStatus string `json:"delivery_status"`
 }
 
 // LoginRequest represents the login request payload
@@ -112,9 +117,36 @@ func (h *AuthHandler) SendVerifyCode(c *gin.Context) {
 	}
 
 	response.Success(c, SendVerifyCodeResponse{
-		Message:   "Verification code sent successfully",
-		Countdown: result.Countdown,
+		Message:        "Verification code sent successfully",
+		Countdown:      result.Countdown,
+		TaskID:         result.TaskID,
+		QueueMessageID: result.QueueMessageID,
+		SendAck:        result.SendAck,
+		ConsumeAck:     result.ConsumeAck,
+		DeliveryStatus: result.DeliveryStatus,
 	})
+}
+
+// GetVerifyCodeStatus 查询验证码发送任务状态
+// GET /api/v1/auth/verify-code-status?task_id=xxx
+func (h *AuthHandler) GetVerifyCodeStatus(c *gin.Context) {
+	taskID := c.Query("task_id")
+	if taskID == "" {
+		response.BadRequest(c, "task_id is required")
+		return
+	}
+
+	status, err := h.authService.GetVerifyCodeTaskStatus(c.Request.Context(), taskID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if status == nil {
+		response.NotFound(c, "task not found")
+		return
+	}
+
+	response.Success(c, status)
 }
 
 // Login handles user login

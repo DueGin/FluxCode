@@ -2,7 +2,8 @@ package service
 
 import (
 	"context"
-	"log"
+
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"sync"
 	"time"
 )
@@ -28,14 +29,14 @@ func NewDeferredService(accountRepo AccountRepository, timingWheel *TimingWheelS
 // Start starts the deferred service
 func (s *DeferredService) Start() {
 	s.timingWheel.ScheduleRecurring("deferred:last_used", s.interval, s.flushLastUsed)
-	log.Printf("[DeferredService] Started (interval: %v)", s.interval)
+	applog.Printf("[DeferredService] Started (interval: %v)", s.interval)
 }
 
 // Stop stops the deferred service
 func (s *DeferredService) Stop() {
 	s.timingWheel.Cancel("deferred:last_used")
 	s.flushLastUsed()
-	log.Printf("[DeferredService] Service stopped")
+	applog.Printf("[DeferredService] Service stopped")
 }
 
 func (s *DeferredService) ScheduleLastUsedUpdate(accountID int64) {
@@ -66,11 +67,11 @@ func (s *DeferredService) flushLastUsed() {
 	defer cancel()
 
 	if err := s.accountRepo.BatchUpdateLastUsed(ctx, updates); err != nil {
-		log.Printf("[DeferredService] BatchUpdateLastUsed failed (%d accounts): %v", len(updates), err)
+		applog.Printf("[DeferredService] BatchUpdateLastUsed failed (%d accounts): %v", len(updates), err)
 		for id, ts := range updates {
 			s.lastUsedUpdates.Store(id, ts)
 		}
 	} else {
-		log.Printf("[DeferredService] BatchUpdateLastUsed flushed %d accounts", len(updates))
+		applog.Printf("[DeferredService] BatchUpdateLastUsed flushed %d accounts", len(updates))
 	}
 }

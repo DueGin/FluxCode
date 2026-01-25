@@ -10,6 +10,7 @@ import (
 	"github.com/DueGin/FluxCode/internal/config"
 	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -92,7 +93,7 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 	// 检查邮箱是否已存在
 	existsEmail, err := s.userRepo.ExistsByEmail(ctx, email)
 	if err != nil {
-		log.Printf("[Auth] Database error checking email exists: %v", err)
+		applog.Printf("[Auth] Database error checking email exists: %v", err)
 		return "", nil, ErrServiceUnavailable
 	}
 	if existsEmail {
@@ -124,7 +125,7 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
-		log.Printf("[Auth] Database error creating user: %v", err)
+		applog.Printf("[Auth] Database error creating user: %v", err)
 		return "", nil, ErrServiceUnavailable
 	}
 
@@ -139,7 +140,12 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 
 // SendVerifyCodeResult 发送验证码返回结果
 type SendVerifyCodeResult struct {
-	Countdown int `json:"countdown"` // 倒计时秒数
+	Countdown      int    `json:"countdown"` // 倒计时秒数
+	TaskID         string `json:"task_id"`
+	QueueMessageID string `json:"queue_message_id"`
+	SendAck        bool   `json:"send_ack"`
+	ConsumeAck     bool   `json:"consume_ack"`
+	DeliveryStatus string `json:"delivery_status"` // enqueued | processing | retrying | sent | failed | dropped
 }
 
 // SendVerifyCode 发送邮箱验证码（同步方式）
@@ -152,7 +158,7 @@ func (s *AuthService) SendVerifyCode(ctx context.Context, email string) error {
 	// 检查邮箱是否已存在
 	existsEmail, err := s.userRepo.ExistsByEmail(ctx, email)
 	if err != nil {
-		log.Printf("[Auth] Database error checking email exists: %v", err)
+		applog.Printf("[Auth] Database error checking email exists: %v", err)
 		return ErrServiceUnavailable
 	}
 	if existsEmail {
@@ -175,7 +181,7 @@ func (s *AuthService) SendVerifyCode(ctx context.Context, email string) error {
 
 // SendVerifyCodeAsync 异步发送邮箱验证码并返回倒计时
 func (s *AuthService) SendVerifyCodeAsync(ctx context.Context, email string) (*SendVerifyCodeResult, error) {
-	log.Printf("[Auth] SendVerifyCodeAsync called for email: %s", email)
+	applog.Printf("[Auth] SendVerifyCodeAsync called for email: %s", email)
 
 	// 检查是否开放注册
 	if s.settingService != nil && !s.settingService.IsRegistrationEnabled(ctx) {
@@ -186,11 +192,11 @@ func (s *AuthService) SendVerifyCodeAsync(ctx context.Context, email string) (*S
 	// 检查邮箱是否已存在
 	existsEmail, err := s.userRepo.ExistsByEmail(ctx, email)
 	if err != nil {
-		log.Printf("[Auth] Database error checking email exists: %v", err)
+		applog.Printf("[Auth] Database error checking email exists: %v", err)
 		return nil, ErrServiceUnavailable
 	}
 	if existsEmail {
-		log.Printf("[Auth] Email already exists: %s", email)
+		applog.Printf("[Auth] Email already exists: %s", email)
 		return nil, ErrEmailExists
 	}
 
@@ -207,16 +213,45 @@ func (s *AuthService) SendVerifyCodeAsync(ctx context.Context, email string) (*S
 	}
 
 	// 异步发送
-	log.Printf("[Auth] Enqueueing verify code for: %s", email)
-	if err := s.emailQueueService.EnqueueVerifyCode(email, siteName); err != nil {
-		log.Printf("[Auth] Failed to enqueue: %v", err)
+	applog.Printf("[Auth] Enqueueing verify code for: %s", email)
+	enqueueResult, err := s.emailQueueService.EnqueueVerifyCode(ctx, email, siteName)
+	if err != nil {
+		applog.Printf("[Auth] Failed to enqueue: %v", err)
 		return nil, fmt.Errorf("enqueue verify code: %w", err)
 	}
 
-	log.Printf("[Auth] Verify code enqueued successfully for: %s", email)
+	applog.Printf("[Auth] Verify code enqueued successfully for: %s", email)
+
+	consumeAck := false
+	deliveryStatus := "enqueued"
+	taskID := ""
+	queueMessageID := ""
+	if enqueueResult != nil {
+		taskID = enqueueResult.TaskID
+		queueMessageID = enqueueResult.QueueMessageID
+	}
+	if taskID != "" {
+		status, err := s.emailQueueService.GetTaskStatus(ctx, taskID)
+		if err == nil && status != nil && status.Status != "" {
+			deliveryStatus = status.Status
+			consumeAck = status.Status == "sent"
+		}
+	}
 	return &SendVerifyCodeResult{
-		Countdown: 60, // 60秒倒计时
+		Countdown:      int(verifyCodeCooldown / time.Second),
+		TaskID:         taskID,
+		QueueMessageID: queueMessageID,
+		SendAck:        true,
+		ConsumeAck:     consumeAck,
+		DeliveryStatus: deliveryStatus,
 	}, nil
+}
+
+func (s *AuthService) GetVerifyCodeTaskStatus(ctx context.Context, taskID string) (*EmailTaskStatus, error) {
+	if s.emailQueueService == nil {
+		return nil, errors.New("email queue service not configured")
+	}
+	return s.emailQueueService.GetTaskStatus(ctx, taskID)
 }
 
 // VerifyTurnstile 验证Turnstile token
@@ -260,7 +295,7 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 			return "", nil, ErrInvalidCredentials
 		}
 		// 记录数据库错误但不暴露给用户
-		log.Printf("[Auth] Database error during login: %v", err)
+		applog.Printf("[Auth] Database error during login: %v", err)
 		return "", nil, ErrServiceUnavailable
 	}
 
@@ -362,7 +397,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, oldTokenString string) (
 		if errors.Is(err, ErrUserNotFound) {
 			return "", ErrInvalidToken
 		}
-		log.Printf("[Auth] Database error refreshing token: %v", err)
+		applog.Printf("[Auth] Database error refreshing token: %v", err)
 		return "", ErrServiceUnavailable
 	}
 

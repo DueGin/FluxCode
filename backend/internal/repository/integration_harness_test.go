@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+
 	"os"
 	"os/exec"
 	"strconv"
@@ -23,6 +23,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	_ "github.com/lib/pq"
 	redisclient "github.com/redis/go-redis/v9"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -46,17 +47,17 @@ func TestMain(m *testing.M) {
 	ctx := context.Background()
 
 	if err := timezone.Init("UTC"); err != nil {
-		log.Printf("failed to init timezone: %v", err)
+		applog.Printf("failed to init timezone: %v", err)
 		os.Exit(1)
 	}
 
 	if !dockerIsAvailable(ctx) {
 		// In CI we expect Docker to be available so integration tests should fail loudly.
 		if os.Getenv("CI") != "" {
-			log.Printf("docker is not available (CI=true); failing integration tests")
+			applog.Printf("docker is not available (CI=true); failing integration tests")
 			os.Exit(1)
 		}
-		log.Printf("docker is not available; skipping integration tests (start Docker to enable)")
+		applog.Printf("docker is not available; skipping integration tests (start Docker to enable)")
 		os.Exit(0)
 	}
 
@@ -70,7 +71,7 @@ func TestMain(m *testing.M) {
 		tcpostgres.BasicWaitStrategies(),
 	)
 	if err != nil {
-		log.Printf("failed to start postgres container: %v", err)
+		applog.Printf("failed to start postgres container: %v", err)
 		os.Exit(1)
 	}
 	defer func() { _ = pgContainer.Terminate(ctx) }()
@@ -80,24 +81,24 @@ func TestMain(m *testing.M) {
 		redisImageTag,
 	)
 	if err != nil {
-		log.Printf("failed to start redis container: %v", err)
+		applog.Printf("failed to start redis container: %v", err)
 		os.Exit(1)
 	}
 	defer func() { _ = redisContainer.Terminate(ctx) }()
 
 	dsn, err := pgContainer.ConnectionString(ctx, "sslmode=disable", "TimeZone=UTC")
 	if err != nil {
-		log.Printf("failed to get postgres dsn: %v", err)
+		applog.Printf("failed to get postgres dsn: %v", err)
 		os.Exit(1)
 	}
 
 	integrationDB, err = openSQLWithRetry(ctx, dsn, 30*time.Second)
 	if err != nil {
-		log.Printf("failed to open sql db: %v", err)
+		applog.Printf("failed to open sql db: %v", err)
 		os.Exit(1)
 	}
 	if err := ApplyMigrations(ctx, integrationDB); err != nil {
-		log.Printf("failed to apply db migrations: %v", err)
+		applog.Printf("failed to apply db migrations: %v", err)
 		os.Exit(1)
 	}
 
@@ -107,12 +108,12 @@ func TestMain(m *testing.M) {
 
 	redisHost, err := redisContainer.Host(ctx)
 	if err != nil {
-		log.Printf("failed to get redis host: %v", err)
+		applog.Printf("failed to get redis host: %v", err)
 		os.Exit(1)
 	}
 	redisPort, err := redisContainer.MappedPort(ctx, "6379/tcp")
 	if err != nil {
-		log.Printf("failed to get redis port: %v", err)
+		applog.Printf("failed to get redis port: %v", err)
 		os.Exit(1)
 	}
 
@@ -121,7 +122,7 @@ func TestMain(m *testing.M) {
 		DB:   0,
 	})
 	if err := integrationRedis.Ping(ctx).Err(); err != nil {
-		log.Printf("failed to ping redis: %v", err)
+		applog.Printf("failed to ping redis: %v", err)
 		os.Exit(1)
 	}
 

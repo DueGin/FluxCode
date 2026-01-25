@@ -37,7 +37,7 @@
       </div>
 
       <!-- Attributes List -->
-      <div v-else class="max-h-96 space-y-2 overflow-y-auto">
+      <div v-else class="space-y-2 overflow-y-auto">
         <div
           v-for="attr in attributes"
           :key="attr.id"

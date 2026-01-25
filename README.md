@@ -16,16 +16,6 @@ English | [中文](README_CN.md)
 
 ---
 
-## Demo
-
-Try FluxCode online: **https://v2.pincc.ai/**
-
-Demo credentials (shared demo environment; **not** created automatically for self-hosted installs):
-
-| Email | Password |
-|-------|----------|
-| admin@fluxcode.com | admin123 |
-
 ## Overview
 
 FluxCode is an AI API gateway platform designed to distribute and manage API quotas from AI product subscriptions (like Claude Code $200/month). Users can access upstream AI services through platform-generated API Keys, while the platform handles authentication, billing, load balancing, and request forwarding.

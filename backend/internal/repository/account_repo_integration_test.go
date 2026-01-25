@@ -304,12 +304,16 @@ func (s *AccountRepoSuite) TestListSchedulable() {
 	future := now.Add(10 * time.Minute)
 	overloaded := mustCreateAccount(s.T(), s.client, &service.Account{Name: "over", Schedulable: true, OverloadUntil: &future})
 	mustBindAccountToGroup(s.T(), s.client, overloaded.ID, group.ID, 1)
+	past := now.Add(-1 * time.Hour)
+	expired := mustCreateAccount(s.T(), s.client, &service.Account{Name: "expired", Schedulable: true, ExpiresAt: &past})
+	mustBindAccountToGroup(s.T(), s.client, expired.ID, group.ID, 1)
 
 	sched, err := s.repo.ListSchedulable(s.ctx)
 	s.Require().NoError(err, "ListSchedulable")
 	ids := idsOfAccounts(sched)
 	s.Require().Contains(ids, okAcc.ID)
 	s.Require().NotContains(ids, overloaded.ID)
+	s.Require().NotContains(ids, expired.ID)
 }
 
 func (s *AccountRepoSuite) TestListSchedulableByGroupID_TimeBoundaries_And_StatusUpdates() {
@@ -322,6 +326,9 @@ func (s *AccountRepoSuite) TestListSchedulableByGroupID_TimeBoundaries_And_Statu
 	future := now.Add(10 * time.Minute)
 	overloaded := mustCreateAccount(s.T(), s.client, &service.Account{Name: "over", Schedulable: true, OverloadUntil: &future})
 	mustBindAccountToGroup(s.T(), s.client, overloaded.ID, group.ID, 1)
+	past := now.Add(-1 * time.Hour)
+	expired := mustCreateAccount(s.T(), s.client, &service.Account{Name: "expired", Schedulable: true, ExpiresAt: &past})
+	mustBindAccountToGroup(s.T(), s.client, expired.ID, group.ID, 1)
 
 	rateLimited := mustCreateAccount(s.T(), s.client, &service.Account{Name: "rl", Schedulable: true})
 	mustBindAccountToGroup(s.T(), s.client, rateLimited.ID, group.ID, 1)

@@ -9,13 +9,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+
 	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/DueGin/FluxCode/internal/pkg/claude"
 	"github.com/DueGin/FluxCode/internal/pkg/geminicli"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/pkg/openai"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -789,7 +790,7 @@ func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader)
 func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
 	eventJSON, _ := json.Marshal(event)
 	if _, err := fmt.Fprintf(c.Writer, "data: %s\n\n", eventJSON); err != nil {
-		log.Printf("failed to write SSE event: %v", err)
+		applog.Printf("failed to write SSE event: %v", err)
 		return
 	}
 	c.Writer.Flush()
@@ -797,7 +798,7 @@ func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
 
 // sendErrorAndEnd sends an error event and ends the stream
 func (s *AccountTestService) sendErrorAndEnd(c *gin.Context, errorMsg string) error {
-	log.Printf("Account test error: %s", errorMsg)
+	applog.Printf("Account test error: %s", errorMsg)
 	s.sendEvent(c, TestEvent{Type: "error", Error: errorMsg})
 	return fmt.Errorf("%s", errorMsg)
 }

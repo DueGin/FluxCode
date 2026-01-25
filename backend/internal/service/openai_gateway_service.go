@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+
 	"net/http"
 	"regexp"
 	"sort"
@@ -19,7 +19,9 @@ import (
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/config"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -84,9 +86,13 @@ type OpenAIGatewayService struct {
 	concurrencyService  *ConcurrencyService
 	billingService      *BillingService
 	rateLimitService    *RateLimitService
+	settingService      *SettingService
+	openaiOAuthService  *OpenAIOAuthService
 	billingCacheService *BillingCacheService
 	httpUpstream        HTTPUpstream
 	deferredService     *DeferredService
+
+	openaiOAuthRefreshGroup singleflight.Group
 }
 
 // NewOpenAIGatewayService creates a new OpenAIGatewayService
@@ -100,6 +106,8 @@ func NewOpenAIGatewayService(
 	concurrencyService *ConcurrencyService,
 	billingService *BillingService,
 	rateLimitService *RateLimitService,
+	settingService *SettingService,
+	openaiOAuthService *OpenAIOAuthService,
 	billingCacheService *BillingCacheService,
 	httpUpstream HTTPUpstream,
 	deferredService *DeferredService,
@@ -114,6 +122,8 @@ func NewOpenAIGatewayService(
 		concurrencyService:  concurrencyService,
 		billingService:      billingService,
 		rateLimitService:    rateLimitService,
+		settingService:      settingService,
+		openaiOAuthService:  openaiOAuthService,
 		billingCacheService: billingCacheService,
 		httpUpstream:        httpUpstream,
 		deferredService:     deferredService,
@@ -136,6 +146,13 @@ func (s *OpenAIGatewayService) BindStickySession(ctx context.Context, sessionHas
 		return nil
 	}
 	return s.cache.SetSessionAccountID(ctx, "openai:"+sessionHash, accountID, openaiStickySessionTTL)
+}
+
+func (s *OpenAIGatewayService) ClearStickySession(ctx context.Context, sessionHash string) error {
+	if sessionHash == "" || s.cache == nil {
+		return nil
+	}
+	return s.cache.DeleteSessionAccountID(ctx, "openai:"+sessionHash)
 }
 
 // SelectAccount selects an OpenAI account with sticky session support
@@ -393,6 +410,13 @@ func (s *OpenAIGatewayService) SelectAccountWithLoadAwareness(ctx context.Contex
 				if a.account.Priority != b.account.Priority {
 					return a.account.Priority < b.account.Priority
 				}
+				// 同优先级下：优先选择当前并发占用更少的账号（分布式环境下从 Redis 汇总）。
+				if a.loadInfo.CurrentConcurrency != b.loadInfo.CurrentConcurrency {
+					return a.loadInfo.CurrentConcurrency < b.loadInfo.CurrentConcurrency
+				}
+				if a.loadInfo.WaitingCount != b.loadInfo.WaitingCount {
+					return a.loadInfo.WaitingCount < b.loadInfo.WaitingCount
+				}
 				if a.loadInfo.LoadRate != b.loadInfo.LoadRate {
 					return a.loadInfo.LoadRate < b.loadInfo.LoadRate
 				}
@@ -478,13 +502,92 @@ func (s *OpenAIGatewayService) schedulingConfig() config.GatewaySchedulingConfig
 	}
 }
 
+type openaiOAuthRefreshResult struct {
+	AccessToken string
+	Credentials map[string]any
+}
+
+func (s *OpenAIGatewayService) getOpenAIOAuthAccessToken(ctx context.Context, account *Account, forceRefresh bool) (string, error) {
+	if account == nil {
+		return "", errors.New("account is nil")
+	}
+	if account.Platform != PlatformOpenAI || account.Type != AccountTypeOAuth {
+		return "", errors.New("not an openai oauth account")
+	}
+
+	accessToken := strings.TrimSpace(account.GetOpenAIAccessToken())
+	if !forceRefresh {
+		if accessToken == "" {
+			return "", errors.New("access_token not found in credentials")
+		}
+		return accessToken, nil
+	}
+
+	if s == nil || s.openaiOAuthService == nil {
+		return "", errors.New("openai oauth service not configured")
+	}
+
+	key := fmt.Sprintf("openai_oauth_refresh:%d", account.ID)
+	v, err, _ := s.openaiOAuthRefreshGroup.Do(key, func() (any, error) {
+		target := account
+		if s.accountRepo != nil {
+			if fresh, err := s.accountRepo.GetByID(ctx, account.ID); err == nil && fresh != nil {
+				target = fresh
+			}
+		}
+
+		tokenInfo, err := s.openaiOAuthService.RefreshAccountToken(ctx, target)
+		if err != nil {
+			return nil, err
+		}
+
+		newCredentials := s.openaiOAuthService.BuildAccountCredentials(tokenInfo)
+		for k, v := range target.Credentials {
+			if _, exists := newCredentials[k]; !exists {
+				newCredentials[k] = v
+			}
+		}
+		target.Credentials = newCredentials
+
+		if s.accountRepo != nil {
+			if err := s.accountRepo.Update(ctx, target); err != nil {
+				applog.Printf("[OpenAI OAuth] save refreshed credentials failed: account=%d err=%v", target.ID, err)
+			}
+		}
+
+		accessToken := strings.TrimSpace(tokenInfo.AccessToken)
+		if accessToken == "" {
+			accessToken = strings.TrimSpace(target.GetOpenAIAccessToken())
+		}
+		if accessToken == "" {
+			return nil, errors.New("access_token not found after refresh")
+		}
+
+		return &openaiOAuthRefreshResult{
+			AccessToken: accessToken,
+			Credentials: newCredentials,
+		}, nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	result, ok := v.(*openaiOAuthRefreshResult)
+	if !ok || result == nil || strings.TrimSpace(result.AccessToken) == "" {
+		return "", errors.New("refresh result invalid")
+	}
+
+	account.Credentials = result.Credentials
+	return strings.TrimSpace(result.AccessToken), nil
+}
+
 // GetAccessToken gets the access token for an OpenAI account
 func (s *OpenAIGatewayService) GetAccessToken(ctx context.Context, account *Account) (string, string, error) {
 	switch account.Type {
 	case AccountTypeOAuth:
-		accessToken := account.GetOpenAIAccessToken()
-		if accessToken == "" {
-			return "", "", errors.New("access_token not found in credentials")
+		accessToken, err := s.getOpenAIOAuthAccessToken(ctx, account, false)
+		if err != nil {
+			return "", "", err
 		}
 		return accessToken, "oauth", nil
 	case AccountTypeAPIKey:
@@ -507,9 +610,11 @@ func (s *OpenAIGatewayService) shouldFailoverUpstreamError(statusCode int) bool 
 	}
 }
 
-func (s *OpenAIGatewayService) handleFailoverSideEffects(ctx context.Context, resp *http.Response, account *Account) {
-	body, _ := io.ReadAll(resp.Body)
-	s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, body)
+func (s *OpenAIGatewayService) handleFailoverSideEffects(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte) {
+	if s.rateLimitService == nil {
+		return
+	}
+	s.rateLimitService.HandleUpstreamError(ctx, account, statusCode, headers, responseBody)
 }
 
 // Forward forwards request to OpenAI API
@@ -558,32 +663,67 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		return nil, err
 	}
 
-	// Build upstream request
-	upstreamReq, err := s.buildUpstreamRequest(ctx, c, account, body, token, reqStream)
-	if err != nil {
-		return nil, err
-	}
-
 	// Get proxy URL
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
 
+	send := func(token string) (*http.Response, error) {
+		upstreamReq, err := s.buildUpstreamRequest(ctx, c, account, body, token, reqStream)
+		if err != nil {
+			return nil, err
+		}
+		return s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+	}
+
 	// Send request
-	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+	resp, err := send(token)
 	if err != nil {
 		return nil, fmt.Errorf("upstream request failed: %w", err)
 	}
+
+	// Handle error response (retry once on OpenAI OAuth 401 by refreshing token)
+	if resp.StatusCode >= 400 {
+		responseBody, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
+		if resp.StatusCode == 401 && account.Type == AccountTypeOAuth {
+			newToken, refreshErr := s.getOpenAIOAuthAccessToken(ctx, account, true)
+			if refreshErr != nil {
+				applog.Printf("[OpenAI OAuth] refresh on 401 failed: account=%d err=%v", account.ID, refreshErr)
+			} else if strings.TrimSpace(newToken) != "" {
+				retryResp, err := send(newToken)
+				if err != nil {
+					applog.Printf("[OpenAI OAuth] retry after refresh failed: account=%d err=%v", account.ID, err)
+				} else if retryResp.StatusCode < 400 {
+					resp = retryResp
+				} else {
+					responseBody, _ = io.ReadAll(retryResp.Body)
+					_ = retryResp.Body.Close()
+					resp = retryResp
+				}
+			}
+		}
+
+		// Still error after retry attempt
+		if resp.StatusCode >= 400 {
+			if s.shouldFailoverUpstreamError(resp.StatusCode) {
+				s.handleFailoverSideEffects(ctx, account, resp.StatusCode, resp.Header, responseBody)
+				return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
+			}
+			return s.handleErrorResponse(ctx, resp.StatusCode, resp.Header, responseBody, c, account)
+		}
+	}
+
 	defer func() { _ = resp.Body.Close() }()
 
-	// Handle error response
-	if resp.StatusCode >= 400 {
-		if s.shouldFailoverUpstreamError(resp.StatusCode) {
-			s.handleFailoverSideEffects(ctx, resp, account)
-			return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
-		}
-		return s.handleErrorResponse(ctx, resp, c, account)
+	rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
+	requestID := normalizeRequestID(rawRequestID)
+	if rawRequestID != "" {
+		c.Header("x-request-id", rawRequestID)
+	} else {
+		c.Header("x-request-id", requestID)
 	}
 
 	// Handle normal response
@@ -611,7 +751,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	}
 
 	return &OpenAIForwardResult{
-		RequestID:    resp.Header.Get("x-request-id"),
+		RequestID:    requestID,
 		Usage:        *usage,
 		Model:        originalModel,
 		Stream:       reqStream,
@@ -688,34 +828,32 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	return req, nil
 }
 
-func (s *OpenAIGatewayService) handleErrorResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account) (*OpenAIForwardResult, error) {
-	body, _ := io.ReadAll(resp.Body)
-
+func (s *OpenAIGatewayService) handleErrorResponse(ctx context.Context, upstreamStatusCode int, headers http.Header, body []byte, c *gin.Context, account *Account) (*OpenAIForwardResult, error) {
 	// Check custom error codes
-	if !account.ShouldHandleErrorCode(resp.StatusCode) {
+	if !account.ShouldHandleErrorCode(upstreamStatusCode) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"type":    "upstream_error",
 				"message": "Upstream gateway error",
 			},
 		})
-		return nil, fmt.Errorf("upstream error: %d (not in custom error codes)", resp.StatusCode)
+		return nil, fmt.Errorf("upstream error: %d (not in custom error codes)", upstreamStatusCode)
 	}
 
 	// Handle upstream error (mark account status)
 	shouldDisable := false
 	if s.rateLimitService != nil {
-		shouldDisable = s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, body)
+		shouldDisable = s.rateLimitService.HandleUpstreamError(ctx, account, upstreamStatusCode, headers, body)
 	}
 	if shouldDisable {
-		return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
+		return nil, &UpstreamFailoverError{StatusCode: upstreamStatusCode}
 	}
 
 	// Return appropriate error response
 	var errType, errMsg string
 	var statusCode int
 
-	switch resp.StatusCode {
+	switch upstreamStatusCode {
 	case 401:
 		statusCode = http.StatusBadGateway
 		errType = "upstream_error"
@@ -745,7 +883,7 @@ func (s *OpenAIGatewayService) handleErrorResponse(ctx context.Context, resp *ht
 		},
 	})
 
-	return nil, fmt.Errorf("upstream error: %d", resp.StatusCode)
+	return nil, fmt.Errorf("upstream error: %d", upstreamStatusCode)
 }
 
 // openaiStreamingResult streaming response result
@@ -1028,7 +1166,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 
 	inserted, err := s.usageLogRepo.Create(ctx, usageLog)
 	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-		log.Printf("[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
+		applog.Printf("[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
 		s.deferredService.ScheduleLastUsedUpdate(account.ID)
 		return nil
 	}
@@ -1127,135 +1265,9 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 		return
 	}
 
-	// Convert snapshot to map for merging into Extra
-	updates := make(map[string]any)
-	if snapshot.PrimaryUsedPercent != nil {
-		updates["codex_primary_used_percent"] = *snapshot.PrimaryUsedPercent
-	}
-	if snapshot.PrimaryResetAfterSeconds != nil {
-		updates["codex_primary_reset_after_seconds"] = *snapshot.PrimaryResetAfterSeconds
-	}
-	if snapshot.PrimaryWindowMinutes != nil {
-		updates["codex_primary_window_minutes"] = *snapshot.PrimaryWindowMinutes
-	}
-	if snapshot.SecondaryUsedPercent != nil {
-		updates["codex_secondary_used_percent"] = *snapshot.SecondaryUsedPercent
-	}
-	if snapshot.SecondaryResetAfterSeconds != nil {
-		updates["codex_secondary_reset_after_seconds"] = *snapshot.SecondaryResetAfterSeconds
-	}
-	if snapshot.SecondaryWindowMinutes != nil {
-		updates["codex_secondary_window_minutes"] = *snapshot.SecondaryWindowMinutes
-	}
-	if snapshot.PrimaryOverSecondaryPercent != nil {
-		updates["codex_primary_over_secondary_percent"] = *snapshot.PrimaryOverSecondaryPercent
-	}
-	updates["codex_usage_updated_at"] = snapshot.UpdatedAt
-
-	// Normalize to canonical 5h/7d fields based on window_minutes
-	// This fixes the issue where OpenAI's primary/secondary naming is reversed
-	// Strategy: Compare the two windows and assign the smaller one to 5h, larger one to 7d
-
-	// IMPORTANT: We can only reliably determine window type from window_minutes field
-	// The reset_after_seconds is remaining time, not window size, so it cannot be used for comparison
-
-	var primaryWindowMins, secondaryWindowMins int
-	var hasPrimaryWindow, hasSecondaryWindow bool
-
-	// Only use window_minutes for reliable window size comparison
-	if snapshot.PrimaryWindowMinutes != nil {
-		primaryWindowMins = *snapshot.PrimaryWindowMinutes
-		hasPrimaryWindow = true
-	}
-
-	if snapshot.SecondaryWindowMinutes != nil {
-		secondaryWindowMins = *snapshot.SecondaryWindowMinutes
-		hasSecondaryWindow = true
-	}
-
-	// Determine which is 5h and which is 7d
-	var use5hFromPrimary, use7dFromPrimary bool
-	var use5hFromSecondary, use7dFromSecondary bool
-
-	if hasPrimaryWindow && hasSecondaryWindow {
-		// Both window sizes known: compare and assign smaller to 5h, larger to 7d
-		if primaryWindowMins < secondaryWindowMins {
-			use5hFromPrimary = true
-			use7dFromSecondary = true
-		} else {
-			use5hFromSecondary = true
-			use7dFromPrimary = true
-		}
-	} else if hasPrimaryWindow {
-		// Only primary window size known: classify by absolute threshold
-		if primaryWindowMins <= 360 {
-			use5hFromPrimary = true
-		} else {
-			use7dFromPrimary = true
-		}
-	} else if hasSecondaryWindow {
-		// Only secondary window size known: classify by absolute threshold
-		if secondaryWindowMins <= 360 {
-			use5hFromSecondary = true
-		} else {
-			use7dFromSecondary = true
-		}
-	} else {
-		// No window_minutes available: cannot reliably determine window types
-		// Fall back to legacy assumption (may be incorrect)
-		// Assume primary=7d, secondary=5h based on historical observation
-		if snapshot.SecondaryUsedPercent != nil || snapshot.SecondaryResetAfterSeconds != nil || snapshot.SecondaryWindowMinutes != nil {
-			use5hFromSecondary = true
-		}
-		if snapshot.PrimaryUsedPercent != nil || snapshot.PrimaryResetAfterSeconds != nil || snapshot.PrimaryWindowMinutes != nil {
-			use7dFromPrimary = true
-		}
-	}
-
-	// Write canonical 5h fields
-	if use5hFromPrimary {
-		if snapshot.PrimaryUsedPercent != nil {
-			updates["codex_5h_used_percent"] = *snapshot.PrimaryUsedPercent
-		}
-		if snapshot.PrimaryResetAfterSeconds != nil {
-			updates["codex_5h_reset_after_seconds"] = *snapshot.PrimaryResetAfterSeconds
-		}
-		if snapshot.PrimaryWindowMinutes != nil {
-			updates["codex_5h_window_minutes"] = *snapshot.PrimaryWindowMinutes
-		}
-	} else if use5hFromSecondary {
-		if snapshot.SecondaryUsedPercent != nil {
-			updates["codex_5h_used_percent"] = *snapshot.SecondaryUsedPercent
-		}
-		if snapshot.SecondaryResetAfterSeconds != nil {
-			updates["codex_5h_reset_after_seconds"] = *snapshot.SecondaryResetAfterSeconds
-		}
-		if snapshot.SecondaryWindowMinutes != nil {
-			updates["codex_5h_window_minutes"] = *snapshot.SecondaryWindowMinutes
-		}
-	}
-
-	// Write canonical 7d fields
-	if use7dFromPrimary {
-		if snapshot.PrimaryUsedPercent != nil {
-			updates["codex_7d_used_percent"] = *snapshot.PrimaryUsedPercent
-		}
-		if snapshot.PrimaryResetAfterSeconds != nil {
-			updates["codex_7d_reset_after_seconds"] = *snapshot.PrimaryResetAfterSeconds
-		}
-		if snapshot.PrimaryWindowMinutes != nil {
-			updates["codex_7d_window_minutes"] = *snapshot.PrimaryWindowMinutes
-		}
-	} else if use7dFromSecondary {
-		if snapshot.SecondaryUsedPercent != nil {
-			updates["codex_7d_used_percent"] = *snapshot.SecondaryUsedPercent
-		}
-		if snapshot.SecondaryResetAfterSeconds != nil {
-			updates["codex_7d_reset_after_seconds"] = *snapshot.SecondaryResetAfterSeconds
-		}
-		if snapshot.SecondaryWindowMinutes != nil {
-			updates["codex_7d_window_minutes"] = *snapshot.SecondaryWindowMinutes
-		}
+	updates := buildCodexUsageUpdates(snapshot)
+	if len(updates) == 0 {
+		return
 	}
 
 	// Update account's Extra field asynchronously
@@ -1263,5 +1275,23 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 		updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = s.accountRepo.UpdateExtra(updateCtx, accountID, updates)
+
+		if s.rateLimitService == nil {
+			return
+		}
+		now := time.Now()
+		tempAccount := &Account{Extra: updates}
+		threshold := float64(s.settingService.GetUsageWindowDisablePercent(updateCtx))
+		if threshold <= 0 {
+			threshold = defaultUsageWindowDisablePercent
+		}
+		_, exceeded := codexUsageWindows(tempAccount, now, threshold)
+		if len(exceeded) == 0 {
+			return
+		}
+		reason := buildCodexExceededReason(exceeded)
+		if err := setUnschedulableWithReasonByID(updateCtx, s.accountRepo, accountID, reason); err != nil {
+			applog.Printf("[CodexQuota] SetUnschedulableWithReason failed for account %d: %v", accountID, err)
+		}
 	}()
 }

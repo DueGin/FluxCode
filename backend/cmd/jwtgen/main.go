@@ -9,11 +9,14 @@ import (
 
 	_ "github.com/DueGin/FluxCode/ent/runtime"
 	"github.com/DueGin/FluxCode/internal/config"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/repository"
 	"github.com/DueGin/FluxCode/internal/service"
 )
 
 func main() {
+	applog.Setup()
+
 	email := flag.String("email", "", "Admin email to issue a JWT for (defaults to first active admin)")
 	flag.Parse()
 
@@ -28,7 +31,7 @@ func main() {
 	}
 	defer func() {
 		if err := client.Close(); err != nil {
-			log.Printf("failed to close db: %v", err)
+			applog.Printf("failed to close db: %v", err)
 		}
 	}()
 

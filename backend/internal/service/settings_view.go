@@ -1,8 +1,16 @@
 package service
 
+type KVItem struct {
+	K string `json:"k"`
+	V string `json:"v"`
+}
+
 type SystemSettings struct {
 	RegistrationEnabled bool
 	EmailVerifyEnabled  bool
+
+	AlertEmails          []string `json:"alert_emails"`
+	AlertCooldownMinutes int      `json:"alert_cooldown_minutes"`
 
 	SMTPHost     string
 	SMTPPort     int
@@ -16,15 +24,21 @@ type SystemSettings struct {
 	TurnstileSiteKey   string
 	TurnstileSecretKey string
 
-	SiteName     string
-	SiteLogo     string
-	SiteSubtitle string
-	APIBaseURL   string
-	ContactInfo  string
-	DocURL       string
+	SiteName         string
+	SiteLogo         string
+	SiteSubtitle     string
+	APIBaseURL       string
+	ContactInfo      string
+	AfterSaleContact []KVItem
+	DocURL           string
 
-	DefaultConcurrency int
-	DefaultBalance     float64
+	DefaultConcurrency                int
+	DefaultBalance                    float64
+	GatewayRetrySwitchAfter           int
+	DailyUsageRefreshTime             string
+	Auth401CooldownSeconds            int
+	UsageWindowDisablePercent         int
+	UserConcurrencyWaitTimeoutSeconds int
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -44,6 +58,7 @@ type PublicSettings struct {
 	SiteSubtitle        string
 	APIBaseURL          string
 	ContactInfo         string
+	AfterSaleContact    []KVItem
 	DocURL              string
 	Version             string
 }

@@ -596,6 +596,50 @@
         </div>
       </div>
 
+      <!-- Expiration Settings -->
+      <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <label class="input-label mb-0">{{ t('admin.accounts.expiration.label') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.expiration.hint') }}
+            </p>
+          </div>
+          <label class="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            <input
+              type="checkbox"
+              v-model="expirationEnabled"
+              class="h-4 w-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500 dark:border-dark-500"
+            />
+            {{ t('admin.accounts.expiration.enableLabel') }}
+          </label>
+        </div>
+
+        <div v-if="expirationEnabled" class="mt-3 space-y-3">
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="preset in expirationPresets"
+              :key="preset.days"
+              type="button"
+              class="rounded-full border px-3 py-1 text-xs font-medium transition-all hover:border-primary-400 dark:border-dark-500 dark:text-gray-200"
+              :class="
+                preset.days === selectedExpirationPreset
+                  ? 'border-primary-500 bg-primary-50 text-primary-600 dark:bg-primary-900/20'
+                  : ''
+              "
+              @click="applyExpirationPreset(preset.days)"
+            >
+              {{ preset.label }}
+            </button>
+          </div>
+          <input type="datetime-local" v-model="expirationInput" class="input" :min="minExpirationInput" />
+          <p class="input-hint">{{ t('admin.accounts.expiration.inputHint') }}</p>
+        </div>
+        <p v-else class="text-xs text-gray-500 dark:text-gray-400">
+          {{ t('admin.accounts.expiration.disabledHint') }}
+        </p>
+      </div>
+
       <div>
         <label class="input-label">{{ t('common.status') }}</label>
         <Select v-model="form.status" :options="statusOptions" />
@@ -690,6 +734,7 @@ import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
 import type { Account, Proxy, Group } from '@/types'
+import { formatDateTimeLocalBeijing, parseBeijingDateTimeLocal } from '@/utils/format'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
@@ -750,6 +795,16 @@ const customErrorCodesEnabled = ref(false)
 const selectedErrorCodes = ref<number[]>([])
 const customErrorCodeInput = ref<number | null>(null)
 const interceptWarmupRequests = ref(false)
+const expirationEnabled = ref(false)
+const expirationInput = ref('')
+const selectedExpirationPreset = ref<number | null>(null)
+const minExpirationInput = computed(() => formatDateTimeLocalBeijing(new Date()))
+const expirationPresets = computed(() => [
+  { days: 7, label: t('admin.accounts.expiration.presetDays', { days: 7 }) },
+  { days: 30, label: t('admin.accounts.expiration.presetDays', { days: 30 }) },
+  { days: 60, label: t('admin.accounts.expiration.presetDays', { days: 60 }) },
+  { days: 180, label: t('admin.accounts.expiration.presetDays', { days: 180 }) }
+])
 const mixedScheduling = ref(false) // For antigravity accounts: enable mixed scheduling
 const tempUnschedEnabled = ref(false)
 const tempUnschedRules = ref<TempUnschedRuleForm[]>([])
@@ -799,7 +854,8 @@ const form = reactive({
   concurrency: 1,
   priority: 1,
   status: 'active' as 'active' | 'inactive',
-  group_ids: [] as number[]
+  group_ids: [] as number[],
+  expires_at: null as string | null
 })
 
 const statusOptions = computed(() => [
@@ -818,6 +874,17 @@ watch(
       form.priority = newAccount.priority
       form.status = newAccount.status as 'active' | 'inactive'
       form.group_ids = newAccount.group_ids || []
+      if (newAccount.expires_at) {
+        form.expires_at = newAccount.expires_at
+        expirationEnabled.value = true
+        expirationInput.value = formatDateTimeLocalBeijing(new Date(newAccount.expires_at))
+        selectedExpirationPreset.value = null
+      } else {
+        expirationEnabled.value = false
+        expirationInput.value = ''
+        selectedExpirationPreset.value = null
+        form.expires_at = null
+      }
 
       // Load intercept warmup requests setting (applies to all account types)
       const credentials = newAccount.credentials as Record<string, unknown> | undefined
@@ -894,6 +961,32 @@ watch(
   { immediate: true }
 )
 
+watch(expirationInput, (value) => {
+  if (!value) {
+    form.expires_at = null
+    selectedExpirationPreset.value = null
+    return
+  }
+  const parsed = parseBeijingDateTimeLocal(value)
+  if (!parsed) {
+    return
+  }
+  form.expires_at = parsed.toISOString()
+  selectedExpirationPreset.value = null
+})
+
+watch(expirationEnabled, (enabled) => {
+  if (!enabled) {
+    expirationInput.value = ''
+    form.expires_at = null
+    selectedExpirationPreset.value = null
+    return
+  }
+  if (!expirationInput.value) {
+    applyExpirationPreset(30)
+  }
+})
+
 // Model mapping helpers
 const addModelMapping = () => {
   modelMappings.value.push({ from: '', to: '' })
@@ -910,6 +1003,17 @@ const addPresetMapping = (from: string, to: string) => {
     return
   }
   modelMappings.value.push({ from, to })
+}
+
+const applyExpirationPreset = (days: number) => {
+  const target = new Date()
+  target.setUTCSeconds(0, 0)
+  target.setUTCMinutes(target.getUTCMinutes() + 1)
+  target.setUTCDate(target.getUTCDate() + days)
+  expirationEnabled.value = true
+  selectedExpirationPreset.value = days
+  expirationInput.value = formatDateTimeLocalBeijing(target)
+  form.expires_at = target.toISOString()
 }
 
 // Error code toggle helper

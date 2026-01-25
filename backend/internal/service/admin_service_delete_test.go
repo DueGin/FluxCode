@@ -237,12 +237,16 @@ func (s *redeemRepoStub) List(ctx context.Context, params pagination.PaginationP
 	panic("unexpected List call")
 }
 
-func (s *redeemRepoStub) ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, search string) ([]RedeemCode, *pagination.PaginationResult, error) {
+func (s *redeemRepoStub) ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, *pagination.PaginationResult, error) {
 	panic("unexpected ListWithFilters call")
 }
 
 func (s *redeemRepoStub) ListByUser(ctx context.Context, userID int64, limit int) ([]RedeemCode, error) {
 	panic("unexpected ListByUser call")
+}
+
+func (s *redeemRepoStub) ListWelfareNos(ctx context.Context) ([]string, error) {
+	panic("unexpected ListWelfareNos call")
 }
 
 type subscriptionInvalidateCall struct {

@@ -40,6 +40,34 @@ export interface SendVerifyCodeRequest {
 export interface SendVerifyCodeResponse {
   message: string
   countdown: number
+  task_id?: string
+  queue_message_id?: string
+  send_ack?: boolean
+  consume_ack?: boolean
+  delivery_status?: string
+}
+
+export interface VerifyCodeTaskStatus {
+  task_id: string
+  task_type: string
+  email: string
+  site_name: string
+  status: string
+  queue_message_id?: string
+  attempt: number
+  next_attempt?: number
+  max_attempts: number
+  send_ack_at: number
+  consume_ack_at?: number
+  next_retry_at?: number
+  last_error?: string
+  worker?: string
+  updated_at: number
+}
+
+export interface KeyValueItem {
+  k: string
+  v: string
 }
 
 export interface PublicSettings {
@@ -52,6 +80,7 @@ export interface PublicSettings {
   site_subtitle: string
   api_base_url: string
   contact_info: string
+  after_sale_contact: KeyValueItem[]
   doc_url: string
   version: string
 }
@@ -162,6 +191,8 @@ export interface UserStats {
 export interface ApiResponse<T = unknown> {
   code: number
   message: string
+  reason?: string
+  metadata?: Record<string, string>
   data: T
 }
 
@@ -259,7 +290,6 @@ export interface ApiKey {
 export interface CreateApiKeyRequest {
   name: string
   group_id?: number | null
-  custom_key?: string // Optional custom API Key
 }
 
 export interface UpdateApiKeyRequest {
@@ -283,6 +313,45 @@ export interface UpdateGroupRequest {
   rate_multiplier?: number
   is_exclusive?: boolean
   status?: 'active' | 'inactive'
+}
+
+// ==================== Pricing Plan Types ====================
+
+export interface PricingPlanContactMethod {
+  type: string
+  value: string
+}
+
+export interface PricingPlan {
+  id: number
+  group_id: number
+  name: string
+  description: string | null
+  icon_url: string | null
+  badge_text: string | null
+  tagline: string | null
+  price_amount: number | null
+  price_currency: string
+  price_period: string
+  price_text: string | null
+  features: string[]
+  contact_methods: PricingPlanContactMethod[]
+  is_featured: boolean
+  sort_order: number
+  status: 'active' | 'inactive'
+  created_at: string
+  updated_at: string
+}
+
+export interface PricingPlanGroup {
+  id: number
+  name: string
+  description: string | null
+  sort_order: number
+  status: 'active' | 'inactive'
+  plans?: PricingPlan[]
+  created_at: string
+  updated_at: string
 }
 
 // ==================== Account & Proxy Types ====================
@@ -376,6 +445,7 @@ export interface Account {
   status: 'active' | 'inactive' | 'error'
   error_message: string | null
   last_used_at: string | null
+  expires_at: string | null
   created_at: string
   updated_at: string
   proxy?: Proxy
@@ -465,6 +535,7 @@ export interface CreateAccountRequest {
   concurrency?: number
   priority?: number
   group_ids?: number[]
+  expires_at?: string | null
   confirm_mixed_channel_risk?: boolean
 }
 
@@ -478,6 +549,7 @@ export interface UpdateAccountRequest {
   priority?: number
   status?: 'active' | 'inactive'
   group_ids?: number[]
+  expires_at?: string | null
   confirm_mixed_channel_risk?: boolean
 }
 
@@ -558,6 +630,7 @@ export interface RedeemCode {
   updated_at?: string
   group_id?: number | null // 订阅类型专用
   validity_days?: number // 订阅类型专用
+  welfare_no?: string | null // 福利号（同一账号同一福利号仅可兑换一次）
   user?: User
   group?: Group // 关联的分组
 }
@@ -568,6 +641,8 @@ export interface GenerateRedeemCodesRequest {
   value: number
   group_id?: number | null // 订阅类型专用
   validity_days?: number // 订阅类型专用
+  is_welfare?: boolean
+  welfare_no?: string
 }
 
 export interface RedeemCodeRequest {
@@ -753,6 +828,10 @@ export interface BulkAssignSubscriptionRequest {
 
 export interface ExtendSubscriptionRequest {
   days: number
+}
+
+export interface BulkAdjustSubscriptionExpiryResult {
+  updated_count: number
 }
 
 // ==================== Query Parameters ====================

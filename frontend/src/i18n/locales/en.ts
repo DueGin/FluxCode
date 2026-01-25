@@ -19,7 +19,7 @@ export default {
     hero: {
       headline: 'Fast & Stable · Built for Teams',
       description:
-        'One entry for multi-model APIs. Account pooling, sticky sessions, and real-time billing — observable, controllable, and scalable.',
+        'One entry for multi-model APIs. Providing observable, controllable, stable and reliable API relay services.',
       secondaryCta: 'View Usage',
       stats: {
         performance: 'Fast & stable routing',
@@ -29,9 +29,9 @@ export default {
     },
     sections: {
       featuresTitle: 'Features',
-      featuresSubtitle: 'One entry, account pooling, and real-time billing to build a stable, controllable API hub.',
+      featuresSubtitle: 'One entry, real-time billing, stable & reliable.',
       pricingTitle: 'Pricing',
-      pricingSubtitle: 'Usage-based billing + quota control, with clear and traceable bills.',
+      pricingSubtitle: 'Subscription-based, with clear and traceable bills.',
       docsTitle: 'Documentation',
       docsSubtitle: 'Quick start, API reference, and best practices.'
     },
@@ -174,20 +174,37 @@ export default {
     close: 'Close',
     enabled: 'Enabled',
     disabled: 'Disabled',
+    banned: 'Banned',
     total: 'Total',
     balance: 'Balance',
     available: 'Available',
     copiedToClipboard: 'Copied to clipboard',
     copyFailed: 'Failed to copy',
     contactSupport: 'Contact Support',
+    contactAdvisor: 'Contact Advisor',
+    purchase: 'Purchase',
     selectOption: 'Select an option',
     searchPlaceholder: 'Search...',
     noOptionsFound: 'No options found',
     saving: 'Saving...',
     refresh: 'Refresh',
+    recommended: 'Recommended',
     notAvailable: 'N/A',
     now: 'Now',
     unknown: 'Unknown',
+    currency: {
+      cny: 'CNY (RMB)',
+      usd: 'USD',
+      eur: 'EUR',
+      gbp: 'GBP'
+    },
+    period: {
+      day: 'Daily',
+      week: 'Weekly',
+      month: 'Monthly',
+      year: 'Yearly',
+      once: 'One-time'
+    },
     time: {
       never: 'Never',
       justNow: 'Just now',
@@ -206,6 +223,7 @@ export default {
     profile: 'Profile',
     users: 'Users',
     groups: 'Groups',
+    pricingPlans: 'Pricing Plans',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
     proxies: 'Proxies',
@@ -261,6 +279,9 @@ export default {
     sendingCode: 'Sending...',
     clickToResend: 'Click to resend code',
     resendCode: 'Resend verification code',
+    verifyCodeQueued: 'Verification code queued, sending...',
+    verifyCodeSent: 'Verification code sent! Please check your inbox.',
+    verifyCodeFailed: 'Failed to send verification code. Please try again.',
     oauth: {
       code: 'Code',
       state: 'State',
@@ -313,7 +334,9 @@ export default {
     viewUsage: 'View Usage',
     checkDetailedLogs: 'Check detailed usage logs',
     redeemCode: 'Redeem Code',
-    addBalanceWithCode: 'Add balance with a code'
+    addBalanceWithCode: 'Add balance with a code',
+    afterSaleContact: 'After-sale Contact',
+    afterSaleContactEmpty: 'After-sale contact is not configured'
   },
 
   // Groups (shared)
@@ -392,12 +415,6 @@ export default {
         note: 'These environment variables will be active in the current terminal session. For permanent configuration, add them to ~/.bashrc, ~/.zshrc, or the appropriate configuration file.',
       },
     },
-    customKeyLabel: 'Custom Key',
-    customKeyPlaceholder: 'Enter your custom key (min 16 chars)',
-    customKeyHint: 'Only letters, numbers, underscores and hyphens allowed. Minimum 16 characters.',
-    customKeyTooShort: 'Custom key must be at least 16 characters',
-    customKeyInvalidChars: 'Custom key can only contain letters, numbers, underscores, and hyphens',
-    customKeyRequired: 'Please enter a custom key',
     ccSwitchNotInstalled: 'CC-Switch is not installed or the protocol handler is not registered. Please install CC-Switch first or manually copy the API key.',
     ccsClientSelect: {
       title: 'Select Client',
@@ -464,7 +481,7 @@ export default {
   // Redeem
   redeem: {
     title: 'Redeem Code',
-    description: 'Enter your redeem code to add balance or increase concurrency',
+    description: 'Enter your redeem code to subscribe to services',
     currentBalance: 'Current Balance',
     concurrency: 'Concurrency',
     requests: 'requests',
@@ -498,6 +515,8 @@ export default {
     subscriptionDays: '{days} days',
     days: ' days',
     codeRedeemSuccess: 'Code redeemed successfully!',
+    codeAlreadyUsed: 'This redeem code has already been used.',
+    welfareAlreadyRedeemed: 'This welfare no. has already been redeemed.',
     failedToRedeem: 'Failed to redeem code. Please check the code and try again.',
     subscriptionRefreshFailed: 'Redeemed successfully, but failed to refresh subscription status.'
   },
@@ -653,6 +672,7 @@ export default {
       leaveEmptyToKeep: 'Leave empty to keep current password',
       generatePassword: 'Generate random password',
       copyPassword: 'Copy password',
+      passwordCopied: 'Password copied',
       creating: 'Creating...',
       updating: 'Updating...',
       columns: {
@@ -850,6 +870,16 @@ export default {
       failedToCreate: 'Failed to create group',
       failedToUpdate: 'Failed to update group',
       failedToDelete: 'Failed to delete group',
+      adjustExpiry: 'Adjust Expiry',
+      adjustExpiryTitle: 'Adjust Subscription Expiry',
+      adjustExpiryDescription:
+        'Bulk add/subtract days for all unexpired subscriptions under this group. Only applies to subscription groups.',
+      adjustExpiryDays: 'Days',
+      adjustExpiryPlaceholder: 'e.g. 30 or -7',
+      adjustExpiryHint: 'Positive to extend, negative to reduce. 0 is not allowed.',
+      adjustExpiryInvalidDays: 'Please enter a non-zero integer number of days',
+      adjustExpirySuccess: 'Updated {count} subscriptions',
+      adjustExpiryFailed: 'Failed to adjust subscription expiry',
       deleteConfirm:
         "Are you sure you want to delete '{name}'? All associated API keys will no longer belong to any group.",
       deleteConfirmSubscription:
@@ -869,6 +899,66 @@ export default {
         validityHint: 'Number of days the subscription is valid when assigned to a user',
         noLimit: 'No limit'
       }
+    },
+
+    // Pricing Plans
+    pricingPlans: {
+      title: 'Pricing Plans',
+      description: 'Manage pricing page groups and plan cards',
+      createGroup: 'Create Group',
+      editGroup: 'Edit Group',
+      deleteGroup: 'Delete Group',
+      createPlan: 'Create Plan',
+      editPlan: 'Edit Plan',
+      deletePlan: 'Delete Plan',
+      sortOrder: 'Sort',
+      columns: {
+        name: 'Name',
+        price: 'Price',
+        sortOrder: 'Sort',
+        status: 'Status',
+        actions: 'Actions'
+      },
+      groupForm: {
+        name: 'Group Name',
+        description: 'Description',
+        sortOrder: 'Sort Order',
+        status: 'Status'
+      },
+      planForm: {
+        group: 'Group',
+        name: 'Plan Name',
+        description: 'Subtitle',
+        iconUrl: 'Icon URL',
+        iconUrlHint: 'e.g. https://example.com/icon.svg (leave empty to show initial)',
+        badgeText: 'Badge',
+        badgeTextHint: 'e.g. Productivity / Custom Plan',
+        priceText: 'Price Text',
+        priceTextHint: 'e.g. Free / Contact us (overrides amount display)',
+        tagline: 'Tagline',
+        taglineHint: 'e.g. Best value | Unlimited usage',
+        priceAmount: 'Amount',
+        priceCurrency: 'Currency',
+        pricePeriod: 'Period',
+        features: 'Features',
+        featuresHint: 'One feature per line',
+        purchaseEntries: 'Purchase Entries',
+        purchaseEntriesHint: 'Click + to add a new entry, drag the handle to reorder',
+        purchaseEntryLabelPlaceholder: 'Label (e.g. WeChat Pay)',
+        purchaseEntryValuePlaceholder: 'Value (URL or text)',
+        addPurchaseEntry: 'Add purchase entry',
+        removePurchaseEntry: 'Remove entry',
+        dragToSort: 'Drag to sort',
+        featured: 'Featured',
+        sortOrder: 'Sort Order',
+        status: 'Status'
+      },
+      emptyTitle: 'No pricing groups',
+      emptyDesc: 'Create a group, then add plans under it.',
+      noPlans: 'No plans in this group.',
+      failedToLoad: 'Failed to load pricing plans',
+      deleteGroupConfirm: "Are you sure you want to delete group '{name}'? All plans under it will be deleted.",
+      deletePlanConfirm: "Are you sure you want to delete plan '{name}' (group: {group})?"
     },
 
     // Subscriptions
@@ -993,7 +1083,33 @@ export default {
       status: {
         paused: 'Paused',
         limited: 'Limited',
-        tempUnschedulable: 'Temp Unschedulable'
+        tempUnschedulable: 'Temp Unschedulable',
+        expired: 'Expired'
+      },
+      expiration: {
+        label: 'Account Expiration',
+        hint: 'After expiration the account will be excluded from scheduling automatically.',
+        enableLabel: 'Enable expiration',
+        presetDays: '{days}-day',
+        inputHint: 'Uses Beijing time (UTC+8, minute precision).',
+        disabledHint: 'Leave disabled if the account should never expire.',
+        never: 'Never expires',
+        expired: 'Expired',
+        today: 'Expires today',
+        tomorrow: 'Expires tomorrow',
+        inDays: 'Expires in {days} days'
+      },
+      schedulableReason: {
+        ok: 'This account can participate in scheduling.',
+        manualOff: 'Scheduling has been turned off manually.',
+        expired: 'This account has expired; scheduling was turned off automatically.',
+        inactive: 'This account is inactive and cannot be scheduled.',
+        error: 'This account is in error state and cannot be scheduled.',
+        banned: 'This account is banned and cannot be scheduled.',
+        tempUnsched: 'This account is temporarily unschedulable.',
+        tempUnschedWithReason: 'This account is temporarily unschedulable: {reason}',
+        rateLimitedUntil: 'Rate limited; expected to recover after {time}.',
+        overloadedUntil: 'Overloaded; expected to recover after {time}.'
       },
       tempUnschedulable: {
         title: 'Temp Unschedulable',
@@ -1046,6 +1162,7 @@ export default {
         concurrencyStatus: 'Concurrency',
         status: 'Status',
         schedulable: 'Schedule',
+        expires: 'Expiration',
         todayStats: "Today's Stats",
         groups: 'Groups',
         usageWindows: 'Usage Windows',
@@ -1066,8 +1183,12 @@ export default {
         selected: '{count} account(s) selected',
         selectCurrentPage: 'Select this page',
         clear: 'Clear selection',
-        edit: 'Bulk Edit',
-        delete: 'Bulk Delete'
+        enableSchedulable: 'Enable Scheduling',
+        disableSchedulable: 'Disable Scheduling',
+        refreshUsage: 'Refresh Usage',
+        resetTempUnschedulable: 'Reset Temp Unschedulable',
+        edit: 'Edit',
+        delete: 'Delete'
       },
       bulkEdit: {
         title: 'Bulk Edit Accounts',
@@ -1088,6 +1209,29 @@ export default {
       bulkDeleteSuccess: 'Deleted {count} account(s)',
       bulkDeletePartial: 'Partially deleted: {success} succeeded, {failed} failed',
       bulkDeleteFailed: 'Bulk delete failed',
+      bulkSchedulableTitle: 'Bulk Set Scheduling',
+      bulkSchedulableConfirmEnable: 'Enable scheduling for the selected {count} account(s)?',
+      bulkSchedulableConfirmDisable: 'Disable scheduling for the selected {count} account(s)?',
+      bulkSchedulableSuccessEnable: 'Enabled scheduling for {count} account(s)',
+      bulkSchedulableSuccessDisable: 'Disabled scheduling for {count} account(s)',
+      bulkSchedulablePartial: 'Partially updated: {success} succeeded, {failed} failed',
+      bulkSchedulableFailed: 'Bulk set scheduling failed',
+      bulkUsageRefreshSuccess: 'Usage refresh completed for {count} account(s)',
+      bulkUsageRefreshPartial: 'Partially refreshed: {success} succeeded, {failed} failed',
+      bulkUsageRefreshFailed: 'Bulk usage refresh failed',
+      bulkUsageRefreshTitle: 'Bulk Usage Refresh Results',
+      bulkUsageRefreshSummary: 'Total {total}, success {success}, failed {failed}',
+      bulkUsageRefreshNoFailures: 'All accounts refreshed successfully.',
+      bulkUsageRefreshFailures: 'Failures ({count})',
+      bulkUsageRefreshAccountId: 'Account ID',
+      bulkUsageRefreshAccountName: 'Account',
+      bulkUsageRefreshOutcome: 'Outcome',
+      bulkUsageRefreshDetail: 'Detail',
+      bulkTempUnschedResetTitle: 'Bulk Reset Temp Unschedulable',
+      bulkTempUnschedResetConfirm: 'Reset temp unschedulable status for the selected {count} account(s)?',
+      bulkTempUnschedResetSuccess: 'Temp unschedulable reset for {count} account(s)',
+      bulkTempUnschedResetPartial: 'Partially reset: {success} succeeded, {failed} failed',
+      bulkTempUnschedResetFailed: 'Bulk reset temp unschedulable failed',
       resetStatus: 'Reset Status',
       statusReset: 'Account status reset successfully',
       failedToResetStatus: 'Failed to reset account status',
@@ -1467,6 +1611,7 @@ export default {
       testing: 'Testing...',
       retry: 'Retry',
       copyOutput: 'Copy output',
+      outputCopied: 'Output copied',
       startingTestForAccount: 'Starting test for account: {name}',
       testAccountTypeLabel: 'Account type: {type}',
       selectTestModel: 'Select Test Model',
@@ -1606,6 +1751,10 @@ export default {
       description: 'Generate and manage redeem codes',
       generateCodes: 'Generate Codes',
       searchCodes: 'Search codes...',
+      filterSettings: 'Filter Settings',
+      searchTypeCode: 'Code',
+      searchTypeUser: 'User',
+      searchUsers: 'Search user email...',
       allTypes: 'All Types',
       allStatus: 'All Status',
       balance: 'Balance',
@@ -1615,6 +1764,7 @@ export default {
       used: 'Used',
       columns: {
         code: 'Code',
+        welfare: 'Welfare No',
         type: 'Type',
         value: 'Value',
         status: 'Status',
@@ -1631,6 +1781,11 @@ export default {
       deleteAllUnusedConfirm:
         'Are you sure you want to delete all unused (active) redeem codes? This action cannot be undone.',
       deleteAll: 'Delete All',
+      isWelfare: 'Welfare No',
+      welfareNo: 'Welfare No',
+      welfareNoPlaceholder: 'Enter welfare no.',
+      welfareNoRequired: 'Welfare no. is required',
+      allWelfareNos: 'All Welfare Nos',
       generateCodesTitle: 'Generate Redeem Codes',
       generatedSuccessfully: 'Generated Successfully',
       codesCreated: '{count} redeem code(s) created',
@@ -1719,6 +1874,37 @@ export default {
         defaultConcurrency: 'Default Concurrency',
         defaultConcurrencyHint: 'Maximum concurrent requests for new users'
       },
+      scheduling: {
+        title: 'Scheduling Settings',
+        description: 'Configure gateway scheduling and switching strategy',
+        gatewayRetrySwitchAfter: 'Switch account after retries',
+        gatewayRetrySwitchAfterHint:
+          'When the request retry count reaches this value, the gateway will switch to another account (recommended: 2)',
+        auth401CooldownSeconds: '401 auth cooldown (seconds)',
+        auth401CooldownSecondsHint:
+          'When upstream returns 401 (token/auth issues), temporarily cool down the account for this many seconds before rescheduling (default: 300)',
+        dailyUsageRefreshTime: 'Daily usage refresh time',
+        dailyUsageRefreshTimeHint: 'Refresh usage windows for active accounts at HH:MM each day',
+        usageWindowDisablePercent: 'Usage window disable threshold (%)',
+        usageWindowDisablePercentHint:
+          'When window utilization reaches this percentage, scheduling will be turned off (range: 1-100, default: 100) and auto-enabled after the window resets',
+        userConcurrencyWaitTimeoutSeconds: 'User concurrency wait timeout (seconds)',
+        userConcurrencyWaitTimeoutSecondsHint:
+          'When user concurrency is maxed out, wait up to this many seconds for a slot (default: 30)'
+      },
+      alert: {
+        title: 'Alerting',
+        description: 'Configure alert recipient emails for system exceptions',
+        cooldownMinutes: 'Alert cooldown (minutes)',
+        cooldownMinutesPlaceholder: '5',
+        cooldownMinutesHint:
+          'At most 1 alert will be sent per cooldown window for the same alert type; set to 0 for no limit (use with caution).',
+        emailPlaceholder: "alert{'@'}example.com",
+        add: 'Add email',
+        remove: 'Remove',
+        hint: 'When the system reports "no available accounts", an alert email will be sent to these recipients (supports multiple).',
+        smtpRequiredHint: 'Note: You must configure SMTP below to send alert emails'
+      },
       site: {
         title: 'Site Settings',
         description: 'Customize site branding',
@@ -1735,6 +1921,12 @@ export default {
         contactInfo: 'Contact Info',
         contactInfoPlaceholder: 'e.g., QQ: 123456789',
         contactInfoHint: 'Customer support contact info, displayed on redeem page, profile, etc.',
+        afterSaleContact: 'After-sale Contact',
+        afterSaleContactHint: 'Configured as name/value pairs and displayed at the bottom of the user dashboard',
+        afterSaleContactKeyPlaceholder: 'e.g., WeChat',
+        afterSaleContactValuePlaceholder: 'e.g., your_wechat_id',
+        afterSaleContactAddRow: 'Add row',
+        afterSaleContactRemoveRow: 'Remove',
         docUrl: 'Documentation URL',
         docUrlPlaceholder: 'https://docs.example.com',
         docUrlHint: 'Link to your documentation site. Leave empty to hide the documentation link.',

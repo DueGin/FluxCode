@@ -43,6 +43,8 @@ const (
 	FieldErrorMessage = "error_message"
 	// FieldLastUsedAt holds the string denoting the last_used_at field in the database.
 	FieldLastUsedAt = "last_used_at"
+	// FieldExpiresAt holds the string denoting the expires_at field in the database.
+	FieldExpiresAt = "expires_at"
 	// FieldSchedulable holds the string denoting the schedulable field in the database.
 	FieldSchedulable = "schedulable"
 	// FieldRateLimitedAt holds the string denoting the rate_limited_at field in the database.
@@ -112,6 +114,7 @@ var Columns = []string{
 	FieldStatus,
 	FieldErrorMessage,
 	FieldLastUsedAt,
+	FieldExpiresAt,
 	FieldSchedulable,
 	FieldRateLimitedAt,
 	FieldRateLimitResetAt,
@@ -241,6 +244,11 @@ func ByErrorMessage(opts ...sql.OrderTermOption) OrderOption {
 // ByLastUsedAt orders the results by the last_used_at field.
 func ByLastUsedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastUsedAt, opts...).ToFunc()
+}
+
+// ByExpiresAt orders the results by the expires_at field.
+func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExpiresAt, opts...).ToFunc()
 }
 
 // BySchedulable orders the results by the schedulable field.

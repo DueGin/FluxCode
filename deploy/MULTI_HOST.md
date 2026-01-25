@@ -1,23 +1,28 @@
-# 多机部署（两台服务器起步）
+# 多机部署（入口与应用分离）
 
-本文档提供一套“拆分部署”的落地方式：把 `PostgreSQL/Redis` 放在一台“状态机”，把 `FluxCode + 入口(Caddy)` 放在另一台“应用/入口机”。后续如果要加更多应用节点，也给出扩展方法。
+本文档提供一套“拆分部署”的落地方式：把 `PostgreSQL/Redis` 放在一台“状态机”，把 `Caddy` 放在“入口机”，把 `FluxCode` 放在“应用节点”。后续如果要加更多应用节点，也给出扩展方法。
 
 ## 目录与文件
 
-- `deploy/docker-compose.infra.yml`：仅部署 PostgreSQL + Redis（状态机用）
-- `deploy/docker-compose.app.yml`：部署 Caddy + FluxCode（入口机用）
-- `deploy/docker-compose.node.yml`：仅部署 FluxCode，并把 8080 暴露给入口层（新增应用节点用）
-- `deploy/Caddyfile.multihost`：入口反代与粘性会话配置
-- `deploy/.env.infra.example`：状态机环境变量模板
-- `deploy/.env.app.example`：入口机环境变量模板
-- `deploy/.env.node.example`：应用节点环境变量模板
+- `deploy/infra/docker-compose.infra.yml`：仅部署 PostgreSQL + Redis（状态机用）
+- `deploy/app/docker-compose.caddy.yml`：仅部署 Caddy（入口机用）
+- `deploy/app/docker-compose.app.yml`：合并版备份（Caddy + FluxCode，同机时使用）
+- `deploy/node/docker-compose.node.yml`：仅部署 FluxCode，并把 8080 暴露给入口层（新增应用节点用）
+- `deploy/app/Caddyfile.multihost`：入口反代与粘性会话配置
+- `deploy/infra/.env.infra.example`：状态机环境变量模板
+- `deploy/app/.env.app.example`：入口机环境变量模板（Caddy）
+- `deploy/node/.env.node.example`：应用节点环境变量模板
 
-## 推荐架构（两台服务器）
+## 推荐架构（三台服务器）
 
 - **服务器 A（状态机）**：PostgreSQL + Redis  
-  - 对外（内网）开放：`5432`、`6379`（只允许服务器 B 访问）
-- **服务器 B（入口机）**：Caddy + FluxCode  
+  - 对外（内网）开放：`5432`、`6379`（只允许服务器 C 访问）
+- **服务器 B（入口机）**：Caddy  
   - 对外开放：`HTTP_PORT/HTTPS_PORT`（默认 `80/443`，建议用域名访问）
+- **服务器 C（应用节点）**：FluxCode  
+  - 对外（内网）开放：`8080`（只允许服务器 B 访问）
+
+> 说明：如果你希望入口与应用同机，仍可使用 `deploy/app/docker-compose.app.yml`（合并版）。
 
 > 说明：你也可以在服务器 A 上再跑一个 FluxCode 作为第二个应用节点，但 2c2g 下 PG/Redis 会和应用抢资源；建议优先“状态机只跑状态组件”，等业务量上来再加第三台应用节点。
 
@@ -45,19 +50,20 @@
 3) **规划内网地址**
 
 - 记下服务器 A 的内网 IP（下文示例：`10.0.0.10`）
-- 记下服务器 B 的内网 IP（用于防火墙放行）
+- 记下服务器 C 的内网 IP（用于防火墙放行）
 
 4) **防火墙（最重要）**
 
-- 服务器 A：只允许服务器 B 访问 `5432/6379`（不要暴露公网）
+- 服务器 A：只允许服务器 C 访问 `5432/6379`（不要暴露公网）
 - 服务器 B：只对公网开放 `80/443`（或你在 `.env` 里自定义的 `HTTP_PORT/HTTPS_PORT`）
+- 服务器 C：`8080` 仅允许服务器 B 访问（不要暴露公网）
 
 （示例，使用 `ufw`，按需调整）
 
 ```bash
 # 服务器 A（状态机）上：
-sudo ufw allow from <服务器B内网IP> to any port 5432 proto tcp
-sudo ufw allow from <服务器B内网IP> to any port 6379 proto tcp
+sudo ufw allow from <服务器C内网IP> to any port 5432 proto tcp
+sudo ufw allow from <服务器C内网IP> to any port 6379 proto tcp
 sudo ufw deny 5432/tcp
 sudo ufw deny 6379/tcp
 ```
@@ -67,7 +73,7 @@ sudo ufw deny 6379/tcp
 在服务器 A 上：
 
 ```bash
-cd deploy
+cd deploy/infra
 cp .env.infra.example .env
 ```
 
@@ -84,24 +90,23 @@ docker compose -f docker-compose.infra.yml up -d
 docker compose -f docker-compose.infra.yml ps
 ```
 
-## 2. 服务器 B：部署 Caddy + FluxCode（入口机）
+## 2. 服务器 B：部署 Caddy（入口机）
 
 在服务器 B 上：
 
 ```bash
-cd deploy
+cd deploy/app
 cp .env.app.example .env
 ```
 
 编辑 `.env`，至少设置：
 
-- `DATABASE_HOST=10.0.0.10`（服务器 A 内网 IP）
-- `REDIS_HOST=10.0.0.10`（服务器 A 内网 IP）
-- `POSTGRES_PASSWORD=...`（必须与服务器 A 一致）
-- `REDIS_PASSWORD=...`（必须与服务器 A 一致）
 - `CADDY_ADDRESS=你的域名`（例如 `fluxcode.example.com`）
-- `JWT_SECRET=...`（固定值，后续扩容所有节点一致）
-- `ADMIN_PASSWORD=...`（固定值，后续扩容所有节点一致）
+- （可选）`HTTP_PORT` / `HTTPS_PORT`（自定义对外端口）
+
+> 入口机只跑 Caddy，`DATABASE_*` / `REDIS_*` / `JWT_SECRET` / `ADMIN_PASSWORD` 等可留空。
+
+编辑 `deploy/app/Caddyfile.multihost`，将 upstream 指向服务器 C 内网 IP（示例见下文）。
 
 证书申请前提（否则 Caddy 可能无法签发证书/HTTPS 不可用）：
 
@@ -111,8 +116,8 @@ cp .env.app.example .env
 启动：
 
 ```bash
-docker compose -f docker-compose.app.yml up -d
-docker compose -f docker-compose.app.yml ps
+docker compose -f docker-compose.caddy.yml up -d
+docker compose -f docker-compose.caddy.yml ps
 ```
 
 访问：
@@ -124,20 +129,19 @@ docker compose -f docker-compose.app.yml ps
 排查：
 
 ```bash
-docker compose -f docker-compose.app.yml logs -f fluxcode
-docker compose -f docker-compose.app.yml logs -f caddy
+docker compose -f docker-compose.caddy.yml logs -f caddy
 ```
 
-## 3. 后续扩容：增加更多“应用节点”（加第三台服务器时）
+## 3. 服务器 C：部署 FluxCode（应用节点）
 
-当你新增一台服务器 C（作为应用节点）时：
+服务器 C（应用节点/服务机）上：
 
 ### 3.1 服务器 C：启动 FluxCode 节点
 
 在服务器 C 上：
 
 ```bash
-cd deploy
+cd deploy/node
 cp .env.node.example .env
 docker compose -f docker-compose.node.yml up -d
 ```
@@ -145,51 +149,66 @@ docker compose -f docker-compose.node.yml up -d
 关键点：
 
 - `.env` 里 `DATABASE_HOST/REDIS_HOST` 仍指向服务器 A
-- `JWT_SECRET/ADMIN_PASSWORD` 必须与入口机一致
+- `JWT_SECRET/ADMIN_PASSWORD` 必须与其他应用节点一致
 - `docker-compose.node.yml` 会把节点 `8080` 映射到宿主机；请用防火墙只允许入口机访问
 
-### 3.2 服务器 B：把新节点加入入口负载均衡
+### 3.2 服务器 B：把节点加入入口负载均衡
 
-编辑 `deploy/Caddyfile.multihost`，在 `(fluxcode_upstreams)` 片段中把 `to ...` 改成多节点列表（示例）：
+编辑 `deploy/app/Caddyfile.multihost`，在 `(fluxcode_upstreams)` 片段中把 `to ...` 改成多节点列表（示例）：
 
 ```caddyfile
 (fluxcode_upstreams) {
     # 方式 B：多机（手动维护节点 IP:PORT 列表）
-    to fluxcode:8080 10.0.0.12:8080 10.0.0.13:8080
+    to 10.0.0.12:8080 10.0.0.13:8080
 }
 ```
 
 然后重启入口容器：
 
 ```bash
-docker compose -f docker-compose.app.yml restart caddy
+cd deploy/app
+docker compose -f docker-compose.caddy.yml restart caddy
 ```
-
-> 提示：如果入口机也跑了本机 `fluxcode`（`docker-compose.app.yml` 默认包含），你可以把本机 upstream 写成 `fluxcode:8080`，再追加其他节点 IP。
 
 ## 4. 调优建议（2c2g 常见设置）
 
 - 连接池总量会随应用节点数线性增长：总连接 ≈ 节点数 × 单节点连接池  
-  建议在 `.env.app` / `.env.node` 里下调：
+  建议在 `deploy/node/.env` 里下调：
   - `DATABASE_MAX_OPEN_CONNS`、`DATABASE_MAX_IDLE_CONNS`
   - `REDIS_POOL_SIZE`、`REDIS_MIN_IDLE_CONNS`
 - Redis 一定要有密码 + 防火墙（跨主机暴露 `6379` 非常危险）
+
+## 4.1 多入口（多 Caddy）+ DNS 负载的注意事项
+
+当你有多台入口机（多 Caddy），并通过 DNS 轮询/负载把流量分发到多台入口机时，请确保：
+
+- **所有应用节点共享同一套 Redis**：OAuth 临时会话与网关粘性会话都依赖 Redis；否则跨入口回调会提示 session 失效。
+- **所有应用节点镜像版本一致**：入口层分流可能命中不同节点，版本不一致会导致静态资源不匹配。
+- **入口机的 Caddy 配置一致**：所有入口机都应指向同一组应用节点（`Caddyfile.multihost` 里维护相同的 upstream 列表）。
+- **证书策略**：多台入口机各自申请证书可能触发 ACME 频率限制；生产建议使用统一证书管理或共享证书存储。
+- **DNS 负载无健康感知**：某入口机故障时，DNS 仍可能把流量打到故障入口；生产建议配合外部 LB/健康检查。
 
 ## 5. 在本地电脑模拟多机（可选）
 
 你可以在一台电脑上用同一套 compose 文件“分项目启动”来模拟：
 
 - infra：PostgreSQL + Redis（映射到宿主机端口）
-- app：Caddy + FluxCode（通过 `host.docker.internal` 访问“宿主机端口”，相当于访问远端）
+- caddy：入口层 Caddy（通过 `host.docker.internal` 访问“宿主机端口”，相当于访问远端）
+- node：FluxCode（把 `8080` 映射到宿主机）
 
 > 注意：**本地通常无法完整验证 Caddy 的 Let’s Encrypt 自动 HTTPS**（需要域名解析到当前机器公网 IP，且公网可访问 `80/443`）。建议先用 HTTP 验证联通与功能，生产环境再切到真实域名 + `80/443`。
 
-### 5.1 准备本地 env 文件（避免覆盖 `deploy/.env`）
+### 5.1 准备本地 env 文件（避免覆盖各目录的 `.env`）
 
 ```bash
-cd deploy
+cd deploy/infra
 cp .env.infra.example .env.infra.local
+
+cd ../app
 cp .env.app.example .env.app.local
+
+cd ../node
+cp .env.node.example .env.node.local
 ```
 
 ### 5.2 启动 infra（本地模拟“状态机”）
@@ -202,65 +221,95 @@ cp .env.app.example .env.app.local
 启动：
 
 ```bash
+cd deploy/infra
 docker compose -p fluxcode-infra --env-file .env.infra.local -f docker-compose.infra.yml up -d
 docker compose -p fluxcode-infra --env-file .env.infra.local -f docker-compose.infra.yml ps
 ```
 
-### 5.3 启动 app（本地模拟“入口机”）
+### 5.3 启动 caddy（本地模拟“入口机”）
 
 编辑 `.env.app.local`：
 
-- `DATABASE_HOST=host.docker.internal`
-- `REDIS_HOST=host.docker.internal`
-- `DATABASE_PORT` / `REDIS_PORT` 与上一步映射端口保持一致
 - 本地避免占用 `80/443`：可设 `HTTP_PORT=8080`、`HTTPS_PORT=8443`
 - 本地测试建议先留空 `CADDY_ADDRESS=`（只走 HTTP）
+
+编辑 `deploy/app/Caddyfile.multihost`，将 upstream 指向本机宿主端口：
+
+```caddyfile
+(fluxcode_upstreams) {
+    to host.docker.internal:8080
+}
+```
 
 启动：
 
 ```bash
-docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml up -d
-docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml ps
+cd deploy/app
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.caddy.yml up -d
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.caddy.yml ps
 ```
 
 访问：
 
 - `http://localhost:8080/`（如果你改了 `HTTP_PORT`，端口按你的值）
 
-### 5.4（可选）在本机模拟“新增应用节点”
+### 5.4 启动应用节点（本地模拟“服务机”）
+
+编辑 `deploy/node/.env.node.local`：
+
+- `DATABASE_HOST=host.docker.internal`
+- `REDIS_HOST=host.docker.internal`
+- `DATABASE_PORT` / `REDIS_PORT` 与上一步映射端口保持一致
+- `NODE_BIND_HOST=0.0.0.0`，`NODE_PORT=8080`
+
+启动：
+
+```bash
+cd deploy/node
+docker compose -p fluxcode-node0 --env-file .env.node.local -f docker-compose.node.yml up -d
+docker compose -p fluxcode-node0 --env-file .env.node.local -f docker-compose.node.yml ps
+```
+
+### 5.5（可选）在本机模拟“新增应用节点”
 
 如果你想验证“入口反代到多个节点”的方式 B（手动 upstream 列表）：
 
 1) 再准备一个节点 env，并把 `NODE_PORT` 改成非 `8080`（例如 `8081`）：
 
 ```bash
+cd deploy/node
 cp .env.node.example .env.node1.local
 # 编辑 .env.node1.local：
 # - DATABASE_HOST/REDIS_HOST=host.docker.internal
 # - NODE_PORT=8081
-# - JWT_SECRET/ADMIN_PASSWORD 必须与 .env.app.local 一致
+# - JWT_SECRET/ADMIN_PASSWORD 必须与 .env.node.local 一致
 docker compose -p fluxcode-node1 --env-file .env.node1.local -f docker-compose.node.yml up -d
 ```
 
-2) 修改 `deploy/Caddyfile.multihost`：注释 `dynamic a fluxcode 8080`，改用方式 B，例如：
+2) 修改 `deploy/app/Caddyfile.multihost`：注释 `dynamic a fluxcode 8080`，改用方式 B，例如：
 
 ```caddyfile
 (fluxcode_upstreams) {
-    to fluxcode:8080 host.docker.internal:8081
+    to host.docker.internal:8080 host.docker.internal:8081
 }
 ```
 
 然后重启入口容器：
 
 ```bash
-docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml restart caddy
+cd deploy/app
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.caddy.yml restart caddy
 ```
 
-### 5.5 清理
+### 5.6 清理
 
 ```bash
-docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml down -v
+cd deploy/app
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.caddy.yml down -v
+cd ../node
+docker compose -p fluxcode-node0 --env-file .env.node.local -f docker-compose.node.yml down -v
 docker compose -p fluxcode-node1 --env-file .env.node1.local -f docker-compose.node.yml down -v
+cd ../infra
 docker compose -p fluxcode-infra --env-file .env.infra.local -f docker-compose.infra.yml down -v
 ```
 
@@ -272,53 +321,52 @@ docker compose -p fluxcode-infra --env-file .env.infra.local -f docker-compose.i
 
 ### 6.1 规划角色
 
-- **电脑 A（入口机）**：跑 `Caddy + FluxCode`（负责对外入口与负载均衡）
-- **电脑 B（新增节点）**：只跑 `FluxCode`（把 `8080` 暴露给入口机）
-
-> 你也可以让电脑 A 上的 `fluxcode` 作为其中一个 upstream（默认就是这样），电脑 B 作为第二个 upstream。
+- **电脑 A（入口机）**：只跑 `Caddy`（负责对外入口与负载均衡）
+- **电脑 B（应用节点）**：只跑 `FluxCode`（把 `8080` 暴露给入口机）
 
 ### 6.2 电脑 A：启动入口机（HTTP 本地测试）
 
 在电脑 A 上：
 
 ```bash
-cd deploy
+cd deploy/app
 cp .env.app.example .env.app.local
 ```
 
-编辑 `deploy/.env.app.local`（关键项）：
+编辑 `deploy/app/.env.app.local`（关键项）：
 
-- `DATABASE_HOST` / `REDIS_HOST`：填你的外部 PG/Redis 地址
-- `POSTGRES_PASSWORD` / `REDIS_PASSWORD`：填实际密码
-- `JWT_SECRET` / `ADMIN_PASSWORD`：**固定值**（后续所有节点必须一致）
 - 建议本地先用 HTTP：`CADDY_ADDRESS=`（留空），`HTTP_PORT=8080`（避免占用 80）
+
+> 入口机只跑 Caddy，不需要数据库/Redis/JWT 相关配置。
 
 启动：
 
 ```bash
-docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml up -d
-docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml ps
+cd deploy/app
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.caddy.yml up -d
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.caddy.yml ps
 ```
 
-### 6.3 电脑 B：启动新增应用节点
+### 6.3 电脑 B：启动应用节点
 
 在电脑 B 上：
 
 ```bash
-cd deploy
+cd deploy/node
 cp .env.node.example .env.node.local
 ```
 
-编辑 `deploy/.env.node.local`（关键项）：
+编辑 `deploy/node/.env.node.local`（关键项）：
 
-- `DATABASE_HOST` / `REDIS_HOST`：与电脑 A 一样，指向外部 PG/Redis
-- `POSTGRES_PASSWORD` / `REDIS_PASSWORD`：与电脑 A 一样
-- `JWT_SECRET` / `ADMIN_PASSWORD`：**必须与电脑 A 完全一致**
+- `DATABASE_HOST` / `REDIS_HOST`：指向外部 PG/Redis
+- `POSTGRES_PASSWORD` / `REDIS_PASSWORD`：填实际密码
+- `JWT_SECRET` / `ADMIN_PASSWORD`：**固定值，所有节点必须一致**
 - `NODE_BIND_HOST=0.0.0.0`，`NODE_PORT=8080`（或你自定义端口）
 
 启动：
 
 ```bash
+cd deploy/node
 docker compose -p fluxcode-node1 --env-file .env.node.local -f docker-compose.node.yml up -d
 docker compose -p fluxcode-node1 --env-file .env.node.local -f docker-compose.node.yml ps
 ```
@@ -331,7 +379,7 @@ curl http://localhost:8080/health
 
 ### 6.4 电脑 A：把电脑 B 加入负载均衡
 
-1) 在电脑 A 上编辑 `deploy/Caddyfile.multihost`：
+1) 在电脑 A 上编辑 `deploy/app/Caddyfile.multihost`：
 
 - 注释掉方式 A：
   - `dynamic a fluxcode 8080`
@@ -339,14 +387,15 @@ curl http://localhost:8080/health
 
 ```caddyfile
 (fluxcode_upstreams) {
-    to fluxcode:8080 192.168.1.23:8080
+    to 192.168.1.23:8080
 }
 ```
 
 2) 重启入口机 Caddy：
 
 ```bash
-docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml restart caddy
+cd deploy/app
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.caddy.yml restart caddy
 ```
 
 ### 6.5 验证是否生效
@@ -356,7 +405,8 @@ docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.y
 - 看入口机 Caddy 日志是否有请求分发：
 
 ```bash
-docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.yml logs -f caddy
+cd deploy/app
+docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.caddy.yml logs -f caddy
 ```
 
 ### 6.6 安全/联通性检查（强烈建议）
@@ -372,10 +422,12 @@ docker compose -p fluxcode-app --env-file .env.app.local -f docker-compose.app.y
 - 本仓库的 compose 文件已加入日志轮转（`max-size`/`max-file`），默认：
   - `DOCKER_LOG_MAX_SIZE=20m`
   - `DOCKER_LOG_MAX_FILE=5`
-- 如需调整，在入口机/应用节点的 `.env` 里设置上述变量，然后重建容器即可生效：
+- 如需调整，在入口机/应用节点的 `deploy/app/.env` 与 `deploy/node/.env` 里设置上述变量，然后重建容器即可生效：
 
 ```bash
-docker compose -f docker-compose.app.yml up -d
+cd deploy/app
+docker compose -f docker-compose.caddy.yml up -d
+cd ../node
 docker compose -f docker-compose.node.yml up -d
 ```
 
@@ -386,3 +438,14 @@ docker compose -f docker-compose.node.yml up -d
 ```bash
 sudo journalctl --vacuum-time=14d
 ```
+
+## 8. 分布式后台任务：账号过期自动停止调度
+
+账号管理支持设置 `expires_at`（账号过期时间）。当 `expires_at <= NOW()` 时，系统会自动把该账号的 `schedulable` 置为 `false`，从而停止调度。
+
+多机部署下，每个应用节点都会启动同一个过期扫描 worker，但会通过 PostgreSQL advisory lock（`pg_try_advisory_lock`）做全局互斥，确保同一时刻只有一个节点执行，不会产生重复更新或并发冲突。
+
+注意：
+
+- 所有应用节点必须连接同一个 PostgreSQL（锁与更新时间基于数据库生效）。
+- 建议所有节点开启 NTP 时间同步（前端展示/其他基于本机时间的逻辑更稳定）。

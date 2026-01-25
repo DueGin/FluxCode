@@ -229,7 +229,7 @@
                     : 'text-gray-700 dark:text-gray-300'
                 "
               >
-                {{ formatDateOnly(value) }}
+                {{ formatDateTime(value) }}
               </span>
               <div v-if="getDaysRemaining(value) !== null" class="text-xs text-gray-500">
                 {{ getDaysRemaining(value) }} {{ t('admin.subscriptions.daysRemaining') }}
@@ -365,7 +365,7 @@
             <!-- User Dropdown -->
             <div
               v-if="showUserDropdown && (userSearchResults.length > 0 || userSearchKeyword)"
-              class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+              class="absolute z-50 mt-1 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
             >
               <div
                 v-if="userSearchLoading"
@@ -469,7 +469,7 @@
             <span class="font-medium text-gray-900 dark:text-white">
               {{
                 extendingSubscription.expires_at
-                  ? formatDateOnly(extendingSubscription.expires_at)
+                  ? formatDateTime(extendingSubscription.expires_at)
                   : t('admin.subscriptions.noExpiration')
               }}
             </span>
@@ -519,7 +519,7 @@ import { adminAPI } from '@/api/admin'
 import type { UserSubscription, Group } from '@/types'
 import type { SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
-import { formatDateOnly } from '@/utils/format'
+import { formatDateTime } from '@/utils/format'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'

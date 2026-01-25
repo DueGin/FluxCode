@@ -58,6 +58,11 @@ type ExtendSubscriptionRequest struct {
 	Days int `json:"days" binding:"required,min=1,max=36500"` // max 100 years
 }
 
+// BulkAdjustSubscriptionExpiryRequest represents bulk adjust expiry request
+type BulkAdjustSubscriptionExpiryRequest struct {
+	Days int `json:"days" binding:"required"`
+}
+
 // List handles listing all subscriptions with pagination and filters
 // GET /api/v1/admin/subscriptions
 func (h *SubscriptionHandler) List(c *gin.Context) {
@@ -202,6 +207,33 @@ func (h *SubscriptionHandler) Extend(c *gin.Context) {
 	}
 
 	response.Success(c, dto.UserSubscriptionFromService(subscription))
+}
+
+// BulkAdjustExpiry handles bulk adjusting expiry for subscriptions in a group
+// POST /api/v1/admin/groups/:id/subscriptions/adjust-expiry
+func (h *SubscriptionHandler) BulkAdjustExpiry(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+
+	var req BulkAdjustSubscriptionExpiryRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.subscriptionService.BulkAdjustSubscriptionExpiry(c.Request.Context(), &service.BulkAdjustSubscriptionExpiryInput{
+		GroupID: groupID,
+		Days:    req.Days,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, dto.BulkAdjustSubscriptionExpiryResultFromService(result))
 }
 
 // Revoke handles revoking a subscription

@@ -153,6 +153,26 @@ func (_u *RedeemCodeUpdate) ClearNotes() *RedeemCodeUpdate {
 	return _u
 }
 
+// SetWelfareNo sets the "welfare_no" field.
+func (_u *RedeemCodeUpdate) SetWelfareNo(v string) *RedeemCodeUpdate {
+	_u.mutation.SetWelfareNo(v)
+	return _u
+}
+
+// SetNillableWelfareNo sets the "welfare_no" field if the given value is not nil.
+func (_u *RedeemCodeUpdate) SetNillableWelfareNo(v *string) *RedeemCodeUpdate {
+	if v != nil {
+		_u.SetWelfareNo(*v)
+	}
+	return _u
+}
+
+// ClearWelfareNo clears the value of the "welfare_no" field.
+func (_u *RedeemCodeUpdate) ClearWelfareNo() *RedeemCodeUpdate {
+	_u.mutation.ClearWelfareNo()
+	return _u
+}
+
 // SetGroupID sets the "group_id" field.
 func (_u *RedeemCodeUpdate) SetGroupID(v int64) *RedeemCodeUpdate {
 	_u.mutation.SetGroupID(v)
@@ -279,6 +299,11 @@ func (_u *RedeemCodeUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.WelfareNo(); ok {
+		if err := redeemcode.WelfareNoValidator(v); err != nil {
+			return &ValidationError{Name: "welfare_no", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.welfare_no": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -320,6 +345,12 @@ func (_u *RedeemCodeUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if _u.mutation.NotesCleared() {
 		_spec.ClearField(redeemcode.FieldNotes, field.TypeString)
+	}
+	if value, ok := _u.mutation.WelfareNo(); ok {
+		_spec.SetField(redeemcode.FieldWelfareNo, field.TypeString, value)
+	}
+	if _u.mutation.WelfareNoCleared() {
+		_spec.ClearField(redeemcode.FieldWelfareNo, field.TypeString)
 	}
 	if value, ok := _u.mutation.ValidityDays(); ok {
 		_spec.SetField(redeemcode.FieldValidityDays, field.TypeInt, value)
@@ -528,6 +559,26 @@ func (_u *RedeemCodeUpdateOne) ClearNotes() *RedeemCodeUpdateOne {
 	return _u
 }
 
+// SetWelfareNo sets the "welfare_no" field.
+func (_u *RedeemCodeUpdateOne) SetWelfareNo(v string) *RedeemCodeUpdateOne {
+	_u.mutation.SetWelfareNo(v)
+	return _u
+}
+
+// SetNillableWelfareNo sets the "welfare_no" field if the given value is not nil.
+func (_u *RedeemCodeUpdateOne) SetNillableWelfareNo(v *string) *RedeemCodeUpdateOne {
+	if v != nil {
+		_u.SetWelfareNo(*v)
+	}
+	return _u
+}
+
+// ClearWelfareNo clears the value of the "welfare_no" field.
+func (_u *RedeemCodeUpdateOne) ClearWelfareNo() *RedeemCodeUpdateOne {
+	_u.mutation.ClearWelfareNo()
+	return _u
+}
+
 // SetGroupID sets the "group_id" field.
 func (_u *RedeemCodeUpdateOne) SetGroupID(v int64) *RedeemCodeUpdateOne {
 	_u.mutation.SetGroupID(v)
@@ -667,6 +718,11 @@ func (_u *RedeemCodeUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.WelfareNo(); ok {
+		if err := redeemcode.WelfareNoValidator(v); err != nil {
+			return &ValidationError{Name: "welfare_no", err: fmt.Errorf(`ent: validator failed for field "RedeemCode.welfare_no": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -725,6 +781,12 @@ func (_u *RedeemCodeUpdateOne) sqlSave(ctx context.Context) (_node *RedeemCode, 
 	}
 	if _u.mutation.NotesCleared() {
 		_spec.ClearField(redeemcode.FieldNotes, field.TypeString)
+	}
+	if value, ok := _u.mutation.WelfareNo(); ok {
+		_spec.SetField(redeemcode.FieldWelfareNo, field.TypeString, value)
+	}
+	if _u.mutation.WelfareNoCleared() {
+		_spec.ClearField(redeemcode.FieldWelfareNo, field.TypeString)
 	}
 	if value, ok := _u.mutation.ValidityDays(); ok {
 		_spec.SetField(redeemcode.FieldValidityDays, field.TypeInt, value)

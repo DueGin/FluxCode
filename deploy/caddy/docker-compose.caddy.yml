@@ -1,0 +1,48 @@
+# =============================================================================
+# FluxCode Multi-Host - Caddy (Ingress only, entry node)
+# =============================================================================
+# 目的：把 Caddy 入口独立部署，并连接到应用所在的网络。
+#
+# 用法（在“入口”服务器上）：
+#   cd deploy
+#   cp .env.app.example .env
+#   # 至少设置：
+#   #   CADDY_ADDRESS=...         # 你的域名（推荐，自动启用 HTTPS）
+#   #   HTTP_PORT/HTTPS_PORT=...  # 可选，自定义对外端口
+#   docker compose -f docker-compose.caddy.yml up -d
+#
+# 说明：
+# - 该文件仅包含 Caddy，对外暴露 80/443（可用 HTTP_PORT/HTTPS_PORT 调整）。
+# - 入口机通过 B 机内网 IP/端口访问应用，见 Caddyfile.multihost。
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Ingress / Load Balancer
+  # ===========================================================================
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "${DOCKER_LOG_MAX_SIZE:-20m}"
+        max-file: "${DOCKER_LOG_MAX_FILE:-5}"
+    ports:
+      # HTTP/HTTPS 入口（用于 Caddy 自动 HTTPS 证书申请与续期）
+      - "${BIND_HOST:-0.0.0.0}:${HTTP_PORT:-80}:80"
+      - "${BIND_HOST:-0.0.0.0}:${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./Caddyfile.multihost:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      # 留空则使用 :80（仅 HTTP）；设置为域名后自动启用 HTTPS（需 80/443 可达）
+      - CADDY_ADDRESS=${CADDY_ADDRESS:-:80}
+      - TZ=${TZ:-Asia/Shanghai}
+
+volumes:
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local

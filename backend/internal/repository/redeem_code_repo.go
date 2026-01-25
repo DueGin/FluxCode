@@ -1,14 +1,17 @@
 package repository
 
-import (
-	"context"
-	"time"
+	import (
+		"context"
+		"time"
 
-	dbent "github.com/DueGin/FluxCode/ent"
-	"github.com/DueGin/FluxCode/ent/redeemcode"
-	"github.com/DueGin/FluxCode/internal/pkg/pagination"
-	"github.com/DueGin/FluxCode/internal/service"
-)
+		dbent "github.com/DueGin/FluxCode/ent"
+		dbpredicate "github.com/DueGin/FluxCode/ent/predicate"
+		"github.com/DueGin/FluxCode/ent/redeemcode"
+		"github.com/DueGin/FluxCode/ent/user"
+		"github.com/DueGin/FluxCode/internal/pkg/pagination"
+		"github.com/DueGin/FluxCode/internal/service"
+		entsql "entgo.io/ent/dialect/sql"
+	)
 
 type redeemCodeRepository struct {
 	client *dbent.Client
@@ -25,6 +28,7 @@ func (r *redeemCodeRepository) Create(ctx context.Context, code *service.RedeemC
 		SetValue(code.Value).
 		SetStatus(code.Status).
 		SetNotes(code.Notes).
+		SetNillableWelfareNo(code.WelfareNo).
 		SetValidityDays(code.ValidityDays).
 		SetNillableUsedBy(code.UsedBy).
 		SetNillableUsedAt(code.UsedAt).
@@ -51,6 +55,7 @@ func (r *redeemCodeRepository) CreateBatch(ctx context.Context, codes []service.
 			SetValue(c.Value).
 			SetStatus(c.Status).
 			SetNotes(c.Notes).
+			SetNillableWelfareNo(c.WelfareNo).
 			SetValidityDays(c.ValidityDays).
 			SetNillableUsedBy(c.UsedBy).
 			SetNillableUsedAt(c.UsedAt).
@@ -92,22 +97,40 @@ func (r *redeemCodeRepository) Delete(ctx context.Context, id int64) error {
 	return err
 }
 
-func (r *redeemCodeRepository) List(ctx context.Context, params pagination.PaginationParams) ([]service.RedeemCode, *pagination.PaginationResult, error) {
-	return r.ListWithFilters(ctx, params, "", "", "")
-}
+	func (r *redeemCodeRepository) List(ctx context.Context, params pagination.PaginationParams) ([]service.RedeemCode, *pagination.PaginationResult, error) {
+		return r.ListWithFilters(ctx, params, "", "", "", "", nil, "")
+	}
 
-func (r *redeemCodeRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, search string) ([]service.RedeemCode, *pagination.PaginationResult, error) {
-	q := r.client.RedeemCode.Query()
+	func (r *redeemCodeRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]service.RedeemCode, *pagination.PaginationResult, error) {
+		q := r.client.RedeemCode.Query()
 
 	if codeType != "" {
 		q = q.Where(redeemcode.TypeEQ(codeType))
 	}
-	if status != "" {
-		q = q.Where(redeemcode.StatusEQ(status))
+	if welfareNo != "" {
+		q = q.Where(
+			redeemcode.WelfareNoNotNil(),
+			dbpredicate.RedeemCode(func(s *entsql.Selector) {
+				s.Where(entsql.EQ(s.C(redeemcode.FieldWelfareNo), welfareNo))
+			}),
+		)
+	} else if isWelfare != nil {
+		if *isWelfare {
+			q = q.Where(redeemcode.WelfareNoNotNil())
+		} else {
+			q = q.Where(redeemcode.WelfareNoIsNil())
+		}
 	}
-	if search != "" {
-		q = q.Where(redeemcode.CodeContainsFold(search))
-	}
+		if status != "" {
+			q = q.Where(redeemcode.StatusEQ(status))
+		}
+		if search != "" {
+			if searchType == "user" {
+				q = q.Where(redeemcode.HasUserWith(user.EmailContainsFold(search)))
+			} else {
+				q = q.Where(redeemcode.CodeContainsFold(search))
+			}
+		}
 
 	total, err := q.Count(ctx)
 	if err != nil {
@@ -128,6 +151,28 @@ func (r *redeemCodeRepository) ListWithFilters(ctx context.Context, params pagin
 	outCodes := redeemCodeEntitiesToService(codes)
 
 	return outCodes, paginationResultFromTotal(int64(total), params), nil
+}
+
+func (r *redeemCodeRepository) ListWelfareNos(ctx context.Context) ([]string, error) {
+	// 只取已存在的 welfare_no（去重）
+	nos, err := r.client.RedeemCode.Query().
+		Where(redeemcode.WelfareNoNotNil()).
+		Unique(true).
+		Order(dbent.Asc(redeemcode.FieldWelfareNo)).
+		Select(redeemcode.FieldWelfareNo).
+		Strings(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]string, 0, len(nos))
+	for _, n := range nos {
+		if n == "" {
+			continue
+		}
+		out = append(out, n)
+	}
+	return out, nil
 }
 
 func (r *redeemCodeRepository) Update(ctx context.Context, code *service.RedeemCode) error {
@@ -154,6 +199,11 @@ func (r *redeemCodeRepository) Update(ctx context.Context, code *service.RedeemC
 	} else {
 		up.ClearGroupID()
 	}
+	if code.WelfareNo != nil {
+		up.SetWelfareNo(*code.WelfareNo)
+	} else {
+		up.ClearWelfareNo()
+	}
 
 	updated, err := up.Save(ctx)
 	if err != nil {
@@ -176,7 +226,7 @@ func (r *redeemCodeRepository) Use(ctx context.Context, id, userID int64) error 
 		SetUsedAt(now).
 		Save(ctx)
 	if err != nil {
-		return err
+		return translatePersistenceError(err, nil, service.ErrWelfareRedeemed)
 	}
 	if affected == 0 {
 		return service.ErrRedeemCodeUsed
@@ -215,6 +265,7 @@ func redeemCodeEntityToService(m *dbent.RedeemCode) *service.RedeemCode {
 		UsedBy:       m.UsedBy,
 		UsedAt:       m.UsedAt,
 		Notes:        derefString(m.Notes),
+		WelfareNo:    m.WelfareNo,
 		CreatedAt:    m.CreatedAt,
 		GroupID:      m.GroupID,
 		ValidityDays: m.ValidityDays,

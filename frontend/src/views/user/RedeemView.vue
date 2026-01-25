@@ -440,9 +440,15 @@ const handleRedeem = async () => {
     // Show success toast
     appStore.showSuccess(t('redeem.codeRedeemSuccess'))
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.detail || t('redeem.failedToRedeem')
+    if (error?.reason === 'WELFARE_ALREADY_REDEEMED') {
+      errorMessage.value = t('redeem.welfareAlreadyRedeemed')
+    } else if (error?.reason === 'REDEEM_CODE_USED') {
+      errorMessage.value = t('redeem.codeAlreadyUsed')
+    } else {
+      errorMessage.value = t('redeem.failedToRedeem')
+    }
 
-    appStore.showError(t('redeem.redeemFailed'))
+    appStore.showError(errorMessage.value)
   } finally {
     submitting.value = false
   }

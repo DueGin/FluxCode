@@ -7,6 +7,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/DueGin/FluxCode/ent"
 	"github.com/DueGin/FluxCode/internal/config"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/service"
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
@@ -15,14 +16,26 @@ import (
 // ProvideConcurrencyCache 创建并发控制缓存，从配置读取 TTL 参数
 // 性能优化：TTL 可配置，支持长时间运行的 LLM 请求场景
 func ProvideConcurrencyCache(rdb *redis.Client, cfg *config.Config) service.ConcurrencyCache {
+	// 为了应对“节点重启导致槽位无法及时释放”的场景：
+	// - 真实的释放依赖 ReleaseXXXSlot（进程重启会丢失）
+	// - 槽位最终依赖 TTL 自动回收
+	// 因此这里对 TTL 做上限保护，避免配置过大时产生长时间“僵尸并发数”。
+	// 同时在 ConcurrencyService 中引入心跳刷新，确保长请求不会因 TTL 较小而误过期。
+	slotTTLMinutes := cfg.Gateway.ConcurrencySlotTTLMinutes
+	const maxSlotTTLMinutes = 2
+	if slotTTLMinutes > maxSlotTTLMinutes {
+		applog.Printf("[Concurrency] gateway.concurrency_slot_ttl_minutes capped: configured=%dm effective=%dm", cfg.Gateway.ConcurrencySlotTTLMinutes, maxSlotTTLMinutes)
+		slotTTLMinutes = maxSlotTTLMinutes
+	}
+
 	waitTTLSeconds := int(cfg.Gateway.Scheduling.StickySessionWaitTimeout.Seconds())
 	if cfg.Gateway.Scheduling.FallbackWaitTimeout > cfg.Gateway.Scheduling.StickySessionWaitTimeout {
 		waitTTLSeconds = int(cfg.Gateway.Scheduling.FallbackWaitTimeout.Seconds())
 	}
 	if waitTTLSeconds <= 0 {
-		waitTTLSeconds = cfg.Gateway.ConcurrencySlotTTLMinutes * 60
+		waitTTLSeconds = slotTTLMinutes * 60
 	}
-	return NewConcurrencyCache(rdb, cfg.Gateway.ConcurrencySlotTTLMinutes, waitTTLSeconds)
+	return NewConcurrencyCache(rdb, slotTTLMinutes, waitTTLSeconds)
 }
 
 // ProviderSet is the Wire provider set for all repositories
@@ -30,6 +43,7 @@ var ProviderSet = wire.NewSet(
 	NewUserRepository,
 	NewAPIKeyRepository,
 	NewGroupRepository,
+	NewPricingPlanRepository,
 	NewAccountRepository,
 	NewProxyRepository,
 	NewRedeemCodeRepository,
@@ -50,6 +64,7 @@ var ProviderSet = wire.NewSet(
 	NewRedeemCache,
 	NewUpdateCache,
 	NewGeminiTokenCache,
+	NewSettingCache,
 
 	// HTTP service ports (DI Strategy A: return interface directly)
 	NewTurnstileVerifier,

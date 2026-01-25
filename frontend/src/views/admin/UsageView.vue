@@ -154,7 +154,11 @@
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ModelDistributionChart :model-stats="modelStats" :loading="chartsLoading" split />
           <div class="lg:col-span-2">
-            <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
+            <TokenUsageTrend
+              :trend-data="trendData"
+              :loading="chartsLoading"
+              :granularity="granularity"
+            />
           </div>
         </div>
       </div>
@@ -192,7 +196,7 @@
                 <!-- User Dropdown -->
                 <div
                   v-if="showUserDropdown && (userSearchResults.length > 0 || userSearchKeyword)"
-                  class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
+                  class="absolute z-50 mt-1 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
                 >
                   <div
                     v-if="userSearchLoading"

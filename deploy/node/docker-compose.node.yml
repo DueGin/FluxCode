@@ -74,6 +74,10 @@ services:
       # Timezone
       - TZ=${TZ:-Asia/Shanghai}
 
+      # Logging
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
       # Gemini OAuth Configuration
       - GEMINI_OAUTH_CLIENT_ID=${GEMINI_OAUTH_CLIENT_ID:-}
       - GEMINI_OAUTH_CLIENT_SECRET=${GEMINI_OAUTH_CLIENT_SECRET:-}
@@ -95,4 +99,3 @@ services:
 volumes:
   fluxcode_data:
     driver: local
-

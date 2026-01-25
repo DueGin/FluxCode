@@ -181,6 +181,20 @@ func (_c *AccountCreate) SetNillableLastUsedAt(v *time.Time) *AccountCreate {
 	return _c
 }
 
+// SetExpiresAt sets the "expires_at" field.
+func (_c *AccountCreate) SetExpiresAt(v time.Time) *AccountCreate {
+	_c.mutation.SetExpiresAt(v)
+	return _c
+}
+
+// SetNillableExpiresAt sets the "expires_at" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableExpiresAt(v *time.Time) *AccountCreate {
+	if v != nil {
+		_c.SetExpiresAt(*v)
+	}
+	return _c
+}
+
 // SetSchedulable sets the "schedulable" field.
 func (_c *AccountCreate) SetSchedulable(v bool) *AccountCreate {
 	_c.mutation.SetSchedulable(v)
@@ -537,6 +551,10 @@ func (_c *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 		_spec.SetField(account.FieldLastUsedAt, field.TypeTime, value)
 		_node.LastUsedAt = &value
 	}
+	if value, ok := _c.mutation.ExpiresAt(); ok {
+		_spec.SetField(account.FieldExpiresAt, field.TypeTime, value)
+		_node.ExpiresAt = &value
+	}
 	if value, ok := _c.mutation.Schedulable(); ok {
 		_spec.SetField(account.FieldSchedulable, field.TypeBool, value)
 		_node.Schedulable = value
@@ -859,6 +877,24 @@ func (u *AccountUpsert) UpdateLastUsedAt() *AccountUpsert {
 // ClearLastUsedAt clears the value of the "last_used_at" field.
 func (u *AccountUpsert) ClearLastUsedAt() *AccountUpsert {
 	u.SetNull(account.FieldLastUsedAt)
+	return u
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *AccountUpsert) SetExpiresAt(v time.Time) *AccountUpsert {
+	u.Set(account.FieldExpiresAt, v)
+	return u
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateExpiresAt() *AccountUpsert {
+	u.SetExcluded(account.FieldExpiresAt)
+	return u
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *AccountUpsert) ClearExpiresAt() *AccountUpsert {
+	u.SetNull(account.FieldExpiresAt)
 	return u
 }
 
@@ -1248,6 +1284,27 @@ func (u *AccountUpsertOne) UpdateLastUsedAt() *AccountUpsertOne {
 func (u *AccountUpsertOne) ClearLastUsedAt() *AccountUpsertOne {
 	return u.Update(func(s *AccountUpsert) {
 		s.ClearLastUsedAt()
+	})
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *AccountUpsertOne) SetExpiresAt(v time.Time) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetExpiresAt(v)
+	})
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateExpiresAt() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateExpiresAt()
+	})
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *AccountUpsertOne) ClearExpiresAt() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearExpiresAt()
 	})
 }
 
@@ -1823,6 +1880,27 @@ func (u *AccountUpsertBulk) UpdateLastUsedAt() *AccountUpsertBulk {
 func (u *AccountUpsertBulk) ClearLastUsedAt() *AccountUpsertBulk {
 	return u.Update(func(s *AccountUpsert) {
 		s.ClearLastUsedAt()
+	})
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (u *AccountUpsertBulk) SetExpiresAt(v time.Time) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetExpiresAt(v)
+	})
+}
+
+// UpdateExpiresAt sets the "expires_at" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateExpiresAt() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateExpiresAt()
+	})
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (u *AccountUpsertBulk) ClearExpiresAt() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearExpiresAt()
 	})
 }
 

@@ -19,6 +19,7 @@ func RegisterAuthRoutes(
 		auth.POST("/register", h.Auth.Register)
 		auth.POST("/login", h.Auth.Login)
 		auth.POST("/send-verify-code", h.Auth.SendVerifyCode)
+		auth.GET("/verify-code-status", h.Auth.GetVerifyCodeStatus)
 	}
 
 	// 公开设置（无需认证）

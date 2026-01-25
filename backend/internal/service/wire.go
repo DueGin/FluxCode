@@ -1,10 +1,13 @@
 package service
 
 import (
+	"database/sql"
 	"time"
 
+	"github.com/DueGin/FluxCode/ent"
 	"github.com/DueGin/FluxCode/internal/config"
 	"github.com/google/wire"
+	"github.com/redis/go-redis/v9"
 )
 
 // BuildInfo contains build information
@@ -29,8 +32,34 @@ func ProvideUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, b
 }
 
 // ProvideEmailQueueService creates EmailQueueService with default worker count
-func ProvideEmailQueueService(emailService *EmailService) *EmailQueueService {
-	return NewEmailQueueService(emailService, 3)
+func ProvideEmailQueueService(rdb *redis.Client, emailService *EmailService) *EmailQueueService {
+	return NewEmailQueueService(rdb, emailService, 3)
+}
+
+// ProvideUsageQueueService creates UsageQueueService with default worker count
+func ProvideUsageQueueService(
+	rdb *redis.Client,
+	entClient *ent.Client,
+	cfg *config.Config,
+	billingService *BillingService,
+	usageLogRepo UsageLogRepository,
+	userRepo UserRepository,
+	userSubRepo UserSubscriptionRepository,
+	billingCacheService *BillingCacheService,
+	deferredService *DeferredService,
+) *UsageQueueService {
+	return NewUsageQueueService(
+		rdb,
+		entClient,
+		cfg,
+		billingService,
+		usageLogRepo,
+		userRepo,
+		userSubRepo,
+		billingCacheService,
+		deferredService,
+		6,
+	)
 }
 
 // ProvideTokenRefreshService creates and starts TokenRefreshService
@@ -40,9 +69,10 @@ func ProvideTokenRefreshService(
 	openaiOAuthService *OpenAIOAuthService,
 	geminiOAuthService *GeminiOAuthService,
 	antigravityOAuthService *AntigravityOAuthService,
+	rdb *redis.Client,
 	cfg *config.Config,
 ) *TokenRefreshService {
-	svc := NewTokenRefreshService(accountRepo, oauthService, openaiOAuthService, geminiOAuthService, antigravityOAuthService, cfg)
+	svc := NewTokenRefreshService(accountRepo, oauthService, openaiOAuthService, geminiOAuthService, antigravityOAuthService, rdb, cfg)
 	svc.Start()
 	return svc
 }
@@ -57,6 +87,28 @@ func ProvideTimingWheelService() *TimingWheelService {
 // ProvideDeferredService creates and starts DeferredService
 func ProvideDeferredService(accountRepo AccountRepository, timingWheel *TimingWheelService) *DeferredService {
 	svc := NewDeferredService(accountRepo, timingWheel, 10*time.Second)
+	svc.Start()
+	return svc
+}
+
+func ProvideAccountExpirationWorker(db *sql.DB, timingWheel *TimingWheelService) *AccountExpirationWorker {
+	svc := NewAccountExpirationWorker(db, timingWheel, 30*time.Second)
+	svc.Start()
+	return svc
+}
+
+func ProvideDailyUsageRefreshWorker(
+	db *sql.DB,
+	settingService *SettingService,
+	accountRepo AccountRepository,
+	usageService *AccountUsageService,
+	rateLimitService *RateLimitService,
+	httpUpstream HTTPUpstream,
+) *DailyUsageRefreshWorker {
+	svc := NewDailyUsageRefreshWorker(db, settingService, accountRepo, usageService, rateLimitService, httpUpstream)
+	if settingService != nil {
+		settingService.RegisterDailyUsageRefreshTimeListener(svc.ResetSchedule)
+	}
 	svc.Start()
 	return svc
 }
@@ -77,6 +129,7 @@ var ProviderSet = wire.NewSet(
 	NewUserService,
 	NewAPIKeyService,
 	NewGroupService,
+	NewPricingPlanService,
 	NewAccountService,
 	NewProxyService,
 	NewRedeemService,
@@ -102,7 +155,9 @@ var ProviderSet = wire.NewSet(
 	NewAccountTestService,
 	NewSettingService,
 	NewEmailService,
+	NewAlertService,
 	ProvideEmailQueueService,
+	ProvideUsageQueueService,
 	NewTurnstileService,
 	NewSubscriptionService,
 	ProvideConcurrencyService,
@@ -112,6 +167,8 @@ var ProviderSet = wire.NewSet(
 	ProvideTokenRefreshService,
 	ProvideTimingWheelService,
 	ProvideDeferredService,
+	ProvideAccountExpirationWorker,
+	ProvideDailyUsageRefreshWorker,
 	NewAntigravityQuotaFetcher,
 	NewUserAttributeService,
 	NewUsageCache,

@@ -3,13 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
+
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/config"
 	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 )
 
 // 错误定义
@@ -153,13 +154,13 @@ func (s *BillingCacheService) cacheWriteWorker() {
 		case cacheWriteUpdateSubscriptionUsage:
 			if s.cache != nil {
 				if err := s.cache.UpdateSubscriptionUsage(ctx, task.userID, task.groupID, task.amount); err != nil {
-					log.Printf("Warning: update subscription cache failed for user %d group %d: %v", task.userID, task.groupID, err)
+					applog.Printf("Warning: update subscription cache failed for user %d group %d: %v", task.userID, task.groupID, err)
 				}
 			}
 		case cacheWriteDeductBalance:
 			if s.cache != nil {
 				if err := s.cache.DeductUserBalance(ctx, task.userID, task.amount); err != nil {
-					log.Printf("Warning: deduct balance cache failed for user %d: %v", task.userID, err)
+					applog.Printf("Warning: deduct balance cache failed for user %d: %v", task.userID, err)
 				}
 			}
 		}
@@ -213,7 +214,7 @@ func (s *BillingCacheService) logCacheWriteDrop(task cacheWriteTask, reason stri
 	if dropped == 0 {
 		return
 	}
-	log.Printf("Warning: cache write queue %s, dropped %d tasks in last %s (latest kind=%s user %d group %d)",
+	applog.Printf("Warning: cache write queue %s, dropped %d tasks in last %s (latest kind=%s user %d group %d)",
 		reason,
 		dropped,
 		cacheWriteDropLogInterval,
@@ -271,7 +272,7 @@ func (s *BillingCacheService) setBalanceCache(ctx context.Context, userID int64,
 		return
 	}
 	if err := s.cache.SetUserBalance(ctx, userID, balance); err != nil {
-		log.Printf("Warning: set balance cache failed for user %d: %v", userID, err)
+		applog.Printf("Warning: set balance cache failed for user %d: %v", userID, err)
 	}
 }
 
@@ -299,7 +300,7 @@ func (s *BillingCacheService) QueueDeductBalance(userID int64, amount float64) {
 	ctx, cancel := context.WithTimeout(context.Background(), cacheWriteTimeout)
 	defer cancel()
 	if err := s.DeductBalanceCache(ctx, userID, amount); err != nil {
-		log.Printf("Warning: deduct balance cache fallback failed for user %d: %v", userID, err)
+		applog.Printf("Warning: deduct balance cache fallback failed for user %d: %v", userID, err)
 	}
 }
 
@@ -309,7 +310,7 @@ func (s *BillingCacheService) InvalidateUserBalance(ctx context.Context, userID 
 		return nil
 	}
 	if err := s.cache.InvalidateUserBalance(ctx, userID); err != nil {
-		log.Printf("Warning: invalidate balance cache failed for user %d: %v", userID, err)
+		applog.Printf("Warning: invalidate balance cache failed for user %d: %v", userID, err)
 		return err
 	}
 	return nil
@@ -393,7 +394,7 @@ func (s *BillingCacheService) setSubscriptionCache(ctx context.Context, userID, 
 		return
 	}
 	if err := s.cache.SetSubscriptionCache(ctx, userID, groupID, s.convertToPortsData(data)); err != nil {
-		log.Printf("Warning: set subscription cache failed for user %d group %d: %v", userID, groupID, err)
+		applog.Printf("Warning: set subscription cache failed for user %d group %d: %v", userID, groupID, err)
 	}
 }
 
@@ -422,7 +423,7 @@ func (s *BillingCacheService) QueueUpdateSubscriptionUsage(userID, groupID int64
 	ctx, cancel := context.WithTimeout(context.Background(), cacheWriteTimeout)
 	defer cancel()
 	if err := s.UpdateSubscriptionUsage(ctx, userID, groupID, costUSD); err != nil {
-		log.Printf("Warning: update subscription cache fallback failed for user %d group %d: %v", userID, groupID, err)
+		applog.Printf("Warning: update subscription cache fallback failed for user %d group %d: %v", userID, groupID, err)
 	}
 }
 
@@ -432,7 +433,7 @@ func (s *BillingCacheService) InvalidateSubscription(ctx context.Context, userID
 		return nil
 	}
 	if err := s.cache.InvalidateSubscriptionCache(ctx, userID, groupID); err != nil {
-		log.Printf("Warning: invalidate subscription cache failed for user %d group %d: %v", userID, groupID, err)
+		applog.Printf("Warning: invalidate subscription cache failed for user %d group %d: %v", userID, groupID, err)
 		return err
 	}
 	return nil
@@ -466,7 +467,7 @@ func (s *BillingCacheService) checkBalanceEligibility(ctx context.Context, userI
 	balance, err := s.GetUserBalance(ctx, userID)
 	if err != nil {
 		// 缓存/数据库错误，允许通过（降级处理）
-		log.Printf("Warning: get user balance failed, allowing request: %v", err)
+		applog.Printf("Warning: get user balance failed, allowing request: %v", err)
 		return nil
 	}
 
@@ -483,7 +484,7 @@ func (s *BillingCacheService) checkSubscriptionEligibility(ctx context.Context, 
 	subData, err := s.GetSubscriptionStatus(ctx, userID, group.ID)
 	if err != nil {
 		// 缓存/数据库错误，降级使用传入的subscription进行检查
-		log.Printf("Warning: get subscription cache failed, using fallback: %v", err)
+		applog.Printf("Warning: get subscription cache failed, using fallback: %v", err)
 		return s.checkSubscriptionLimitsFallback(subscription, group)
 	}
 

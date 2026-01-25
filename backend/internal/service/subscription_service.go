@@ -3,10 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
+
 	"time"
 
 	infraerrors "github.com/DueGin/FluxCode/internal/pkg/errors"
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 )
 
@@ -27,6 +28,7 @@ var (
 	ErrWeeklyLimitExceeded       = infraerrors.TooManyRequests("WEEKLY_LIMIT_EXCEEDED", "weekly usage limit exceeded")
 	ErrMonthlyLimitExceeded      = infraerrors.TooManyRequests("MONTHLY_LIMIT_EXCEEDED", "monthly usage limit exceeded")
 	ErrSubscriptionNilInput      = infraerrors.BadRequest("SUBSCRIPTION_NIL_INPUT", "subscription input cannot be nil")
+	ErrInvalidSubscriptionDays   = infraerrors.BadRequest("INVALID_SUBSCRIPTION_DAYS", "days must not be zero")
 )
 
 // SubscriptionService 订阅服务
@@ -161,7 +163,7 @@ func (s *SubscriptionService) AssignOrExtendSubscription(ctx context.Context, in
 			}
 			newNotes += input.Notes
 			if err := s.userSubRepo.UpdateNotes(ctx, existingSub.ID, newNotes); err != nil {
-				log.Printf("update subscription notes failed: sub_id=%d err=%v", existingSub.ID, err)
+				applog.Printf("update subscription notes failed: sub_id=%d err=%v", existingSub.ID, err)
 			}
 		}
 
@@ -256,6 +258,17 @@ type BulkAssignResult struct {
 	Errors        []string
 }
 
+// BulkAdjustSubscriptionExpiryInput 批量调整订阅到期时间输入
+type BulkAdjustSubscriptionExpiryInput struct {
+	GroupID int64
+	Days    int
+}
+
+// BulkAdjustSubscriptionExpiryResult 批量调整订阅到期时间结果
+type BulkAdjustSubscriptionExpiryResult struct {
+	UpdatedCount int64
+}
+
 // BulkAssignSubscription 批量分配订阅
 func (s *SubscriptionService) BulkAssignSubscription(ctx context.Context, input *BulkAssignSubscriptionInput) (*BulkAssignResult, error) {
 	result := &BulkAssignResult{
@@ -348,6 +361,51 @@ func (s *SubscriptionService) ExtendSubscription(ctx context.Context, subscripti
 	}
 
 	return s.userSubRepo.GetByID(ctx, subscriptionID)
+}
+
+// BulkAdjustSubscriptionExpiry 按分组批量调整未过期订阅的到期时间
+func (s *SubscriptionService) BulkAdjustSubscriptionExpiry(ctx context.Context, input *BulkAdjustSubscriptionExpiryInput) (*BulkAdjustSubscriptionExpiryResult, error) {
+	if input == nil {
+		return nil, ErrSubscriptionNilInput
+	}
+	if input.Days == 0 {
+		return nil, ErrInvalidSubscriptionDays
+	}
+
+	group, err := s.groupRepo.GetByID(ctx, input.GroupID)
+	if err != nil {
+		return nil, fmt.Errorf("group not found: %w", err)
+	}
+	if !group.IsSubscriptionType() {
+		return nil, ErrGroupNotSubscriptionType
+	}
+
+	days := input.Days
+	if days > MaxValidityDays {
+		days = MaxValidityDays
+	}
+	if days < -MaxValidityDays {
+		days = -MaxValidityDays
+	}
+
+	userIDs, err := s.userSubRepo.BulkAdjustExpiryByGroupID(ctx, input.GroupID, days)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.billingCacheService != nil && len(userIDs) > 0 {
+		groupID := input.GroupID
+		ids := append([]int64(nil), userIDs...)
+		go func() {
+			cacheCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			for _, userID := range ids {
+				_ = s.billingCacheService.InvalidateSubscription(cacheCtx, userID, groupID)
+			}
+		}()
+	}
+
+	return &BulkAdjustSubscriptionExpiryResult{UpdatedCount: int64(len(userIDs))}, nil
 }
 
 // GetByID 根据ID获取订阅

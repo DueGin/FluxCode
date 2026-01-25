@@ -129,6 +129,86 @@
               </button>
             </div>
             <div class="flex items-center gap-2">
+              <button
+                @click="handleBulkSetSchedulable(true)"
+                :disabled="bulkSettingSchedulable"
+                class="btn btn-secondary btn-sm"
+              >
+                <svg
+                  class="mr-1.5 h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 6v12m6-6H6"
+                  />
+                </svg>
+                {{ t('admin.accounts.bulkActions.enableSchedulable') }}
+              </button>
+              <button
+                @click="handleBulkSetSchedulable(false)"
+                :disabled="bulkSettingSchedulable"
+                class="btn btn-secondary btn-sm"
+              >
+                <svg
+                  class="mr-1.5 h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M18 12H6"
+                  />
+                </svg>
+                {{ t('admin.accounts.bulkActions.disableSchedulable') }}
+              </button>
+              <button
+                @click="handleBulkRefreshUsage"
+                :disabled="bulkRefreshingUsage"
+                class="btn btn-secondary btn-sm"
+              >
+                <svg
+                  :class="['mr-1.5 h-4 w-4', bulkRefreshingUsage ? 'animate-spin' : '']"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+                  />
+                </svg>
+                {{ t('admin.accounts.bulkActions.refreshUsage') }}
+              </button>
+              <button
+                @click="handleBulkClearTempUnschedulable"
+                :disabled="bulkClearingTempUnsched"
+                class="btn btn-secondary btn-sm"
+              >
+                <svg
+                  class="mr-1.5 h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+                {{ t('admin.accounts.bulkActions.resetTempUnschedulable') }}
+              </button>
               <button @click="handleBulkDelete" class="btn btn-danger btn-sm">
                 <svg
                   class="mr-1.5 h-4 w-4"
@@ -220,26 +300,57 @@
           </template>
 
           <template #cell-schedulable="{ row }">
-            <button
-              @click="handleToggleSchedulable(row)"
-              :disabled="togglingSchedulable === row.id"
-              class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-dark-800"
-              :class="[
-                row.schedulable
-                  ? 'bg-primary-500 hover:bg-primary-600'
-                  : 'bg-gray-200 hover:bg-gray-300 dark:bg-dark-600 dark:hover:bg-dark-500'
-              ]"
-              :title="
-                row.schedulable
-                  ? t('admin.accounts.schedulableEnabled')
-                  : t('admin.accounts.schedulableDisabled')
-              "
-            >
+            <div class="flex items-center gap-2">
+              <button
+                @click="handleToggleSchedulable(row)"
+                :disabled="togglingSchedulable === row.id || isExpired(row.expires_at)"
+                class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-dark-800"
+                :class="[
+                  row.schedulable
+                    ? 'bg-primary-500 hover:bg-primary-600'
+                    : 'bg-gray-200 hover:bg-gray-300 dark:bg-dark-600 dark:hover:bg-dark-500'
+                ]"
+                :title="
+                  row.schedulable
+                    ? t('admin.accounts.schedulableEnabled')
+                    : t('admin.accounts.schedulableDisabled')
+                "
+              >
+                <span
+                  class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                  :class="[row.schedulable ? 'translate-x-4' : 'translate-x-0']"
+                />
+              </button>
+
+              <div v-if="shouldShowSchedulableHint(row)" class="group relative">
+                <span
+                  class="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-600 hover:bg-gray-300 dark:bg-dark-600 dark:text-gray-300 dark:hover:bg-dark-500"
+                >
+                  ?
+                </span>
+                <div
+                  class="pointer-events-none absolute top-full z-50 mt-2 hidden w-64 -translate-x-1/2 rounded bg-gray-900 px-3 py-2 text-xs text-white dark:bg-gray-700 whitespace-normal break-words group-hover:block left-1/2"
+                >
+                  {{ getSchedulableHint(row) }}
+                  <div
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-gray-900 dark:border-b-gray-700"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template #cell-expires_at="{ row }">
+            <div class="flex flex-col text-xs">
               <span
-                class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
-                :class="[row.schedulable ? 'translate-x-4' : 'translate-x-0']"
-              />
-            </button>
+                :class="['badge text-xs font-medium', getExpirationState(row.expires_at).variant]"
+              >
+                {{ getExpirationState(row.expires_at).label }}
+              </span>
+              <span v-if="row.expires_at" class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                {{ formatDateTimeBeijing(row.expires_at) }}
+              </span>
+            </div>
           </template>
 
           <template #cell-today_stats="{ row }">
@@ -429,6 +540,33 @@
       @confirm="confirmBulkDelete"
       @cancel="showBulkDeleteDialog = false"
     />
+    <ConfirmDialog
+      :show="showBulkSchedulableDialog"
+      :title="t('admin.accounts.bulkSchedulableTitle')"
+      :message="
+        bulkSchedulableTarget
+          ? t('admin.accounts.bulkSchedulableConfirmEnable', { count: selectedAccountIds.length })
+          : t('admin.accounts.bulkSchedulableConfirmDisable', { count: selectedAccountIds.length })
+      "
+      :confirm-text="
+        bulkSchedulableTarget
+          ? t('admin.accounts.bulkActions.enableSchedulable')
+          : t('admin.accounts.bulkActions.disableSchedulable')
+      "
+      :cancel-text="t('common.cancel')"
+      :danger="!bulkSchedulableTarget"
+      @confirm="confirmBulkSetSchedulable"
+      @cancel="showBulkSchedulableDialog = false"
+    />
+    <ConfirmDialog
+      :show="showBulkClearTempUnschedDialog"
+      :title="t('admin.accounts.bulkTempUnschedResetTitle')"
+      :message="t('admin.accounts.bulkTempUnschedResetConfirm', { count: selectedAccountIds.length })"
+      :confirm-text="t('admin.accounts.bulkActions.resetTempUnschedulable')"
+      :cancel-text="t('common.cancel')"
+      @confirm="confirmBulkClearTempUnschedulable"
+      @cancel="showBulkClearTempUnschedDialog = false"
+    />
 
     <SyncFromCrsModal
       :show="showCrsSyncModal"
@@ -445,6 +583,75 @@
       @close="showBulkEditModal = false"
       @updated="handleBulkUpdated"
     />
+
+    <BaseDialog
+      :show="showBulkRefreshDialog"
+      :title="t('admin.accounts.bulkUsageRefreshTitle')"
+      width="wide"
+      @close="closeBulkRefreshDialog"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          {{
+            t('admin.accounts.bulkUsageRefreshSummary', {
+              total: bulkRefreshResult?.total || 0,
+              success: bulkRefreshResult?.success || 0,
+              failed: bulkRefreshResult?.failed || 0
+            })
+          }}
+        </p>
+
+        <div v-if="bulkRefreshFailures.length === 0" class="rounded-lg bg-gray-50 p-4 text-sm text-gray-600 dark:bg-dark-800 dark:text-gray-300">
+          {{ t('admin.accounts.bulkUsageRefreshNoFailures') }}
+        </div>
+
+        <div v-else class="space-y-2">
+          <div class="text-sm font-medium text-gray-700 dark:text-gray-200">
+            {{ t('admin.accounts.bulkUsageRefreshFailures', { count: bulkRefreshFailures.length }) }}
+          </div>
+          <div class="max-h-64 overflow-auto rounded-lg border border-gray-200 dark:border-dark-700">
+            <table class="min-w-full text-sm">
+              <thead class="bg-gray-50 text-left text-xs text-gray-500 dark:bg-dark-800 dark:text-gray-400">
+                <tr>
+                  <th class="px-4 py-2">{{ t('admin.accounts.bulkUsageRefreshAccountId') }}</th>
+                  <th class="px-4 py-2">{{ t('admin.accounts.bulkUsageRefreshAccountName') }}</th>
+                  <th class="px-4 py-2">{{ t('admin.accounts.bulkUsageRefreshOutcome') }}</th>
+                  <th class="px-4 py-2">{{ t('admin.accounts.bulkUsageRefreshDetail') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="item in bulkRefreshFailures"
+                  :key="item.account_id"
+                  class="border-t border-gray-200 dark:border-dark-700"
+                >
+                  <td class="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">
+                    {{ item.account_id }}
+                  </td>
+                  <td class="px-4 py-2 text-gray-700 dark:text-gray-300">
+                    {{ item.name || '-' }}
+                  </td>
+                  <td class="px-4 py-2 text-xs text-red-600 dark:text-red-400">
+                    {{ item.outcome }}
+                  </td>
+                  <td class="px-4 py-2 text-xs text-gray-600 dark:text-gray-400">
+                    {{ item.detail }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end">
+          <button @click="closeBulkRefreshDialog" class="btn btn-secondary">
+            {{ t('common.close') }}
+          </button>
+        </div>
+      </template>
+    </BaseDialog>
     <!-- Action Menu (Teleported) -->
     <Teleport to="body">
       <div
@@ -513,6 +720,7 @@ import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import {
   CreateAccountModal,
@@ -529,7 +737,7 @@ import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vu
 import AccountTestModal from '@/components/account/AccountTestModal.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
-import { formatRelativeTime } from '@/utils/format'
+import { formatRelativeTime, formatDateTime, formatDateTimeBeijing, diffBeijingDays, formatRFC3339InText } from '@/utils/format'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -545,6 +753,7 @@ const columns = computed<Column[]>(() => {
     { key: 'concurrency', label: t('admin.accounts.columns.concurrencyStatus'), sortable: false },
     { key: 'status', label: t('admin.accounts.columns.status'), sortable: true },
     { key: 'schedulable', label: t('admin.accounts.columns.schedulable'), sortable: true },
+    { key: 'expires_at', label: t('admin.accounts.columns.expires'), sortable: true },
     { key: 'today_stats', label: t('admin.accounts.columns.todayStats'), sortable: false }
   ]
 
@@ -611,6 +820,8 @@ const showEditModal = ref(false)
 const showReAuthModal = ref(false)
 const showDeleteDialog = ref(false)
 const showBulkDeleteDialog = ref(false)
+const showBulkSchedulableDialog = ref(false)
+const showBulkClearTempUnschedDialog = ref(false)
 const showTestModal = ref(false)
 const showStatsModal = ref(false)
 const showTempUnschedModal = ref(false)
@@ -619,11 +830,36 @@ const showBulkEditModal = ref(false)
 const editingAccount = ref<Account | null>(null)
 const reAuthAccount = ref<Account | null>(null)
 const deletingAccount = ref<Account | null>(null)
+const bulkSchedulableTarget = ref(true)
+const bulkSettingSchedulable = ref(false)
 const testingAccount = ref<Account | null>(null)
 const statsAccount = ref<Account | null>(null)
 const tempUnschedAccount = ref<Account | null>(null)
 const togglingSchedulable = ref<number | null>(null)
 const bulkDeleting = ref(false)
+const bulkRefreshingUsage = ref(false)
+const bulkClearingTempUnsched = ref(false)
+const showBulkRefreshDialog = ref(false)
+
+interface BulkRefreshUsageResult {
+  total: number
+  success: number
+  failed: number
+  results: Array<{ account_id: number; action: string; outcome: string; detail: string }>
+}
+
+const bulkRefreshResult = ref<BulkRefreshUsageResult | null>(null)
+const bulkRefreshFailures = computed(() => {
+  const result = bulkRefreshResult.value
+  if (!result) return []
+  const nameMap = new Map(accounts.value.map((account) => [account.id, account.name]))
+  return result.results
+    .filter((item) => item.outcome?.toLowerCase() === 'error')
+    .map((item) => ({
+      ...item,
+      name: nameMap.get(item.account_id) || ''
+    }))
+})
 
 // Action Menu State
 const activeMenuId = ref<number | null>(null)
@@ -676,6 +912,41 @@ const selectCurrentPageAccounts = () => {
   selectedAccountIds.value = Array.from(merged)
 }
 
+const getExpirationState = (expiresAt: string | null) => {
+  if (!expiresAt) {
+    return {
+      label: t('admin.accounts.expiration.never'),
+      variant: 'badge-gray'
+    }
+  }
+  const target = new Date(expiresAt)
+  if (Number.isNaN(target.getTime())) {
+    return {
+      label: '-',
+      variant: 'badge-gray'
+    }
+  }
+  if (target <= new Date()) {
+    return {
+      label: t('admin.accounts.expiration.expired'),
+      variant: 'badge-gray'
+    }
+  }
+  const diffDays = diffBeijingDays(new Date(), target)
+  let label = ''
+  if (diffDays === 0) {
+    label = t('admin.accounts.expiration.today')
+  } else if (diffDays === 1) {
+    label = t('admin.accounts.expiration.tomorrow')
+  } else {
+    label = t('admin.accounts.expiration.inDays', { days: diffDays })
+  }
+  return {
+    label,
+    variant: diffDays <= 3 ? 'badge-warning' : 'badge-success'
+  }
+}
+
 // Rate limit / Overload helpers
 const isRateLimited = (account: Account): boolean => {
   if (!account.rate_limit_reset_at) return false
@@ -685,6 +956,84 @@ const isRateLimited = (account: Account): boolean => {
 const isOverloaded = (account: Account): boolean => {
   if (!account.overload_until) return false
   return new Date(account.overload_until) > new Date()
+}
+
+const isTempUnschedulable = (account: Account): boolean => {
+  if (!account.temp_unschedulable_until) return false
+  return new Date(account.temp_unschedulable_until) > new Date()
+}
+
+const isExpired = (expiresAt: string | null): boolean => {
+  if (!expiresAt) return false
+  return new Date(expiresAt) <= new Date()
+}
+
+const hasSchedulableReason = (account: Account): boolean => {
+  if (account.schedulable) return false
+  return (account.temp_unschedulable_reason || '').trim().length > 0
+}
+
+const shouldShowSchedulableHint = (account: Account): boolean => {
+  if (isExpired(account.expires_at)) return true
+  if (account.status === 'inactive' || account.status === 'error') return true
+  if (hasSchedulableReason(account)) return true
+  if (isTempUnschedulable(account)) return true
+  if (isRateLimited(account)) return true
+  if (isOverloaded(account)) return true
+  return false
+}
+
+const formatTempUnschedReason = (raw: string | null): string => {
+  const reason = raw?.trim() || ''
+  if (!reason) return ''
+  try {
+    const parsed = JSON.parse(reason) as {
+      error_message?: string
+      ErrorMessage?: string
+      message?: string
+    }
+    const message =
+      parsed.error_message?.trim() ||
+      parsed.ErrorMessage?.trim() ||
+      parsed.message?.trim() ||
+      ''
+    return formatRFC3339InText(message)
+  } catch {
+    return formatRFC3339InText(reason)
+  }
+}
+
+const getSchedulableHint = (account: Account): string => {
+  if (isExpired(account.expires_at)) {
+    return t('admin.accounts.schedulableReason.expired')
+  }
+  if (account.status === 'inactive') {
+    return t('admin.accounts.schedulableReason.inactive')
+  }
+  if (account.status === 'error') {
+    return t('admin.accounts.schedulableReason.error')
+  }
+  if (!account.schedulable) {
+    const reason = formatTempUnschedReason(account.temp_unschedulable_reason)
+    return reason ? reason : t('admin.accounts.schedulableReason.manualOff')
+  }
+  if (isTempUnschedulable(account)) {
+    const reason = formatTempUnschedReason(account.temp_unschedulable_reason)
+    return reason
+      ? t('admin.accounts.schedulableReason.tempUnschedWithReason', { reason })
+      : t('admin.accounts.schedulableReason.tempUnsched')
+  }
+  if (isRateLimited(account)) {
+    return t('admin.accounts.schedulableReason.rateLimitedUntil', {
+      time: account.rate_limit_reset_at ? formatDateTime(account.rate_limit_reset_at) : '-'
+    })
+  }
+  if (isOverloaded(account)) {
+    return t('admin.accounts.schedulableReason.overloadedUntil', {
+      time: account.overload_until ? formatDateTime(account.overload_until) : '-'
+    })
+  }
+  return t('admin.accounts.schedulableReason.ok')
 }
 
 // Data loading
@@ -837,6 +1186,108 @@ const confirmDelete = async () => {
 const handleBulkDelete = () => {
   if (selectedAccountIds.value.length === 0) return
   showBulkDeleteDialog.value = true
+}
+
+const handleBulkSetSchedulable = (schedulable: boolean) => {
+  if (selectedAccountIds.value.length === 0) return
+  bulkSchedulableTarget.value = schedulable
+  showBulkSchedulableDialog.value = true
+}
+
+const handleBulkClearTempUnschedulable = () => {
+  if (selectedAccountIds.value.length === 0) return
+  showBulkClearTempUnschedDialog.value = true
+}
+
+const confirmBulkSetSchedulable = async () => {
+  if (bulkSettingSchedulable.value || selectedAccountIds.value.length === 0) return
+
+  bulkSettingSchedulable.value = true
+  const ids = [...selectedAccountIds.value]
+  const target = bulkSchedulableTarget.value
+  try {
+    const result = await adminAPI.accounts.bulkSetSchedulable(ids, target)
+    const success = result.success || 0
+    const failed = result.failed || 0
+
+    if (failed === 0) {
+      appStore.showSuccess(
+        target
+          ? t('admin.accounts.bulkSchedulableSuccessEnable', { count: success })
+          : t('admin.accounts.bulkSchedulableSuccessDisable', { count: success })
+      )
+    } else {
+      appStore.showError(t('admin.accounts.bulkSchedulablePartial', { success, failed }))
+    }
+
+    showBulkSchedulableDialog.value = false
+    selectedAccountIds.value = []
+    loadAccounts()
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('admin.accounts.bulkSchedulableFailed'))
+    console.error('Error bulk setting schedulable:', error)
+  } finally {
+    bulkSettingSchedulable.value = false
+  }
+}
+
+const confirmBulkClearTempUnschedulable = async () => {
+  if (bulkClearingTempUnsched.value || selectedAccountIds.value.length === 0) return
+
+  bulkClearingTempUnsched.value = true
+  const ids = [...selectedAccountIds.value]
+  try {
+    const result = await adminAPI.accounts.bulkClearTempUnschedulable(ids)
+    const success = result.success || 0
+    const failed = result.failed || 0
+
+    if (failed === 0) {
+      appStore.showSuccess(t('admin.accounts.bulkTempUnschedResetSuccess', { count: success }))
+    } else {
+      appStore.showError(t('admin.accounts.bulkTempUnschedResetPartial', { success, failed }))
+    }
+
+    showBulkClearTempUnschedDialog.value = false
+    selectedAccountIds.value = []
+    loadAccounts()
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('admin.accounts.bulkTempUnschedResetFailed'))
+    console.error('Error bulk clearing temp unschedulable:', error)
+  } finally {
+    bulkClearingTempUnsched.value = false
+  }
+}
+
+const closeBulkRefreshDialog = () => {
+  showBulkRefreshDialog.value = false
+}
+
+const handleBulkRefreshUsage = async () => {
+  if (bulkRefreshingUsage.value || selectedAccountIds.value.length === 0) return
+
+  bulkRefreshingUsage.value = true
+  const ids = [...selectedAccountIds.value]
+  try {
+    const result = await adminAPI.accounts.bulkRefreshUsage(ids)
+    const success = result.success || 0
+    const failed = result.failed || 0
+
+    if (failed === 0) {
+      appStore.showSuccess(t('admin.accounts.bulkUsageRefreshSuccess', { count: success }))
+    } else {
+      appStore.showError(t('admin.accounts.bulkUsageRefreshPartial', { success, failed }))
+    }
+
+    bulkRefreshResult.value = result
+    showBulkRefreshDialog.value = true
+    selectedAccountIds.value = []
+    loadAccounts()
+  } catch (error: any) {
+    appStore.showError(error.response?.data?.detail || t('admin.accounts.bulkUsageRefreshFailed'))
+    console.error('Error bulk refreshing usage:', error)
+  } finally {
+    bulkRefreshingUsage.value = false
+  }
 }
 
 const confirmBulkDelete = async () => {

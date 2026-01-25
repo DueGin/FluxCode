@@ -45,7 +45,8 @@ gateway:
   max_upstream_clients: 5000
   client_idle_ttl_seconds: 900
   # 并发槽位过期时间（分钟）
-  concurrency_slot_ttl_minutes: 15
+  # 说明：槽位会在请求期间通过心跳刷新，因此建议设置较小值以加速“节点重启/崩溃”后的僵尸槽位回收。
+  concurrency_slot_ttl_minutes: 2
 
 # =============================================================================
 # Database Configuration (PostgreSQL)

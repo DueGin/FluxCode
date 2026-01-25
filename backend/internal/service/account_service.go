@@ -38,6 +38,7 @@ type AccountRepository interface {
 	BatchUpdateLastUsed(ctx context.Context, updates map[int64]time.Time) error
 	SetError(ctx context.Context, id int64, errorMsg string) error
 	SetSchedulable(ctx context.Context, id int64, schedulable bool) error
+	SetUnschedulableWithReason(ctx context.Context, id int64, reason string) error
 	BindGroups(ctx context.Context, accountID int64, groupIDs []int64) error
 
 	ListSchedulable(ctx context.Context) ([]Account, error)
@@ -60,14 +61,16 @@ type AccountRepository interface {
 // AccountBulkUpdate describes the fields that can be updated in a bulk operation.
 // Nil pointers mean "do not change".
 type AccountBulkUpdate struct {
-	Name         *string
-	ProxyID      *int64
-	ClearProxyID bool
-	Concurrency  *int
-	Priority     *int
-	Status       *string
-	Credentials  map[string]any
-	Extra        map[string]any
+	Name           *string
+	ProxyID        *int64
+	ClearProxyID   bool
+	Concurrency    *int
+	Priority       *int
+	Status         *string
+	ExpiresAt      *time.Time
+	ClearExpiresAt bool
+	Credentials    map[string]any
+	Extra          map[string]any
 }
 
 // CreateAccountRequest 创建账号请求
@@ -81,6 +84,7 @@ type CreateAccountRequest struct {
 	Concurrency int            `json:"concurrency"`
 	Priority    int            `json:"priority"`
 	GroupIDs    []int64        `json:"group_ids"`
+	ExpiresAt   *time.Time     `json:"expires_at"`
 }
 
 // UpdateAccountRequest 更新账号请求
@@ -93,6 +97,7 @@ type UpdateAccountRequest struct {
 	Priority    *int            `json:"priority"`
 	Status      *string         `json:"status"`
 	GroupIDs    *[]int64        `json:"group_ids"`
+	ExpiresAt   *time.Time      `json:"expires_at"`
 }
 
 // AccountService 账号管理服务
@@ -132,6 +137,7 @@ func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (
 		Concurrency: req.Concurrency,
 		Priority:    req.Priority,
 		Status:      StatusActive,
+		ExpiresAt:   req.ExpiresAt,
 	}
 
 	if err := s.accountRepo.Create(ctx, account); err != nil {
@@ -218,6 +224,9 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 
 	if req.Status != nil {
 		account.Status = *req.Status
+	}
+	if req.ExpiresAt != nil {
+		account.ExpiresAt = req.ExpiresAt
 	}
 
 	// 先验证分组是否存在（在任何写操作之前）

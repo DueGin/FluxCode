@@ -196,6 +196,28 @@ export async function resetTempUnschedulable(id: number): Promise<{ message: str
 }
 
 /**
+ * Bulk reset temporary unschedulable status for multiple accounts.
+ * @param accountIds - Array of account IDs
+ * @returns Results of bulk operation
+ */
+export async function bulkClearTempUnschedulable(accountIds: number[]): Promise<{
+  total: number
+  success: number
+  failed: number
+  results: Array<{ account_id: number; success: boolean; error?: string }>
+}> {
+  const { data } = await apiClient.post<{
+    total: number
+    success: number
+    failed: number
+    results: Array<{ account_id: number; success: boolean; error?: string }>
+  }>('/admin/accounts/bulk-clear-temp-unschedulable', {
+    account_ids: accountIds
+  })
+  return data
+}
+
+/**
  * Generate OAuth authorization URL
  * @param endpoint - API endpoint path
  * @param config - Proxy configuration
@@ -312,6 +334,53 @@ export async function setSchedulable(id: number, schedulable: boolean): Promise<
 }
 
 /**
+ * Bulk set schedulable status for multiple accounts
+ * @param accountIds - Array of account IDs
+ * @param schedulable - Whether the accounts should participate in scheduling
+ * @returns Results of bulk operation
+ */
+export async function bulkSetSchedulable(
+  accountIds: number[],
+  schedulable: boolean
+): Promise<{
+  success: number
+  failed: number
+  results: Array<{ account_id: number; success: boolean; error?: string }>
+}> {
+  const { data } = await apiClient.post<{
+    success: number
+    failed: number
+    results: Array<{ account_id: number; success: boolean; error?: string }>
+  }>('/admin/accounts/bulk-schedulable', {
+    account_ids: accountIds,
+    schedulable
+  })
+  return data
+}
+
+/**
+ * Bulk refresh usage windows for multiple accounts.
+ * @param accountIds - Array of account IDs
+ * @returns Results of bulk refresh operation
+ */
+export async function bulkRefreshUsage(accountIds: number[]): Promise<{
+  total: number
+  success: number
+  failed: number
+  results: Array<{ account_id: number; action: string; outcome: string; detail: string }>
+}> {
+  const { data } = await apiClient.post<{
+    total: number
+    success: number
+    failed: number
+    results: Array<{ account_id: number; action: string; outcome: string; detail: string }>
+  }>('/admin/accounts/bulk-refresh-usage', {
+    account_ids: accountIds
+  })
+  return data
+}
+
+/**
  * Get available models for an account
  * @param id - Account ID
  * @returns List of available models for this account
@@ -359,7 +428,10 @@ export const accountsAPI = {
   clearRateLimit,
   getTempUnschedulableStatus,
   resetTempUnschedulable,
+  bulkClearTempUnschedulable,
   setSchedulable,
+  bulkSetSchedulable,
+  bulkRefreshUsage,
   getAvailableModels,
   generateAuthUrl,
   exchangeCode,

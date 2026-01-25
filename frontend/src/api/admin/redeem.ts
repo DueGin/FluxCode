@@ -24,6 +24,9 @@ export async function list(
   filters?: {
     type?: RedeemCodeType
     status?: 'active' | 'used' | 'expired' | 'unused'
+    is_welfare?: boolean
+    welfare_no?: string
+    search_type?: 'code' | 'user'
     search?: string
   },
   options?: {
@@ -38,6 +41,15 @@ export async function list(
     },
     signal: options?.signal
   })
+  return data
+}
+
+/**
+ * List distinct welfare numbers from existing redeem codes
+ * @returns Array of welfare numbers
+ */
+export async function listWelfareNos(): Promise<string[]> {
+  const { data } = await apiClient.get<string[]>('/admin/redeem-codes/welfare-nos')
   return data
 }
 
@@ -65,7 +77,9 @@ export async function generate(
   type: RedeemCodeType,
   value: number,
   groupId?: number | null,
-  validityDays?: number
+  validityDays?: number,
+  isWelfare?: boolean,
+  welfareNo?: string
 ): Promise<RedeemCode[]> {
   const payload: GenerateRedeemCodesRequest = {
     count,
@@ -78,6 +92,13 @@ export async function generate(
     payload.group_id = groupId
     if (validityDays && validityDays > 0) {
       payload.validity_days = validityDays
+    }
+  }
+
+  if (isWelfare) {
+    payload.is_welfare = true
+    if (welfareNo) {
+      payload.welfare_no = welfareNo
     }
   }
 
@@ -162,6 +183,7 @@ export async function exportCodes(filters?: {
 
 export const redeemAPI = {
   list,
+  listWelfareNos,
   getById,
   generate,
   delete: deleteCode,

@@ -27,9 +27,8 @@ func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 
 // CreateAPIKeyRequest represents the create API key request payload
 type CreateAPIKeyRequest struct {
-	Name      string  `json:"name" binding:"required"`
-	GroupID   *int64  `json:"group_id"`   // nullable
-	CustomKey *string `json:"custom_key"` // 可选的自定义key
+	Name    string `json:"name" binding:"required"`
+	GroupID *int64 `json:"group_id"` // nullable
 }
 
 // UpdateAPIKeyRequest represents the update API key request payload
@@ -110,9 +109,8 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 	}
 
 	svcReq := service.CreateAPIKeyRequest{
-		Name:      req.Name,
-		GroupID:   req.GroupID,
-		CustomKey: req.CustomKey,
+		Name:    req.Name,
+		GroupID: req.GroupID,
 	}
 	key, err := h.apiKeyService.Create(c.Request.Context(), subject.UserID, svcReq)
 	if err != nil {

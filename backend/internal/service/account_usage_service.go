@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
+
+	"strings"
 	"sync"
 	"time"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 	"github.com/DueGin/FluxCode/internal/pkg/usagestats"
 )
@@ -162,6 +164,7 @@ type AccountUsageService struct {
 	usageFetcher            ClaudeUsageFetcher
 	geminiQuotaService      *GeminiQuotaService
 	antigravityQuotaFetcher *AntigravityQuotaFetcher
+	settingService          *SettingService
 	cache                   *UsageCache
 }
 
@@ -172,6 +175,7 @@ func NewAccountUsageService(
 	usageFetcher ClaudeUsageFetcher,
 	geminiQuotaService *GeminiQuotaService,
 	antigravityQuotaFetcher *AntigravityQuotaFetcher,
+	settingService *SettingService,
 	cache *UsageCache,
 ) *AccountUsageService {
 	return &AccountUsageService{
@@ -180,8 +184,19 @@ func NewAccountUsageService(
 		usageFetcher:            usageFetcher,
 		geminiQuotaService:      geminiQuotaService,
 		antigravityQuotaFetcher: antigravityQuotaFetcher,
+		settingService:          settingService,
 		cache:                   cache,
 	}
+}
+
+// GetUsageFresh bypasses cached usage snapshots and fetches the latest usage when possible.
+func (s *AccountUsageService) GetUsageFresh(ctx context.Context, accountID int64) (*UsageInfo, error) {
+	if s != nil && s.cache != nil {
+		s.cache.apiCache.Delete(accountID)
+		s.cache.windowStatsCache.Delete(accountID)
+		s.cache.antigravityCache.Delete(accountID)
+	}
+	return s.GetUsage(ctx, accountID)
 }
 
 // GetUsage 获取账号使用量
@@ -195,12 +210,22 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 	}
 
 	if account.Platform == PlatformGemini {
-		return s.getGeminiUsage(ctx, account)
+		usage, err := s.getGeminiUsage(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		s.enforceUsageWindows(ctx, account, usage)
+		return usage, nil
 	}
 
 	// Antigravity 平台：使用 AntigravityQuotaFetcher 获取额度
 	if account.Platform == PlatformAntigravity {
-		return s.getAntigravityUsage(ctx, account)
+		usage, err := s.getAntigravityUsage(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		s.enforceUsageWindows(ctx, account, usage)
+		return usage, nil
 	}
 
 	// 只有oauth类型账号可以通过API获取usage（有profile scope）
@@ -234,6 +259,9 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 		// 4. 添加窗口统计（有独立缓存，1 分钟）
 		s.addWindowStats(ctx, account, usage)
 
+		// 5. 超限检测：5h/7d 达到或超过配置阈值时，取消调度并写入提示信息（非临时不可调度，窗口恢复后可被刷新任务自动启用）
+		s.enforceUsageWindows(ctx, account, usage)
+
 		return usage, nil
 	}
 
@@ -242,6 +270,7 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 		usage := s.estimateSetupTokenUsage(account)
 		// 添加窗口统计
 		s.addWindowStats(ctx, account, usage)
+		s.enforceUsageWindows(ctx, account, usage)
 		return usage, nil
 	}
 
@@ -371,7 +400,7 @@ func (s *AccountUsageService) addWindowStats(ctx context.Context, account *Accou
 
 		stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, startTime)
 		if err != nil {
-			log.Printf("Failed to get window stats for account %d: %v", account.ID, err)
+			applog.Printf("Failed to get window stats for account %d: %v", account.ID, err)
 			return
 		}
 
@@ -462,7 +491,7 @@ func (s *AccountUsageService) buildUsageInfo(resp *ClaudeUsageResponse, updatedA
 			info.FiveHour.ResetsAt = &fiveHourReset
 			info.FiveHour.RemainingSeconds = int(time.Until(fiveHourReset).Seconds())
 		} else {
-			log.Printf("Failed to parse FiveHour.ResetsAt: %s, error: %v", resp.FiveHour.ResetsAt, err)
+			applog.Printf("Failed to parse FiveHour.ResetsAt: %s, error: %v", resp.FiveHour.ResetsAt, err)
 		}
 	}
 
@@ -475,7 +504,7 @@ func (s *AccountUsageService) buildUsageInfo(resp *ClaudeUsageResponse, updatedA
 				RemainingSeconds: int(time.Until(sevenDayReset).Seconds()),
 			}
 		} else {
-			log.Printf("Failed to parse SevenDay.ResetsAt: %s, error: %v", resp.SevenDay.ResetsAt, err)
+			applog.Printf("Failed to parse SevenDay.ResetsAt: %s, error: %v", resp.SevenDay.ResetsAt, err)
 			info.SevenDay = &UsageProgress{
 				Utilization: resp.SevenDay.Utilization,
 			}
@@ -491,7 +520,7 @@ func (s *AccountUsageService) buildUsageInfo(resp *ClaudeUsageResponse, updatedA
 				RemainingSeconds: int(time.Until(sonnetReset).Seconds()),
 			}
 		} else {
-			log.Printf("Failed to parse SevenDaySonnet.ResetsAt: %s, error: %v", resp.SevenDaySonnet.ResetsAt, err)
+			applog.Printf("Failed to parse SevenDaySonnet.ResetsAt: %s, error: %v", resp.SevenDaySonnet.ResetsAt, err)
 			info.SevenDaySonnet = &UsageProgress{
 				Utilization: resp.SevenDaySonnet.Utilization,
 			}
@@ -563,4 +592,95 @@ func buildGeminiUsageProgress(used, limit int64, resetAt time.Time, tokens int64
 			Cost:     cost,
 		},
 	}
+}
+
+func (s *AccountUsageService) enforceUsageWindows(ctx context.Context, account *Account, usage *UsageInfo) {
+	if account == nil || usage == nil {
+		return
+	}
+	if s.accountRepo == nil {
+		return
+	}
+	// 仅在有 5h/7d 窗口数据时执行（API Key 等无 usage 窗口的账号会被跳过）
+	if usage.FiveHour == nil && usage.SevenDay == nil && usage.SevenDaySonnet == nil {
+		return
+	}
+
+	type window struct {
+		name   string
+		used   float64
+		reset  *time.Time
+		exceed bool
+	}
+	windows := []window{
+		{name: "5h", used: usageValue(usage.FiveHour), reset: usageResetAt(usage.FiveHour)},
+		{name: "7d", used: usageValue(usage.SevenDay), reset: usageResetAt(usage.SevenDay)},
+		{name: "7d_sonnet", used: usageValue(usage.SevenDaySonnet), reset: usageResetAt(usage.SevenDaySonnet)},
+	}
+
+	threshold := float64(s.settingService.GetUsageWindowDisablePercent(ctx))
+	if threshold <= 0 {
+		threshold = defaultUsageWindowDisablePercent
+	}
+
+	var exceeded []window
+	for _, w := range windows {
+		if w.used >= threshold {
+			w.exceed = true
+			exceeded = append(exceeded, w)
+		}
+	}
+	if len(exceeded) == 0 {
+		return
+	}
+
+	platformLabel := "账号"
+	switch account.Platform {
+	case PlatformAnthropic:
+		platformLabel = "Anthropic"
+	case PlatformOpenAI:
+		platformLabel = "OpenAI"
+	case PlatformGemini:
+		platformLabel = "Gemini"
+	case PlatformAntigravity:
+		platformLabel = "Antigravity"
+	}
+
+	var b strings.Builder
+	b.WriteString(platformLabel)
+	b.WriteString(" 额度已超限：")
+	for i, w := range exceeded {
+		if i > 0 {
+			b.WriteString("；")
+		}
+		b.WriteString(w.name)
+		b.WriteString(" 已用 ")
+		b.WriteString(fmt.Sprintf("%.1f%%", w.used))
+		if w.reset != nil {
+			b.WriteString("，预计 ")
+			b.WriteString(w.reset.Format(time.RFC3339))
+			b.WriteString(" 恢复")
+		} else {
+			b.WriteString("（重置时间未知）")
+		}
+	}
+
+	reason := strings.TrimSpace(b.String())
+	if err := setUnschedulableWithReason(ctx, s.accountRepo, account, reason); err != nil {
+		applog.Printf("[UsageLimit] SetUnschedulableWithReason failed for account %d: %v", account.ID, err)
+	}
+}
+
+func usageValue(p *UsageProgress) float64 {
+	if p == nil {
+		return 0
+	}
+	return p.Utilization
+}
+
+func usageResetAt(p *UsageProgress) *time.Time {
+	if p == nil {
+		return nil
+	}
+	return p.ResetsAt
 }

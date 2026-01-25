@@ -32,3 +32,8 @@ func (c *gatewayCache) RefreshSessionTTL(ctx context.Context, sessionHash string
 	key := stickySessionPrefix + sessionHash
 	return c.rdb.Expire(ctx, key, ttl).Err()
 }
+
+func (c *gatewayCache) DeleteSessionAccountID(ctx context.Context, sessionHash string) error {
+	key := stickySessionPrefix + sessionHash
+	return c.rdb.Del(ctx, key).Err()
+}

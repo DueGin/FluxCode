@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+
 	"strconv"
 	"time"
 
+	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/DueGin/FluxCode/internal/service"
 	"github.com/redis/go-redis/v9"
 )
@@ -89,7 +90,7 @@ func (c *billingCache) DeductUserBalance(ctx context.Context, userID int64, amou
 	key := billingBalanceKey(userID)
 	_, err := deductBalanceScript.Run(ctx, c.rdb, []string{key}, amount, int(billingCacheTTL.Seconds())).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		log.Printf("Warning: deduct balance cache failed for user %d: %v", userID, err)
+		applog.Printf("Warning: deduct balance cache failed for user %d: %v", userID, err)
 	}
 	return nil
 }
@@ -172,7 +173,7 @@ func (c *billingCache) UpdateSubscriptionUsage(ctx context.Context, userID, grou
 	key := billingSubKey(userID, groupID)
 	_, err := updateSubUsageScript.Run(ctx, c.rdb, []string{key}, cost, int(billingCacheTTL.Seconds())).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		log.Printf("Warning: update subscription usage cache failed for user %d group %d: %v", userID, groupID, err)
+		applog.Printf("Warning: update subscription usage cache failed for user %d group %d: %v", userID, groupID, err)
 	}
 	return nil
 }

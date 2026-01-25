@@ -136,6 +136,9 @@ func (m *mockAccountRepoForPlatform) SetRateLimited(ctx context.Context, id int6
 func (m *mockAccountRepoForPlatform) SetOverloaded(ctx context.Context, id int64, until time.Time) error {
 	return nil
 }
+func (m *mockAccountRepoForPlatform) SetUnschedulableWithReason(ctx context.Context, id int64, reason string) error {
+	return nil
+}
 func (m *mockAccountRepoForPlatform) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
 	return nil
 }
@@ -179,6 +182,13 @@ func (m *mockGatewayCacheForPlatform) SetSessionAccountID(ctx context.Context, s
 }
 
 func (m *mockGatewayCacheForPlatform) RefreshSessionTTL(ctx context.Context, sessionHash string, ttl time.Duration) error {
+	return nil
+}
+
+func (m *mockGatewayCacheForPlatform) DeleteSessionAccountID(ctx context.Context, sessionHash string) error {
+	if m.sessionBindings != nil {
+		delete(m.sessionBindings, sessionHash)
+	}
 	return nil
 }
 

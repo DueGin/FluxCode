@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from '../client'
+import type { KeyValueItem } from '@/types'
 
 /**
  * System settings interface
@@ -12,15 +13,24 @@ export interface SystemSettings {
   // Registration settings
   registration_enabled: boolean
   email_verify_enabled: boolean
+  // Alerting
+  alert_emails: string[]
+  alert_cooldown_minutes: number
   // Default settings
   default_balance: number
   default_concurrency: number
+  gateway_retry_switch_after: number
+  daily_usage_refresh_time: string
+  auth_401_cooldown_seconds: number
+  usage_window_disable_percent: number
+  user_concurrency_wait_timeout_seconds: number
   // OEM settings
   site_name: string
   site_logo: string
   site_subtitle: string
   api_base_url: string
   contact_info: string
+  after_sale_contact: KeyValueItem[]
   doc_url: string
   // SMTP settings
   smtp_host: string
