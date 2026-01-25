@@ -245,7 +245,7 @@
           </div>
         </div>
 
-      <DataTable :columns="columns" :data="accounts" :loading="loading">
+      <DataTable :columns="columns" :data="accounts" :loading="loading" sort-mode="server" @sort-change="handleSortChange">
           <template #cell-select="{ row }">
             <input
               type="checkbox"
@@ -745,29 +745,29 @@ const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 
 // Table columns
-	const columns = computed<Column[]>(() => {
-	  const cols: Column[] = [
-	    { key: 'select', label: '', sortable: false },
-	    { key: 'name', label: t('admin.accounts.columns.name'), sortable: false },
-	    { key: 'platform_type', label: t('admin.accounts.columns.platformType'), sortable: false },
-	    { key: 'concurrency', label: t('admin.accounts.columns.concurrencyStatus'), sortable: false },
-	    { key: 'status', label: t('admin.accounts.columns.status'), sortable: false },
-	    { key: 'schedulable', label: t('admin.accounts.columns.schedulable'), sortable: false },
-	    { key: 'expires_at', label: t('admin.accounts.columns.expires'), sortable: false },
-	    { key: 'today_stats', label: t('admin.accounts.columns.todayStats'), sortable: false }
-	  ]
+const columns = computed<Column[]>(() => {
+  const cols: Column[] = [
+    { key: 'select', label: '', sortable: false },
+    { key: 'name', label: t('admin.accounts.columns.name'), sortable: true },
+    { key: 'platform_type', label: t('admin.accounts.columns.platformType'), sortable: false },
+    { key: 'concurrency', label: t('admin.accounts.columns.concurrencyStatus'), sortable: false },
+    { key: 'status', label: t('admin.accounts.columns.status'), sortable: true },
+    { key: 'schedulable', label: t('admin.accounts.columns.schedulable'), sortable: true },
+    { key: 'expires_at', label: t('admin.accounts.columns.expires'), sortable: true },
+    { key: 'today_stats', label: t('admin.accounts.columns.todayStats'), sortable: false }
+  ]
 
   // 简易模式下不显示分组列
   if (!authStore.isSimpleMode) {
     cols.push({ key: 'groups', label: t('admin.accounts.columns.groups'), sortable: false })
   }
 
-	  cols.push(
-	    { key: 'usage', label: t('admin.accounts.columns.usageWindows'), sortable: false },
-	    { key: 'priority', label: t('admin.accounts.columns.priority'), sortable: false },
-	    { key: 'last_used_at', label: t('admin.accounts.columns.lastUsed'), sortable: false },
-	    { key: 'actions', label: t('admin.accounts.columns.actions'), sortable: false }
-	  )
+  cols.push(
+    { key: 'usage', label: t('admin.accounts.columns.usageWindows'), sortable: false },
+    { key: 'priority', label: t('admin.accounts.columns.priority'), sortable: true },
+    { key: 'last_used_at', label: t('admin.accounts.columns.lastUsed'), sortable: true },
+    { key: 'actions', label: t('admin.accounts.columns.actions'), sortable: false }
+  )
 
   return cols
 })
@@ -811,6 +811,10 @@ const pagination = reactive({
   page_size: 20,
   total: 0,
   pages: 0
+})
+const sort = reactive({
+  by: 'id',
+  order: 'desc' as 'asc' | 'desc'
 })
 let abortController: AbortController | null = null
 
@@ -1047,7 +1051,9 @@ const loadAccounts = async () => {
       platform: filters.platform || undefined,
       type: filters.type || undefined,
       status: filters.status || undefined,
-      search: searchQuery.value || undefined
+      search: searchQuery.value || undefined,
+      sort_by: sort.by || undefined,
+      sort_order: sort.order || undefined
     }, {
       signal: currentAbortController.signal
     })
@@ -1104,6 +1110,13 @@ const handlePageChange = (page: number) => {
 
 const handlePageSizeChange = (pageSize: number) => {
   pagination.page_size = pageSize
+  pagination.page = 1
+  loadAccounts()
+}
+
+const handleSortChange = (payload: { key: string; order: 'asc' | 'desc' }) => {
+  sort.by = payload.key
+  sort.order = payload.order
   pagination.page = 1
   loadAccounts()
 }

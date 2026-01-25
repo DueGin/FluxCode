@@ -177,8 +177,36 @@ func (h *AccountHandler) List(c *gin.Context) {
 	accountType := c.Query("type")
 	status := c.Query("status")
 	search := c.Query("search")
+	sortBy := strings.ToLower(strings.TrimSpace(c.Query("sort_by")))
+	sortOrder := strings.ToLower(strings.TrimSpace(c.Query("sort_order")))
 
-	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search)
+	if sortBy != "" {
+		allowedSortBy := map[string]struct{}{
+			"id":           {},
+			"name":         {},
+			"status":       {},
+			"schedulable":  {},
+			"expires_at":   {},
+			"priority":     {},
+			"last_used_at": {},
+		}
+		if _, ok := allowedSortBy[sortBy]; !ok {
+			response.BadRequest(c, "Invalid sort_by")
+			return
+		}
+
+		if sortOrder == "" {
+			sortOrder = "asc"
+		}
+		if sortOrder != "asc" && sortOrder != "desc" {
+			response.BadRequest(c, "Invalid sort_order")
+			return
+		}
+	} else {
+		sortOrder = ""
+	}
+
+	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -1400,7 +1428,7 @@ func (h *AccountHandler) BatchRefreshTier(c *gin.Context) {
 	accounts := make([]*service.Account, 0)
 
 	if len(req.AccountIDs) == 0 {
-		allAccounts, _, err := h.adminService.ListAccounts(ctx, 1, 10000, "gemini", "oauth", "", "")
+		allAccounts, _, err := h.adminService.ListAccounts(ctx, 1, 10000, "gemini", "oauth", "", "", "", "")
 		if err != nil {
 			response.ErrorFrom(c, err)
 			return
