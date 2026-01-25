@@ -39,6 +39,7 @@ type SystemSettings struct {
 	DailyUsageRefreshTime             string  `json:"daily_usage_refresh_time"`
 	Auth401CooldownSeconds            int     `json:"auth_401_cooldown_seconds"`
 	UsageWindowDisablePercent         int     `json:"usage_window_disable_percent"`
+	UsageWindowCooldownSeconds        int     `json:"usage_window_cooldown_seconds"`
 	UserConcurrencyWaitTimeoutSeconds int     `json:"user_concurrency_wait_timeout_seconds"`
 
 	// Model fallback configuration

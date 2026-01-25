@@ -27,6 +27,7 @@ const (
 	defaultDailyUsageRefreshTime             = "03:00"
 	defaultAuth401CooldownSeconds            = 300
 	defaultUsageWindowDisablePercent         = 100
+	defaultUsageWindowCooldownSeconds        = 300
 	defaultUserConcurrencyWaitTimeoutSeconds = 30
 )
 
@@ -216,6 +217,10 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyAuth401CooldownSeconds] = strconv.Itoa(settings.Auth401CooldownSeconds)
 	settings.UsageWindowDisablePercent = normalizeUsageWindowDisablePercent(settings.UsageWindowDisablePercent)
 	updates[SettingKeyUsageWindowDisablePercent] = strconv.Itoa(settings.UsageWindowDisablePercent)
+	if settings.UsageWindowCooldownSeconds <= 0 {
+		settings.UsageWindowCooldownSeconds = defaultUsageWindowCooldownSeconds
+	}
+	updates[SettingKeyUsageWindowCooldownSeconds] = strconv.Itoa(settings.UsageWindowCooldownSeconds)
 	if settings.UserConcurrencyWaitTimeoutSeconds <= 0 {
 		settings.UserConcurrencyWaitTimeoutSeconds = defaultUserConcurrencyWaitTimeoutSeconds
 	}
@@ -258,6 +263,7 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 			SettingKeyDailyUsageRefreshTime:             updates[SettingKeyDailyUsageRefreshTime],
 			SettingKeyAuth401CooldownSeconds:            updates[SettingKeyAuth401CooldownSeconds],
 			SettingKeyUsageWindowDisablePercent:         updates[SettingKeyUsageWindowDisablePercent],
+			SettingKeyUsageWindowCooldownSeconds:        updates[SettingKeyUsageWindowCooldownSeconds],
 			SettingKeyUserConcurrencyWaitTimeoutSeconds: updates[SettingKeyUserConcurrencyWaitTimeoutSeconds],
 		}
 		if err := s.settingCache.SetMultiple(ctx, cacheUpdates); err != nil {
@@ -319,6 +325,9 @@ func (s *SettingService) bestEffortRestoreSettingsCache(ctx context.Context, pre
 	}
 	if v, ok := previousValues[SettingKeyUsageWindowDisablePercent]; ok {
 		restore[SettingKeyUsageWindowDisablePercent] = v
+	}
+	if v, ok := previousValues[SettingKeyUsageWindowCooldownSeconds]; ok {
+		restore[SettingKeyUsageWindowCooldownSeconds] = v
 	}
 	if v, ok := previousValues[SettingKeyUserConcurrencyWaitTimeoutSeconds]; ok {
 		restore[SettingKeyUserConcurrencyWaitTimeoutSeconds] = v
@@ -508,6 +517,40 @@ func (s *SettingService) GetUsageWindowDisablePercent(ctx context.Context) int {
 	return v
 }
 
+func (s *SettingService) GetUsageWindowCooldownSeconds(ctx context.Context) int {
+	if s == nil {
+		return defaultUsageWindowCooldownSeconds
+	}
+	if s.settingCache != nil {
+		if value, err := s.settingCache.GetValue(ctx, SettingKeyUsageWindowCooldownSeconds); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && v > 0 {
+				return v
+			}
+		}
+	}
+
+	if s.settingRepo == nil {
+		return defaultUsageWindowCooldownSeconds
+	}
+
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyUsageWindowCooldownSeconds)
+	if err != nil {
+		return defaultUsageWindowCooldownSeconds
+	}
+	v, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || v <= 0 {
+		v = defaultUsageWindowCooldownSeconds
+	}
+	if s.settingCache != nil {
+		_ = s.settingCache.Set(ctx, SettingKeyUsageWindowCooldownSeconds, strconv.Itoa(v))
+	}
+	return v
+}
+
+func (s *SettingService) GetUsageWindowCooldown(ctx context.Context) time.Duration {
+	return time.Duration(s.GetUsageWindowCooldownSeconds(ctx)) * time.Second
+}
+
 func (s *SettingService) GetUserConcurrencyWaitTimeoutSeconds(ctx context.Context) int {
 	if s == nil {
 		return defaultUserConcurrencyWaitTimeoutSeconds
@@ -569,6 +612,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyDailyUsageRefreshTime:             defaultDailyUsageRefreshTime,
 		SettingKeyAuth401CooldownSeconds:            strconv.Itoa(defaultAuth401CooldownSeconds),
 		SettingKeyUsageWindowDisablePercent:         strconv.Itoa(defaultUsageWindowDisablePercent),
+		SettingKeyUsageWindowCooldownSeconds:        strconv.Itoa(defaultUsageWindowCooldownSeconds),
 		SettingKeyUserConcurrencyWaitTimeoutSeconds: strconv.Itoa(defaultUserConcurrencyWaitTimeoutSeconds),
 		SettingKeySMTPPort:                          "587",
 		SettingKeySMTPUseTLS:                        "false",
@@ -589,6 +633,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 			SettingKeyDailyUsageRefreshTime:             defaults[SettingKeyDailyUsageRefreshTime],
 			SettingKeyAuth401CooldownSeconds:            defaults[SettingKeyAuth401CooldownSeconds],
 			SettingKeyUsageWindowDisablePercent:         defaults[SettingKeyUsageWindowDisablePercent],
+			SettingKeyUsageWindowCooldownSeconds:        defaults[SettingKeyUsageWindowCooldownSeconds],
 			SettingKeyUserConcurrencyWaitTimeoutSeconds: defaults[SettingKeyUserConcurrencyWaitTimeoutSeconds],
 		})
 	}
@@ -661,6 +706,11 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		result.UsageWindowDisablePercent = normalizeUsageWindowDisablePercent(v)
 	} else {
 		result.UsageWindowDisablePercent = defaultUsageWindowDisablePercent
+	}
+	if v, err := strconv.Atoi(strings.TrimSpace(settings[SettingKeyUsageWindowCooldownSeconds])); err == nil && v > 0 {
+		result.UsageWindowCooldownSeconds = v
+	} else {
+		result.UsageWindowCooldownSeconds = defaultUsageWindowCooldownSeconds
 	}
 	if v, err := strconv.Atoi(strings.TrimSpace(settings[SettingKeyUserConcurrencyWaitTimeoutSeconds])); err == nil && v > 0 {
 		result.UserConcurrencyWaitTimeoutSeconds = v

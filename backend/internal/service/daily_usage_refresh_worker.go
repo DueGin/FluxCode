@@ -367,15 +367,11 @@ func (w *DailyUsageRefreshWorker) refreshAccountInternal(ctx context.Context, ac
 	}
 	exceeded := exceededWindows(usageWindowsFromUsageInfo(usage), threshold)
 	if len(exceeded) > 0 {
-		schedDetail := ""
-		if account.Schedulable {
-			schedDetail = " schedulable_disabled"
-		}
 		reason := buildUsageExceededReason(account.Platform, exceeded)
-		if err := setUnschedulableWithReason(reqCtx, w.accountRepo, account, reason); err != nil {
+		if err := w.setTempUnschedulableByUsage(reqCtx, account.ID, reason); err != nil {
 			return action, "error", "disable_schedulable_failed " + windows
 		}
-		return action, "ok", "usage_exceeded " + windows + schedDetail
+		return action, "ok", "usage_exceeded " + windows + " temp_unsched_set"
 	}
 
 	schedDetail := ""
@@ -481,17 +477,13 @@ func (w *DailyUsageRefreshWorker) refreshCodexUsage(ctx context.Context, account
 		return action, "ok", "cleared_temp_unsched " + windowSummary + schedDetail
 	}
 
-	schedDetail := ""
 	reqCtx, cancel := context.WithTimeout(ctx, w.perAccountTimeout)
 	defer cancel()
-	if account.Schedulable {
-		schedDetail = " schedulable_disabled"
-	}
 	reason := buildUsageExceededReason(account.Platform, exceeded)
-	if err := setUnschedulableWithReason(reqCtx, w.accountRepo, account, reason); err != nil {
+	if err := w.setTempUnschedulableByUsage(reqCtx, account.ID, reason); err != nil {
 		return action, "error", "disable_schedulable_failed " + windowSummary
 	}
-	return action, "ok", "usage_exceeded " + windowSummary + schedDetail
+	return action, "ok", "usage_exceeded " + windowSummary + " temp_unsched_set"
 }
 
 func (w *DailyUsageRefreshWorker) probeCodexUsage(ctx context.Context, account *Account) (updates map[string]any, attempted bool, statusCode int, modelID string, err error) {
@@ -723,13 +715,26 @@ func usageExceeded(usage *UsageInfo, threshold float64) bool {
 	if usageValue(usage.FiveHour) >= threshold {
 		return true
 	}
-	if usageValue(usage.SevenDay) >= threshold {
-		return true
-	}
-	if usageValue(usage.SevenDaySonnet) >= threshold {
-		return true
-	}
 	return false
+}
+
+func (w *DailyUsageRefreshWorker) setTempUnschedulableByUsage(ctx context.Context, accountID int64, reason string) error {
+	if w == nil || w.accountRepo == nil || accountID <= 0 {
+		return nil
+	}
+	cooldown := time.Duration(defaultUsageWindowCooldownSeconds) * time.Second
+	if w.settingService != nil {
+		if v := w.settingService.GetUsageWindowCooldown(ctx); v > 0 {
+			cooldown = v
+		}
+	}
+	until := time.Now().Add(cooldown)
+	reason = sanitizeSensitiveText(strings.TrimSpace(reason))
+
+	if w.rateLimitService != nil {
+		return w.rateLimitService.SetTempUnschedulableWithReason(ctx, accountID, until, reason)
+	}
+	return w.accountRepo.SetTempUnschedulable(ctx, accountID, until, reason)
 }
 
 // 注意："schedulable=false + temp_unschedulable_reason" 仅作为调度开关的提示信息（系统/手动都会写入）。

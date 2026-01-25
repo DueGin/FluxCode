@@ -62,8 +62,11 @@ func (c *fakeSettingCache) ReleaseUpdateLock(ctx context.Context, token string) 
 }
 
 type accountRepoForUnschedTest struct {
-	unschedCalls int
-	lastReason   string
+	unschedCalls     int
+	lastReason       string
+	tempUnschedCalls int
+	tempUntil        time.Time
+	tempReason       string
 }
 
 func (r *accountRepoForUnschedTest) SetUnschedulableWithReason(ctx context.Context, id int64, reason string) error {
@@ -173,7 +176,10 @@ func (r *accountRepoForUnschedTest) SetOverloaded(ctx context.Context, id int64,
 }
 
 func (r *accountRepoForUnschedTest) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
-	panic("unexpected SetTempUnschedulable call")
+	r.tempUnschedCalls++
+	r.tempUntil = until
+	r.tempReason = reason
+	return nil
 }
 
 func (r *accountRepoForUnschedTest) ClearTempUnschedulable(ctx context.Context, id int64) error {
@@ -253,4 +259,3 @@ func TestAccountUsageService_EnforceUsageWindows_Ignores7d(t *testing.T) {
 	svc.enforceUsageWindows(context.Background(), account, usage)
 	require.Equal(t, 0, repo.unschedCalls)
 }
-

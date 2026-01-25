@@ -1888,8 +1888,11 @@ export default {
         auth401CooldownSecondsHint: '当上游返回 401（token/鉴权异常）时，将账号临时冷却该秒数后再参与调度（默认 300）',
         dailyUsageRefreshTime: '每日用量检查时间',
         dailyUsageRefreshTimeHint: '每日在此时间对启用账号刷新上游用量窗口（HH:MM）',
-        usageWindowDisablePercent: '窗口超限取消调度阈值（%）',
-        usageWindowDisablePercentHint: '当窗口使用率达到该比例时，账号将取消调度（范围 1-100，默认 100），窗口恢复后会自动启用',
+        usageWindowDisablePercent: '窗口超限阈值（%）',
+        usageWindowDisablePercentHint:
+          '当 5h 窗口使用率达到该比例时，账号将进入临时不可调度（不关闭调度开关），冷却时间见下方配置（范围 1-100，默认 100）',
+        usageWindowCooldownSeconds: '窗口超限冷却时间（秒）',
+        usageWindowCooldownSecondsHint: '当 5h 窗口超限时，将账号临时不可调度该秒数（默认 300，即 5 分钟）',
         userConcurrencyWaitTimeoutSeconds: '用户并发等待超时（秒）',
         userConcurrencyWaitTimeoutSecondsHint:
           '当请求达到用户并发上限时，最多等待该秒数获取并发槽位（默认 30）'

@@ -387,6 +387,22 @@
               </div>
               <div>
                 <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.scheduling.usageWindowCooldownSeconds') }}
+                </label>
+                <input
+                  v-model.number="form.usage_window_cooldown_seconds"
+                  type="number"
+                  min="1"
+                  step="1"
+                  class="input"
+                  placeholder="300"
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.scheduling.usageWindowCooldownSecondsHint') }}
+                </p>
+              </div>
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.scheduling.userConcurrencyWaitTimeoutSeconds') }}
                 </label>
                 <input
@@ -950,6 +966,7 @@ const form = reactive<SystemSettings>({
   daily_usage_refresh_time: '03:00',
   auth_401_cooldown_seconds: 300,
   usage_window_disable_percent: 100,
+  usage_window_cooldown_seconds: 300,
   user_concurrency_wait_timeout_seconds: 30,
   site_name: 'FluxCode',
   site_logo: '',

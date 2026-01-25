@@ -1885,9 +1885,12 @@ export default {
           'When upstream returns 401 (token/auth issues), temporarily cool down the account for this many seconds before rescheduling (default: 300)',
         dailyUsageRefreshTime: 'Daily usage refresh time',
         dailyUsageRefreshTimeHint: 'Refresh usage windows for active accounts at HH:MM each day',
-        usageWindowDisablePercent: 'Usage window disable threshold (%)',
+        usageWindowDisablePercent: 'Usage window threshold (%)',
         usageWindowDisablePercentHint:
-          'When window utilization reaches this percentage, scheduling will be turned off (range: 1-100, default: 100) and auto-enabled after the window resets',
+          'When 5h window utilization reaches this percentage, the account becomes temporarily unschedulable (scheduling switch stays on). Cooldown is configured below (range: 1-100, default: 100)',
+        usageWindowCooldownSeconds: 'Usage window cooldown (seconds)',
+        usageWindowCooldownSecondsHint:
+          'When 5h window is exceeded, temporarily mark the account as unschedulable for this many seconds (default: 300 = 5 minutes)',
         userConcurrencyWaitTimeoutSeconds: 'User concurrency wait timeout (seconds)',
         userConcurrencyWaitTimeoutSecondsHint:
           'When user concurrency is maxed out, wait up to this many seconds for a slot (default: 30)'
