@@ -259,7 +259,8 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 		// 4. 添加窗口统计（有独立缓存，1 分钟）
 		s.addWindowStats(ctx, account, usage)
 
-		// 5. 超限检测：5h/7d 达到或超过配置阈值时，取消调度并写入提示信息（非临时不可调度，窗口恢复后可被刷新任务自动启用）
+		// 5. 超限检测：仅 5h 达到或超过配置阈值时，取消调度并写入提示信息（非临时不可调度，窗口恢复后可被刷新任务自动启用）。
+		//    注意：7d 窗口仅用于展示，不参与调度状态更新（临时/非临时都不基于 7d）。
 		s.enforceUsageWindows(ctx, account, usage)
 
 		return usage, nil
@@ -601,8 +602,8 @@ func (s *AccountUsageService) enforceUsageWindows(ctx context.Context, account *
 	if s.accountRepo == nil {
 		return
 	}
-	// 仅在有 5h/7d 窗口数据时执行（API Key 等无 usage 窗口的账号会被跳过）
-	if usage.FiveHour == nil && usage.SevenDay == nil && usage.SevenDaySonnet == nil {
+	// 仅在有 5h 窗口数据时执行（API Key 等无 usage 窗口的账号会被跳过；7d 不参与调度状态更新）
+	if usage.FiveHour == nil {
 		return
 	}
 
@@ -614,8 +615,6 @@ func (s *AccountUsageService) enforceUsageWindows(ctx context.Context, account *
 	}
 	windows := []window{
 		{name: "5h", used: usageValue(usage.FiveHour), reset: usageResetAt(usage.FiveHour)},
-		{name: "7d", used: usageValue(usage.SevenDay), reset: usageResetAt(usage.SevenDay)},
-		{name: "7d_sonnet", used: usageValue(usage.SevenDaySonnet), reset: usageResetAt(usage.SevenDaySonnet)},
 	}
 
 	threshold := float64(s.settingService.GetUsageWindowDisablePercent(ctx))
