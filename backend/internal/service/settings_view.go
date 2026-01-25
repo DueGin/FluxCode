@@ -38,6 +38,7 @@ type SystemSettings struct {
 	DailyUsageRefreshTime             string
 	Auth401CooldownSeconds            int
 	UsageWindowDisablePercent         int
+	UsageWindowCooldownSeconds        int
 	UserConcurrencyWaitTimeoutSeconds int
 
 	// Model fallback configuration

@@ -315,6 +315,7 @@ func TestAPIContracts(t *testing.T) {
 					"daily_usage_refresh_time": "03:00",
 					"auth_401_cooldown_seconds": 300,
 					"usage_window_disable_percent": 100,
+					"usage_window_cooldown_seconds": 300,
 					"user_concurrency_wait_timeout_seconds": 30,
 					"alert_emails": [],
 					"alert_cooldown_minutes": 5,

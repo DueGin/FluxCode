@@ -1275,10 +1275,6 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 		updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = s.accountRepo.UpdateExtra(updateCtx, accountID, updates)
-
-		if s.rateLimitService == nil {
-			return
-		}
 		now := time.Now()
 		tempAccount := &Account{Extra: updates}
 		threshold := float64(s.settingService.GetUsageWindowDisablePercent(updateCtx))
@@ -1290,8 +1286,22 @@ func (s *OpenAIGatewayService) updateCodexUsageSnapshot(ctx context.Context, acc
 			return
 		}
 		reason := buildCodexExceededReason(exceeded)
-		if err := setUnschedulableWithReasonByID(updateCtx, s.accountRepo, accountID, reason); err != nil {
-			applog.Printf("[CodexQuota] SetUnschedulableWithReason failed for account %d: %v", accountID, err)
+		cooldown := time.Duration(defaultUsageWindowCooldownSeconds) * time.Second
+		if s.settingService != nil {
+			if v := s.settingService.GetUsageWindowCooldown(updateCtx); v > 0 {
+				cooldown = v
+			}
+		}
+		until := time.Now().Add(cooldown)
+		reason = sanitizeSensitiveText(strings.TrimSpace(reason))
+		if s.rateLimitService != nil {
+			if err := s.rateLimitService.SetTempUnschedulableWithReason(updateCtx, accountID, until, reason); err != nil {
+				applog.Printf("[CodexQuota] SetTempUnschedulable failed for account %d: %v", accountID, err)
+			}
+			return
+		}
+		if err := s.accountRepo.SetTempUnschedulable(updateCtx, accountID, until, reason); err != nil {
+			applog.Printf("[CodexQuota] SetTempUnschedulable failed for account %d: %v", accountID, err)
 		}
 	}()
 }

@@ -35,7 +35,7 @@ type AdminService interface {
 	GetGroupAPIKeys(ctx context.Context, groupID int64, page, pageSize int) ([]APIKey, int64, error)
 
 	// Account management
-	ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string) ([]Account, int64, error)
+	ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search, sortBy, sortOrder string) ([]Account, int64, error)
 	GetAccount(ctx context.Context, id int64) (*Account, error)
 	GetAccountsByIDs(ctx context.Context, ids []int64) ([]*Account, error)
 	CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error)
@@ -59,12 +59,12 @@ type AdminService interface {
 	CheckProxyExists(ctx context.Context, host string, port int, username, password string) (bool, error)
 	TestProxy(ctx context.Context, id int64) (*ProxyTestResult, error)
 
-		// Redeem code management
-		ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error)
-		GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
-		GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error)
-		DeleteRedeemCode(ctx context.Context, id int64) error
-		BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error)
+	// Redeem code management
+	ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error)
+	GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
+	GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error)
+	DeleteRedeemCode(ctx context.Context, id int64) error
+	BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error)
 	ExpireRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
 	ListRedeemWelfareNos(ctx context.Context) ([]string, error)
 }
@@ -612,8 +612,8 @@ func (s *adminServiceImpl) GetGroupAPIKeys(ctx context.Context, groupID int64, p
 }
 
 // Account management implementations
-func (s *adminServiceImpl) ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string) ([]Account, int64, error) {
-	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
+func (s *adminServiceImpl) ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search, sortBy, sortOrder string) ([]Account, int64, error) {
+	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
 	accounts, result, err := s.accountRepo.ListWithFilters(ctx, params, platform, accountType, status, search)
 	if err != nil {
 		return nil, 0, err
@@ -1042,14 +1042,14 @@ func (s *adminServiceImpl) CheckProxyExists(ctx context.Context, host string, po
 }
 
 // Redeem code management implementations
-	func (s *adminServiceImpl) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error) {
-		params := pagination.PaginationParams{Page: page, PageSize: pageSize}
-		codes, result, err := s.redeemCodeRepo.ListWithFilters(ctx, params, codeType, status, searchType, search, isWelfare, welfareNo)
-		if err != nil {
-			return nil, 0, err
-		}
-		return codes, result.Total, nil
+func (s *adminServiceImpl) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, searchType, search string, isWelfare *bool, welfareNo string) ([]RedeemCode, int64, error) {
+	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
+	codes, result, err := s.redeemCodeRepo.ListWithFilters(ctx, params, codeType, status, searchType, search, isWelfare, welfareNo)
+	if err != nil {
+		return nil, 0, err
 	}
+	return codes, result.Total, nil
+}
 
 func (s *adminServiceImpl) GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error) {
 	return s.redeemCodeRepo.GetByID(ctx, id)

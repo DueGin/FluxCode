@@ -50,7 +50,7 @@
       </thead>
       <tbody class="table-body divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-900">
         <!-- Loading skeleton -->
-        <tr v-if="loading" v-for="i in 5" :key="i">
+        <tr v-if="showLoadingSkeleton" v-for="i in 5" :key="i">
           <td v-for="column in columns" :key="column.key" :class="['whitespace-nowrap py-4', getAdaptivePaddingClass()]">
             <div class="animate-pulse">
               <div class="h-4 w-3/4 rounded bg-gray-200 dark:bg-dark-700"></div>
@@ -103,9 +103,19 @@
               getStickyColumnClass(column, colIndex)
             ]"
           >
-            <slot :name="`cell-${column.key}`" :row="row" :value="row[column.key]" :expanded="actionsExpanded">
-              {{ column.formatter ? column.formatter(row[column.key], row) : row[column.key] }}
-            </slot>
+            <div class="relative">
+              <div v-if="isRefreshing" class="pointer-events-none absolute inset-0 flex items-center">
+                <div
+                  class="animate-pulse rounded bg-gray-200 dark:bg-dark-700"
+                  :class="getCellSkeletonClass(column.key)"
+                ></div>
+              </div>
+              <div :class="{ 'pointer-events-none opacity-0': isRefreshing }">
+                <slot :name="`cell-${column.key}`" :row="row" :value="row[column.key]" :expanded="actionsExpanded">
+                  {{ column.formatter ? column.formatter(row[column.key], row) : row[column.key] }}
+                </slot>
+              </div>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -215,6 +225,7 @@ interface Props {
   loading?: boolean
   defaultSortKey?: string
   defaultSortOrder?: 'asc' | 'desc'
+  sortMode?: 'client' | 'server'
   stickyFirstColumn?: boolean
   stickyActionsColumn?: boolean
   expandableActions?: boolean
@@ -225,10 +236,15 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
   defaultSortKey: '',
   defaultSortOrder: 'asc',
+  sortMode: 'client',
   stickyFirstColumn: true,
   stickyActionsColumn: true,
   expandableActions: true
 })
+
+const emit = defineEmits<{
+  (e: 'sort-change', payload: { key: string; order: 'asc' | 'desc' }): void
+}>()
 
 const sortKey = ref<string>(props.defaultSortKey)
 const sortOrder = ref<'asc' | 'desc'>(props.defaultSortOrder)
@@ -259,9 +275,11 @@ const handleSort = (key: string) => {
     sortKey.value = key
     sortOrder.value = 'asc'
   }
+  emit('sort-change', { key: sortKey.value, order: sortOrder.value })
 }
 
 const sortedData = computed(() => {
+  if (props.sortMode === 'server') return props.data
   if (!sortKey.value || !props.data) return props.data
 
   return [...props.data].sort((a, b) => {
@@ -274,6 +292,15 @@ const sortedData = computed(() => {
     return sortOrder.value === 'asc' ? comparison : -comparison
   })
 })
+
+const showLoadingSkeleton = computed(() => props.loading && props.data.length === 0)
+const isRefreshing = computed(() => props.loading && props.data.length > 0)
+
+const getCellSkeletonClass = (key: string) => {
+  if (key === 'select') return 'h-4 w-4'
+  if (key === 'actions') return 'h-4 w-24'
+  return 'h-4 w-3/4'
+}
 
 // 检查第一列是否为勾选列
 const hasSelectColumn = computed(() => {

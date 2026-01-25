@@ -729,13 +729,16 @@ func (s *RateLimitService) handleQuotaExceeded429(ctx context.Context, account *
 	}
 
 	until := parseRateLimitReset(headers)
+	if until == nil {
+		until = parseRateLimitResetFromBody(responseBody)
+	}
 	now := time.Now()
 	if until == nil || !until.After(now) {
 		fallback := now.Add(30 * time.Minute)
 		until = &fallback
 	}
 
-	reason := buildQuotaExceededReason(code, msg, headers)
+	reason := buildQuotaExceededReason(code, msg, headers, until)
 	if err := setUnschedulableWithReason(ctx, s.accountRepo, account, reason); err != nil {
 		applog.Printf("[QuotaExceeded] SetUnschedulableWithReason failed for account %d: %v", account.ID, err)
 		return false
@@ -830,6 +833,7 @@ func parseRateLimitReset(headers http.Header) *time.Time {
 	}
 	keys := []string{
 		"anthropic-ratelimit-unified-reset",
+		"retry-after",
 		"x-ratelimit-reset-requests",
 		"x-ratelimit-reset-tokens",
 		"x-ratelimit-reset",
@@ -844,6 +848,39 @@ func parseRateLimitReset(headers http.Header) *time.Time {
 			return resetAt
 		}
 	}
+	return nil
+}
+
+func parseRateLimitResetFromBody(body []byte) *time.Time {
+	if len(body) == 0 {
+		return nil
+	}
+
+	if ts := gjson.GetBytes(body, "error.resets_at"); ts.Exists() {
+		if unix := ts.Int(); unix > 0 {
+			resetAt := time.Unix(unix, 0)
+			return &resetAt
+		}
+	}
+	if ts := gjson.GetBytes(body, "resets_at"); ts.Exists() {
+		if unix := ts.Int(); unix > 0 {
+			resetAt := time.Unix(unix, 0)
+			return &resetAt
+		}
+	}
+	if secs := gjson.GetBytes(body, "error.resets_in_seconds"); secs.Exists() {
+		if v := secs.Int(); v > 0 {
+			resetAt := time.Now().Add(time.Duration(v) * time.Second)
+			return &resetAt
+		}
+	}
+	if secs := gjson.GetBytes(body, "resets_in_seconds"); secs.Exists() {
+		if v := secs.Int(); v > 0 {
+			resetAt := time.Now().Add(time.Duration(v) * time.Second)
+			return &resetAt
+		}
+	}
+
 	return nil
 }
 
@@ -873,10 +910,13 @@ func parseResetValue(raw string) *time.Time {
 	if t, err := time.Parse(time.RFC3339, value); err == nil {
 		return &t
 	}
+	if t, err := http.ParseTime(value); err == nil {
+		return &t
+	}
 	return nil
 }
 
-func buildQuotaExceededReason(code, msg string, headers http.Header) string {
+func buildQuotaExceededReason(code, msg string, headers http.Header, resetAt *time.Time) string {
 	reqID := ""
 	if headers != nil {
 		reqID = firstNonEmptyHeader(headers, "x-request-id", "request-id", "anthropic-request-id")
@@ -898,6 +938,12 @@ func buildQuotaExceededReason(code, msg string, headers http.Header) string {
 	reason := "Upstream quota exceeded (429)"
 	if code != "" {
 		reason += "; upstream_code=" + code
+	}
+	if resetAt == nil {
+		resetAt = parseRateLimitReset(headers)
+	}
+	if resetAt != nil {
+		reason += "; reset_at=" + resetAt.Format(time.RFC3339)
 	}
 	if msg != "" {
 		reason += "; upstream_message=" + msg

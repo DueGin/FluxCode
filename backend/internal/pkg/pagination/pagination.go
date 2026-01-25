@@ -3,8 +3,10 @@ package pagination
 
 // PaginationParams 分页参数
 type PaginationParams struct {
-	Page     int
-	PageSize int
+	Page      int
+	PageSize  int
+	SortBy    string
+	SortOrder string
 }
 
 // PaginationResult 分页结果
