@@ -1108,8 +1108,8 @@ export default {
         banned: 'This account is banned and cannot be scheduled.',
         tempUnsched: 'This account is temporarily unschedulable.',
         tempUnschedWithReason: 'This account is temporarily unschedulable: {reason}',
-        rateLimitedUntil: 'Rate limited; expected to recover after {time}.',
-        overloadedUntil: 'Overloaded; expected to recover after {time}.'
+        rateLimitedUntil: 'Rate limited; expected to recover at {time}.',
+        overloadedUntil: 'Overloaded; expected to recover at {time}.'
       },
       tempUnschedulable: {
         title: 'Temp Unschedulable',

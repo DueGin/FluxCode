@@ -1130,8 +1130,8 @@ export default {
         banned: '账号已封号，无法参与调度。',
         tempUnsched: '账号处于临时不可调度状态。',
         tempUnschedWithReason: '账号处于临时不可调度状态：{reason}',
-        rateLimitedUntil: '账号触发限流，预计 {time} 后恢复调度。',
-        overloadedUntil: '账号处于过载，预计 {time} 后恢复调度。'
+        rateLimitedUntil: '账号触发限流，预计于 {time} 恢复调度。',
+        overloadedUntil: '账号处于过载，预计于 {time} 恢复调度。'
       },
       tempUnschedulable: {
         title: '临时不可调度',
