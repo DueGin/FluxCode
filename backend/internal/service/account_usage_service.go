@@ -257,7 +257,7 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 		// 4. 添加窗口统计（有独立缓存，1 分钟）
 		s.addWindowStats(ctx, account, usage)
 
-		// 5. 超限检测：仅 5h 达到或超过配置阈值时，取消调度并写入提示信息（非临时不可调度，窗口恢复后可被刷新任务自动启用）。
+		// 5. 超限检测：仅当 5h 窗口达到/超过配置阈值时，将账号标记为“临时不可调度”（不关闭调度开关）。
 		//    注意：7d 窗口仅用于展示，不参与调度状态更新（临时/非临时都不基于 7d）。
 		s.enforceUsageWindows(ctx, account, usage)
 

@@ -369,7 +369,7 @@ func (w *DailyUsageRefreshWorker) refreshAccountInternal(ctx context.Context, ac
 	if len(exceeded) > 0 {
 		reason := buildUsageExceededReason(account.Platform, exceeded)
 		if err := w.setTempUnschedulableByUsage(reqCtx, account.ID, reason); err != nil {
-			return action, "error", "disable_schedulable_failed " + windows
+			return action, "error", "set_temp_unsched_failed " + windows
 		}
 		return action, "ok", "usage_exceeded " + windows + " temp_unsched_set"
 	}
@@ -481,7 +481,7 @@ func (w *DailyUsageRefreshWorker) refreshCodexUsage(ctx context.Context, account
 	defer cancel()
 	reason := buildUsageExceededReason(account.Platform, exceeded)
 	if err := w.setTempUnschedulableByUsage(reqCtx, account.ID, reason); err != nil {
-		return action, "error", "disable_schedulable_failed " + windowSummary
+		return action, "error", "set_temp_unsched_failed " + windowSummary
 	}
 	return action, "ok", "usage_exceeded " + windowSummary + " temp_unsched_set"
 }
@@ -626,8 +626,7 @@ func (w *DailyUsageRefreshWorker) ensureSchedulable(ctx context.Context, account
 	if err := w.accountRepo.SetSchedulable(ctx, account.ID, true); err != nil {
 		return false, err
 	}
-	// 尽力清理调度开关旁的提示字段（temp_unschedulable_reason/until）。
-	// 这些字段在 schedulable=false 时用于展示“取消调度原因”，启用调度后不应继续残留。
+	// 尽力清理提示字段（temp_unschedulable_reason/until），避免在恢复调度开关后 UI 继续残留旧提示/旧临时状态。
 	if err := w.accountRepo.ClearTempUnschedulable(ctx, account.ID); err != nil {
 		applog.Printf("[DailyUsageRefreshWorker] ClearTempUnschedulable failed for account_id=%d: %v", account.ID, err)
 	}
@@ -737,5 +736,6 @@ func (w *DailyUsageRefreshWorker) setTempUnschedulableByUsage(ctx context.Contex
 	return w.accountRepo.SetTempUnschedulable(ctx, accountID, until, reason)
 }
 
-// 注意："schedulable=false + temp_unschedulable_reason" 仅作为调度开关的提示信息（系统/手动都会写入）。
-// 刷新任务在判定账号未超限（或无法获取 usage 的场景）时，会自动恢复 schedulable=true，并清空该提示字段。
+// 注意：temp_unschedulable_reason/until 表示“临时不可调度”状态（可能由 5h 窗口超限/上游限流等触发）。
+// 刷新任务在判定账号未超限时（且 reason 属于 usage 超限场景）会清理该临时不可调度状态；
+// 同时也会在账号 schedulable=false 且非过期时，尝试恢复 schedulable=true（历史行为）。
