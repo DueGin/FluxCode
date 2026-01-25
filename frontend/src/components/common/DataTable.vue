@@ -7,6 +7,12 @@
       'is-scrollable': isScrollable
     }"
   >
+    <div
+      v-if="isRefreshing"
+      class="pointer-events-none absolute right-2 top-2 z-[230] rounded bg-white/60 px-2 py-1 text-xs text-gray-500 backdrop-blur dark:bg-dark-900/60 dark:text-dark-400"
+    >
+      {{ t('common.loading') }}
+    </div>
     <table class="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
       <thead class="table-header bg-gray-50 dark:bg-dark-800">
         <tr>
@@ -48,9 +54,14 @@
           </th>
         </tr>
       </thead>
-      <tbody class="table-body divide-y divide-gray-200 bg-white dark:divide-dark-700 dark:bg-dark-900">
+      <tbody
+        :class="[
+          'table-body divide-y divide-gray-200 bg-white transition-opacity dark:divide-dark-700 dark:bg-dark-900',
+          { 'opacity-60': isRefreshing }
+        ]"
+      >
         <!-- Loading skeleton -->
-        <tr v-if="loading" v-for="i in 5" :key="i">
+        <tr v-if="showLoadingSkeleton" v-for="i in 5" :key="i">
           <td v-for="column in columns" :key="column.key" :class="['whitespace-nowrap py-4', getAdaptivePaddingClass()]">
             <div class="animate-pulse">
               <div class="h-4 w-3/4 rounded bg-gray-200 dark:bg-dark-700"></div>
@@ -282,6 +293,9 @@ const sortedData = computed(() => {
     return sortOrder.value === 'asc' ? comparison : -comparison
   })
 })
+
+const showLoadingSkeleton = computed(() => props.loading && props.data.length === 0)
+const isRefreshing = computed(() => props.loading && props.data.length > 0)
 
 // 检查第一列是否为勾选列
 const hasSelectColumn = computed(() => {
