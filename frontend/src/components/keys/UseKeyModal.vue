@@ -99,48 +99,54 @@
                 {{ t('keys.useKeyModal.openai.oneClick.description') }}
               </p>
 
-              <div class="mt-3 overflow-hidden rounded-xl bg-gray-900 dark:bg-dark-900">
+              <div class="mt-3 space-y-3">
                 <div
-                  class="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-4 py-2 dark:border-dark-700 dark:bg-dark-800"
+                  v-for="block in oneClickBlocks"
+                  :key="block.copyId"
+                  class="overflow-hidden rounded-xl bg-gray-900 dark:bg-dark-900"
                 >
-                  <span class="text-xs font-mono text-gray-400">{{ activeTabLabel }}</span>
-                  <button
-                    @click="copyContent(oneClickCommand, -1)"
-                    class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors"
-                    :class="
-                      copiedIndex === -1
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white'
-                    "
+                  <div
+                    class="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-4 py-2 dark:border-dark-700 dark:bg-dark-800"
                   >
-                    <svg
-                      v-if="copiedIndex === -1"
-                      class="h-3.5 w-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      stroke-width="2"
+                    <span class="text-xs font-mono text-gray-400">{{ block.title }}</span>
+                    <button
+                      @click="copyContent(block.content, block.copyId)"
+                      class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors"
+                      :class="
+                        copiedIndex === block.copyId
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white'
+                      "
                     >
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                    <svg
-                      v-else
-                      class="h-3.5 w-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      stroke-width="1.5"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
-                      />
-                    </svg>
-                    {{ copiedIndex === -1 ? t('keys.useKeyModal.copied') : t('keys.useKeyModal.copy') }}
-                  </button>
+                      <svg
+                        v-if="copiedIndex === block.copyId"
+                        class="h-3.5 w-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        stroke-width="2"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                      <svg
+                        v-else
+                        class="h-3.5 w-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        stroke-width="1.5"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
+                        />
+                      </svg>
+                      {{ copiedIndex === block.copyId ? t('keys.useKeyModal.copied') : t('keys.useKeyModal.copy') }}
+                    </button>
+                  </div>
+                  <pre class="p-4 text-sm font-mono text-gray-100 whitespace-pre-wrap break-words"><code v-text="block.content"></code></pre>
                 </div>
-                <pre class="p-4 text-sm font-mono text-gray-100 whitespace-pre-wrap break-words"><code v-text="oneClickCommand"></code></pre>
               </div>
 
               <p class="mt-2 text-xs text-emerald-800/80 dark:text-emerald-200/70">
@@ -148,6 +154,12 @@
               </p>
             </div>
           </div>
+        </div>
+
+        <div v-if="platform === 'openai'" class="pt-1">
+          <p class="text-sm font-semibold text-gray-900 dark:text-white">
+            {{ t('keys.useKeyModal.openai.manualTitle') }}
+          </p>
         </div>
 
         <!-- Code Blocks (Stacked for multi-file platforms) -->
@@ -338,11 +350,10 @@ const clientTabs = computed((): TabConfig[] => [
   { id: 'gemini', label: t('keys.useKeyModal.antigravity.geminiCli'), icon: SparkleIcon }
 ])
 
-// Shell tabs (3 types)
+// Shell tabs (2 types)
 const shellTabs: TabConfig[] = [
   { id: 'unix', label: 'macOS / Linux', icon: AppleIcon },
-  { id: 'cmd', label: 'Windows CMD', icon: WindowsIcon },
-  { id: 'powershell', label: 'PowerShell', icon: WindowsIcon }
+  { id: 'windows', label: 'Windows', icon: WindowsIcon }
 ]
 
 const currentTabs = computed(() => {
@@ -397,37 +408,47 @@ const currentFiles = computed((): FileConfig[] => {
     case 'openai':
       return generateOpenAIFiles(baseUrl, apiKey)
     case 'gemini':
-      return [generateGeminiCliContent(baseUrl, apiKey)]
+      return generateGeminiCliFiles(baseUrl, apiKey)
     case 'antigravity':
       // Both Claude Code and Gemini CLI need /antigravity suffix for antigravity platform
       if (activeClientTab.value === 'claude') {
         return generateAnthropicFiles(`${baseUrl}/antigravity`, apiKey)
       }
-      return [generateGeminiCliContent(`${baseUrl}/antigravity`, apiKey)]
+      return generateGeminiCliFiles(`${baseUrl}/antigravity`, apiKey)
     default: // anthropic
       return generateAnthropicFiles(baseUrl, apiKey)
   }
 })
 
-const activeTabLabel = computed(() => {
-  return currentTabs.value.find((tab) => tab.id === activeTab.value)?.label || ''
-})
-
-const oneClickCommand = computed(() => {
+const oneClickBlocks = computed(() => {
   const baseUrl = normalizeBaseUrl(props.baseUrl || window.location.origin)
   const apiKey = props.apiKey
   const scriptBase = getScriptBaseUrl()
   const ps1Url = `${scriptBase}/codex-fluxcode-init.ps1`
   const shUrl = `${scriptBase}/codex-fluxcode-init.sh`
 
-  switch (activeTab.value) {
-    case 'cmd':
-      return `set "OPENAI_API_KEY=${apiKey}" & set "FLUXCODE_BASE_URL=${baseUrl}" & powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -UseBasicParsing ${psSingleQuote(ps1Url)} | iex"`
-    case 'powershell':
-      return `$env:OPENAI_API_KEY=${psSingleQuote(apiKey)}; $env:FLUXCODE_BASE_URL=${psSingleQuote(baseUrl)}; iwr -UseBasicParsing ${psSingleQuote(ps1Url)} | iex`
-    default:
-      return `curl -fsSL ${shSingleQuote(shUrl)} | OPENAI_API_KEY=${shSingleQuote(apiKey)} FLUXCODE_BASE_URL=${shSingleQuote(baseUrl)} sh`
+  if (activeTab.value === 'unix') {
+    return [
+      {
+        title: 'macOS / Linux',
+        content: `curl -fsSL ${shSingleQuote(shUrl)} | OPENAI_API_KEY=${shSingleQuote(apiKey)} FLUXCODE_BASE_URL=${shSingleQuote(baseUrl)} sh`,
+        copyId: -1
+      }
+    ]
   }
+
+  return [
+    {
+      title: 'Windows CMD',
+      content: `set "OPENAI_API_KEY=${apiKey}" & set "FLUXCODE_BASE_URL=${baseUrl}" & powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -UseBasicParsing ${psSingleQuote(ps1Url)} | iex"`,
+      copyId: -2
+    },
+    {
+      title: 'PowerShell',
+      content: `$env:OPENAI_API_KEY=${psSingleQuote(apiKey)}; $env:FLUXCODE_BASE_URL=${psSingleQuote(baseUrl)}; iwr -UseBasicParsing ${psSingleQuote(ps1Url)} | iex`,
+      copyId: -3
+    }
+  ]
 })
 
 function normalizeBaseUrl(raw: string): string {
@@ -452,88 +473,73 @@ function psSingleQuote(value: string): string {
 }
 
 function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
-  let path: string
-  let content: string
-  let highlighted: string
-
-  switch (activeTab.value) {
-    case 'unix':
-      path = 'Terminal'
-      content = `export ANTHROPIC_BASE_URL="${baseUrl}"
+  if (activeTab.value === 'unix') {
+    const path = 'Terminal'
+    const content = `export ANTHROPIC_BASE_URL="${baseUrl}"
 export ANTHROPIC_AUTH_TOKEN="${apiKey}"`
-      highlighted = `${keyword('export')} ${variable('ANTHROPIC_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
+    const highlighted = `${keyword('export')} ${variable('ANTHROPIC_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
 ${keyword('export')} ${variable('ANTHROPIC_AUTH_TOKEN')}${operator('=')}${string(`"${apiKey}"`)}`
-      break
-    case 'cmd':
-      path = 'Command Prompt'
-      content = `set ANTHROPIC_BASE_URL=${baseUrl}
-set ANTHROPIC_AUTH_TOKEN=${apiKey}`
-      highlighted = `${keyword('set')} ${variable('ANTHROPIC_BASE_URL')}${operator('=')}${baseUrl}
-${keyword('set')} ${variable('ANTHROPIC_AUTH_TOKEN')}${operator('=')}${apiKey}`
-      break
-    case 'powershell':
-      path = 'PowerShell'
-      content = `$env:ANTHROPIC_BASE_URL="${baseUrl}"
-$env:ANTHROPIC_AUTH_TOKEN="${apiKey}"`
-      highlighted = `${keyword('$env:')}${variable('ANTHROPIC_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
-${keyword('$env:')}${variable('ANTHROPIC_AUTH_TOKEN')}${operator('=')}${string(`"${apiKey}"`)}`
-      break
-    default:
-      path = 'Terminal'
-      content = ''
-      highlighted = ''
+    return [{ path, content, highlighted }]
   }
 
-  return [{ path, content, highlighted }]
+  const cmdPath = 'Windows CMD'
+  const cmdContent = `set ANTHROPIC_BASE_URL=${baseUrl}
+set ANTHROPIC_AUTH_TOKEN=${apiKey}`
+  const cmdHighlighted = `${keyword('set')} ${variable('ANTHROPIC_BASE_URL')}${operator('=')}${baseUrl}
+${keyword('set')} ${variable('ANTHROPIC_AUTH_TOKEN')}${operator('=')}${apiKey}`
+
+  const psPath = 'PowerShell'
+  const psContent = `$env:ANTHROPIC_BASE_URL="${baseUrl}"
+$env:ANTHROPIC_AUTH_TOKEN="${apiKey}"`
+  const psHighlighted = `${keyword('$env:')}${variable('ANTHROPIC_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
+${keyword('$env:')}${variable('ANTHROPIC_AUTH_TOKEN')}${operator('=')}${string(`"${apiKey}"`)}`
+
+  return [
+    { path: cmdPath, content: cmdContent, highlighted: cmdHighlighted },
+    { path: psPath, content: psContent, highlighted: psHighlighted }
+  ]
 }
 
-function generateGeminiCliContent(baseUrl: string, apiKey: string): FileConfig {
+function generateGeminiCliFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const model = 'gemini-2.5-pro'
   const modelComment = t('keys.useKeyModal.gemini.modelComment')
-  let path: string
-  let content: string
-  let highlighted: string
 
-  switch (activeTab.value) {
-    case 'unix':
-      path = 'Terminal'
-      content = `export GOOGLE_GEMINI_BASE_URL="${baseUrl}"
+  if (activeTab.value === 'unix') {
+    const path = 'Terminal'
+    const content = `export GOOGLE_GEMINI_BASE_URL="${baseUrl}"
 export GEMINI_API_KEY="${apiKey}"
 export GEMINI_MODEL="${model}"  # ${modelComment}`
-      highlighted = `${keyword('export')} ${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
+    const highlighted = `${keyword('export')} ${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
 ${keyword('export')} ${variable('GEMINI_API_KEY')}${operator('=')}${string(`"${apiKey}"`)}
 ${keyword('export')} ${variable('GEMINI_MODEL')}${operator('=')}${string(`"${model}"`)}  ${comment(`# ${modelComment}`)}`
-      break
-    case 'cmd':
-      path = 'Command Prompt'
-      content = `set GOOGLE_GEMINI_BASE_URL=${baseUrl}
+    return [{ path, content, highlighted }]
+  }
+
+  const cmdPath = 'Windows CMD'
+  const cmdContent = `set GOOGLE_GEMINI_BASE_URL=${baseUrl}
 set GEMINI_API_KEY=${apiKey}
 set GEMINI_MODEL=${model}`
-      highlighted = `${keyword('set')} ${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${baseUrl}
+  const cmdHighlighted = `${keyword('set')} ${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${baseUrl}
 ${keyword('set')} ${variable('GEMINI_API_KEY')}${operator('=')}${apiKey}
 ${keyword('set')} ${variable('GEMINI_MODEL')}${operator('=')}${model}
 ${comment(`REM ${modelComment}`)}`
-      break
-    case 'powershell':
-      path = 'PowerShell'
-      content = `$env:GOOGLE_GEMINI_BASE_URL="${baseUrl}"
+
+  const psPath = 'PowerShell'
+  const psContent = `$env:GOOGLE_GEMINI_BASE_URL="${baseUrl}"
 $env:GEMINI_API_KEY="${apiKey}"
 $env:GEMINI_MODEL="${model}"  # ${modelComment}`
-      highlighted = `${keyword('$env:')}${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
+  const psHighlighted = `${keyword('$env:')}${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
 ${keyword('$env:')}${variable('GEMINI_API_KEY')}${operator('=')}${string(`"${apiKey}"`)}
 ${keyword('$env:')}${variable('GEMINI_MODEL')}${operator('=')}${string(`"${model}"`)}  ${comment(`# ${modelComment}`)}`
-      break
-    default:
-      path = 'Terminal'
-      content = ''
-      highlighted = ''
-  }
 
-  return { path, content, highlighted }
+  return [
+    { path: cmdPath, content: cmdContent, highlighted: cmdHighlighted },
+    { path: psPath, content: psContent, highlighted: psHighlighted }
+  ]
 }
 
 function generateOpenAIFiles(baseUrl: string, apiKey: string): FileConfig[] {
-  const isWindows = activeTab.value !== 'unix'
+  const isWindows = activeTab.value === 'windows'
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
 
   // config.toml content
