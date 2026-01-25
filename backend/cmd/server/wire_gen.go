@@ -157,7 +157,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	httpServer := server.ProvideHTTPServer(configConfig, engine)
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, redisClient, configConfig)
 	accountExpirationWorker := service.ProvideAccountExpirationWorker(db, timingWheelService)
-	v := provideCleanup(client, redisClient, tokenRefreshService, pricingService, emailQueueService, usageQueueService, billingCacheService, accountExpirationWorker, dailyUsageRefreshWorker, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService)
+	rateLimitReactivateWorker := service.ProvideRateLimitReactivateWorker(db, timingWheelService, accountRepository, dailyUsageRefreshWorker)
+	v := provideCleanup(client, redisClient, tokenRefreshService, pricingService, emailQueueService, usageQueueService, billingCacheService, accountExpirationWorker, dailyUsageRefreshWorker, rateLimitReactivateWorker, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService)
 	application := &Application{
 		Server:  httpServer,
 		Cleanup: v,
@@ -189,6 +190,7 @@ func provideCleanup(
 	billingCache *service.BillingCacheService,
 	accountExpirationWorker *service.AccountExpirationWorker,
 	dailyUsageRefreshWorker *service.DailyUsageRefreshWorker,
+	rateLimitReactivateWorker *service.RateLimitReactivateWorker,
 	oauth *service.OAuthService,
 	openaiOAuth *service.OpenAIOAuthService,
 	geminiOAuth *service.GeminiOAuthService,
@@ -208,6 +210,10 @@ func provideCleanup(
 			}},
 			{"DailyUsageRefreshWorker", func() error {
 				dailyUsageRefreshWorker.Stop()
+				return nil
+			}},
+			{"RateLimitReactivateWorker", func() error {
+				rateLimitReactivateWorker.Stop()
 				return nil
 			}},
 			{"TokenRefreshService", func() error {
