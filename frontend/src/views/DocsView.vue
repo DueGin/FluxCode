@@ -45,27 +45,23 @@
               （可选）Windows 自动配置环境
             </h3>
             <p class="mt-3 text-gray-700 dark:text-dark-300">
-              复制下面这条命令到 CMD 执行，会自动下载并运行
+              复制下面这条命令到 PowerShell 执行，会自动下载并运行
               <a
                 class="underline underline-offset-4 hover:text-gray-900 dark:hover:text-white"
                 :href="windowsOneClickScriptUrl"
                 target="_blank"
                 rel="noopener noreferrer"
                 >FluxCode Codex 一键配置.cmd</a>。
-              <span class="text-sm text-gray-600 dark:text-dark-400">
-                （命令里的 <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">^</code>
-                是 CMD 转义符，请勿删除）
-              </span>
             </p>
 
             <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="w-full rounded-2xl bg-slate-900 p-4 text-[15px] text-slate-100 sm:flex-1">
-                <pre class="overflow-x-auto font-mono leading-relaxed"><code v-text="windowsSetupCmdForCmd"></code></pre>
+                <pre class="overflow-x-auto font-mono leading-relaxed"><code v-text="windowsSetupCmdForPowerShell"></code></pre>
               </div>
               <button
                 type="button"
                 class="btn btn-secondary btn-sm sm:mt-1"
-                @click="copyWindowsSetupCmdForCmd"
+                @click="copyWindowsSetupCmdForPowerShell"
               >
                 {{ t('common.copyToClipboard') }}
               </button>
@@ -73,16 +69,21 @@
 
             <details class="mt-4 rounded-2xl border border-black/5 bg-white/60 p-4 dark:border-white/10 dark:bg-dark-950/30">
               <summary class="cursor-pointer select-none font-medium text-gray-900 dark:text-white">
-                如果你使用 PowerShell（可选）
+                如果你使用 CMD（可选）
               </summary>
+              <p class="mt-3 text-sm text-gray-600 dark:text-dark-400">
+                提示：CMD 版本命令里的
+                <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">^</code>
+                是转义符，请勿删除；不要在 PowerShell 里运行该版本。
+              </p>
               <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="w-full rounded-2xl bg-slate-900 p-4 text-[15px] text-slate-100 sm:flex-1">
-                  <pre class="overflow-x-auto font-mono leading-relaxed"><code v-text="windowsSetupCmdForPowerShell"></code></pre>
+                  <pre class="overflow-x-auto font-mono leading-relaxed"><code v-text="windowsSetupCmdForCmd"></code></pre>
                 </div>
                 <button
                   type="button"
                   class="btn btn-secondary btn-sm sm:mt-1"
-                  @click="copyWindowsSetupCmdForPowerShell"
+                  @click="copyWindowsSetupCmdForCmd"
                 >
                   {{ t('common.copyToClipboard') }}
                 </button>
@@ -409,7 +410,7 @@ const windowsOneClickScriptUrlForCmd = windowsOneClickScriptUrl.replace(/%/g, '^
 
 const windowsSetupCmdForCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$u='${windowsOneClickScriptUrlForCmd}'; $p=Join-Path $env:TEMP 'fluxcode-codex-setup.cmd'; Invoke-WebRequest -Uri $u -OutFile $p; cmd /c $p"`
 
-const windowsSetupCmdForPowerShell = `$u='${windowsOneClickScriptUrl}'; $p=Join-Path $env:TEMP 'fluxcode-codex-setup.cmd'; Invoke-WebRequest -Uri $u -OutFile $p; cmd /c $p`
+const windowsSetupCmdForPowerShell = `[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u='${windowsOneClickScriptUrl}'; $p=Join-Path $env:TEMP 'fluxcode-codex-setup.cmd'; Invoke-WebRequest -Uri $u -OutFile $p; & $p`
 
 const copyWindowsSetupCmdForCmd = async () => {
   await copyToClipboard(windowsSetupCmdForCmd, t('common.copiedToClipboard'))
