@@ -1109,6 +1109,9 @@ export default {
         tempUnsched: 'This account is temporarily unschedulable.',
         tempUnschedWithReason: 'This account is temporarily unschedulable: {reason}',
         rateLimitedUntil: 'Rate limited; expected to recover after {time}.',
+        upstreamQuotaExceededUntil: 'Upstream quota exceeded (429); expected to recover at {time}.',
+        upstreamQuotaExceededUntilWithMessage:
+          'Upstream quota exceeded (429); expected to recover at {time}: {message}',
         overloadedUntil: 'Overloaded; expected to recover after {time}.'
       },
       tempUnschedulable: {

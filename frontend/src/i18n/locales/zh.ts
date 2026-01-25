@@ -1131,6 +1131,8 @@ export default {
         tempUnsched: '账号处于临时不可调度状态。',
         tempUnschedWithReason: '账号处于临时不可调度状态：{reason}',
         rateLimitedUntil: '账号触发限流，预计 {time} 后恢复调度。',
+        upstreamQuotaExceededUntil: '上游配额已用尽（429），预计于 {time} 恢复调度。',
+        upstreamQuotaExceededUntilWithMessage: '上游配额已用尽（429），预计于 {time} 恢复调度：{message}',
         overloadedUntil: '账号处于过载，预计 {time} 后恢复调度。'
       },
       tempUnschedulable: {
