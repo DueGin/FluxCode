@@ -402,6 +402,11 @@ export default {
         configTomlHint: 'Make sure the following content is at the beginning of the config.toml file',
         note: 'Make sure the config directory exists. macOS/Linux users can run mkdir -p ~/.codex to create it.',
         noteWindows: 'Press Win+R and enter %userprofile%\\.codex to open the config directory. Create it manually if it does not exist.',
+        oneClick: {
+          title: 'Recommended: One-click setup',
+          description: 'Copy and run the command below to write Codex CLI config automatically.',
+          overwriteWarning: 'Note: This will overwrite ~/.codex/auth.json and ~/.codex/config.toml (Windows: %userprofile%\\.codex).',
+        },
       },
       antigravity: {
         description: 'Configure API access for Antigravity group. Select the configuration method based on your client.',

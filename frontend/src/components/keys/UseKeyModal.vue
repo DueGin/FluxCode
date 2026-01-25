@@ -72,6 +72,84 @@
           </nav>
         </div>
 
+        <!-- Recommended One-click Setup (OpenAI/Codex) -->
+        <div
+          v-if="platform === 'openai'"
+          class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-800 dark:bg-emerald-900/10"
+        >
+          <div class="flex items-start gap-3">
+            <svg
+              class="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600 dark:text-emerald-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="1.5"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3.75 13.5l10.5-10.5.75 6.75 5.25.75-10.5 10.5-.75-6.75-5.25-.75z"
+              />
+            </svg>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                {{ t('keys.useKeyModal.openai.oneClick.title') }}
+              </p>
+              <p class="mt-1 text-sm text-emerald-800/90 dark:text-emerald-200/80">
+                {{ t('keys.useKeyModal.openai.oneClick.description') }}
+              </p>
+
+              <div class="mt-3 overflow-hidden rounded-xl bg-gray-900 dark:bg-dark-900">
+                <div
+                  class="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-4 py-2 dark:border-dark-700 dark:bg-dark-800"
+                >
+                  <span class="text-xs font-mono text-gray-400">{{ activeTabLabel }}</span>
+                  <button
+                    @click="copyContent(oneClickCommand, -1)"
+                    class="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors"
+                    :class="
+                      copiedIndex === -1
+                        ? 'bg-green-500/20 text-green-400'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white'
+                    "
+                  >
+                    <svg
+                      v-if="copiedIndex === -1"
+                      class="h-3.5 w-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      stroke-width="2"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <svg
+                      v-else
+                      class="h-3.5 w-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      stroke-width="1.5"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"
+                      />
+                    </svg>
+                    {{ copiedIndex === -1 ? t('keys.useKeyModal.copied') : t('keys.useKeyModal.copy') }}
+                  </button>
+                </div>
+                <pre class="overflow-x-auto p-4 text-sm font-mono text-gray-100"><code v-text="oneClickCommand"></code></pre>
+              </div>
+
+              <p class="mt-2 text-xs text-emerald-800/80 dark:text-emerald-200/70">
+                {{ t('keys.useKeyModal.openai.oneClick.overwriteWarning') }}
+              </p>
+            </div>
+          </div>
+        </div>
+
         <!-- Code Blocks (Stacked for multi-file platforms) -->
         <div class="space-y-4">
           <div
@@ -260,24 +338,15 @@ const clientTabs = computed((): TabConfig[] => [
   { id: 'gemini', label: t('keys.useKeyModal.antigravity.geminiCli'), icon: SparkleIcon }
 ])
 
-// Shell tabs (3 types for environment variable based configs)
+// Shell tabs (3 types)
 const shellTabs: TabConfig[] = [
   { id: 'unix', label: 'macOS / Linux', icon: AppleIcon },
   { id: 'cmd', label: 'Windows CMD', icon: WindowsIcon },
   { id: 'powershell', label: 'PowerShell', icon: WindowsIcon }
 ]
 
-// OpenAI tabs (2 OS types)
-const openaiTabs: TabConfig[] = [
-  { id: 'unix', label: 'macOS / Linux', icon: AppleIcon },
-  { id: 'windows', label: 'Windows', icon: WindowsIcon }
-]
-
 const currentTabs = computed(() => {
-  if (props.platform === 'openai') {
-    return openaiTabs  // 2 tabs: unix, windows
-  }
-  // All other platforms (anthropic, gemini, antigravity) use shell tabs
+  // All platforms use the same shell tabs now
   return shellTabs
 })
 
@@ -297,9 +366,9 @@ const platformDescription = computed(() => {
 const platformNote = computed(() => {
   switch (props.platform) {
     case 'openai':
-      return activeTab.value === 'windows'
-        ? t('keys.useKeyModal.openai.noteWindows')
-        : t('keys.useKeyModal.openai.note')
+      return activeTab.value === 'unix'
+        ? t('keys.useKeyModal.openai.note')
+        : t('keys.useKeyModal.openai.noteWindows')
     case 'gemini':
       return t('keys.useKeyModal.gemini.note')
     case 'antigravity':
@@ -321,7 +390,7 @@ const key = (text: string) => `<span class="text-blue-400">${text}</span>`
 
 // Generate file configs based on platform and active tab
 const currentFiles = computed((): FileConfig[] => {
-  const baseUrl = props.baseUrl || window.location.origin
+  const baseUrl = normalizeBaseUrl(props.baseUrl || window.location.origin)
   const apiKey = props.apiKey
 
   switch (props.platform) {
@@ -339,6 +408,48 @@ const currentFiles = computed((): FileConfig[] => {
       return generateAnthropicFiles(baseUrl, apiKey)
   }
 })
+
+const activeTabLabel = computed(() => {
+  return currentTabs.value.find((tab) => tab.id === activeTab.value)?.label || ''
+})
+
+const oneClickCommand = computed(() => {
+  const baseUrl = normalizeBaseUrl(props.baseUrl || window.location.origin)
+  const apiKey = props.apiKey
+  const scriptBase = getScriptBaseUrl()
+  const ps1Url = `${scriptBase}/codex-fluxcode-init.ps1`
+  const shUrl = `${scriptBase}/codex-fluxcode-init.sh`
+
+  switch (activeTab.value) {
+    case 'cmd':
+      return `set "OPENAI_API_KEY=${apiKey}" & set "FLUXCODE_BASE_URL=${baseUrl}" & powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr -UseBasicParsing ${psSingleQuote(ps1Url)} | iex"`
+    case 'powershell':
+      return `$env:OPENAI_API_KEY=${psSingleQuote(apiKey)}; $env:FLUXCODE_BASE_URL=${psSingleQuote(baseUrl)}; iwr -UseBasicParsing ${psSingleQuote(ps1Url)} | iex`
+    default:
+      return `curl -fsSL ${shSingleQuote(shUrl)} | OPENAI_API_KEY=${shSingleQuote(apiKey)} FLUXCODE_BASE_URL=${shSingleQuote(baseUrl)} sh`
+  }
+})
+
+function normalizeBaseUrl(raw: string): string {
+  const trimmed = (raw || '').trim()
+  if (!trimmed) return ''
+  const withoutApiV1 = trimmed.replace(/\/api\/v1\/?$/, '')
+  return withoutApiV1.replace(/\/+$/, '')
+}
+
+function getScriptBaseUrl(): string {
+  const base = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
+  const url = new URL(base, window.location.origin)
+  return url.toString().replace(/\/$/, '')
+}
+
+function shSingleQuote(value: string): string {
+  return `'${String(value).replace(/'/g, `'\"'\"'`)}'`
+}
+
+function psSingleQuote(value: string): string {
+  return `'${String(value).replace(/'/g, "''")}'`
+}
 
 function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
   let path: string
@@ -422,17 +533,13 @@ ${keyword('$env:')}${variable('GEMINI_MODEL')}${operator('=')}${string(`"${model
 }
 
 function generateOpenAIFiles(baseUrl: string, apiKey: string): FileConfig[] {
-  const isWindows = activeTab.value === 'windows'
+  const isWindows = activeTab.value !== 'unix'
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
 
   // config.toml content
   const configContent = `model_provider = "fluxcode"
 model = "gpt-5.2-codex"
-model_reasoning_effort = "high"
-network_access = "enabled"
-disable_response_storage = true
-windows_wsl_setup_acknowledged = true
-model_verbosity = "high"
+model_reasoning_effort = "medium"
 
 [model_providers.fluxcode]
 name = "fluxcode"
@@ -442,11 +549,7 @@ requires_openai_auth = true`
 
   const configHighlighted = `${key('model_provider')} ${operator('=')} ${string('"fluxcode"')}
 ${key('model')} ${operator('=')} ${string('"gpt-5.2-codex"')}
-${key('model_reasoning_effort')} ${operator('=')} ${string('"high"')}
-${key('network_access')} ${operator('=')} ${string('"enabled"')}
-${key('disable_response_storage')} ${operator('=')} ${keyword('true')}
-${key('windows_wsl_setup_acknowledged')} ${operator('=')} ${keyword('true')}
-${key('model_verbosity')} ${operator('=')} ${string('"high"')}
+${key('model_reasoning_effort')} ${operator('=')} ${string('"medium"')}
 
 ${comment('[model_providers.fluxcode]')}
 ${key('name')} ${operator('=')} ${string('"fluxcode"')}
