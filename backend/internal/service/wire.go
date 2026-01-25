@@ -98,7 +98,7 @@ func ProvideAccountExpirationWorker(db *sql.DB, timingWheel *TimingWheelService)
 }
 
 func ProvideSubscriptionExpirationWorker(db *sql.DB, timingWheel *TimingWheelService) *SubscriptionExpirationWorker {
-	svc := NewSubscriptionExpirationWorker(db, timingWheel, 30*time.Second)
+	svc := NewSubscriptionExpirationWorker(db, timingWheel, 1*time.Minute)
 	svc.Start()
 	return svc
 }

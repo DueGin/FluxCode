@@ -21,7 +21,7 @@ const subscriptionExpirationWorkerName = "worker:subscription_expiration"
 
 func NewSubscriptionExpirationWorker(db *sql.DB, timingWheel *TimingWheelService, interval time.Duration) *SubscriptionExpirationWorker {
 	if interval <= 0 {
-		interval = 30 * time.Second
+		interval = time.Minute
 	}
 	return &SubscriptionExpirationWorker{
 		db:          db,
@@ -91,4 +91,3 @@ func (w *SubscriptionExpirationWorker) runOnce() {
 		applog.Printf("[SubscriptionExpirationWorker] Marked %d subscriptions expired", affected)
 	}
 }
-

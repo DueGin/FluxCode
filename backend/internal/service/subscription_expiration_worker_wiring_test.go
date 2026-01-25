@@ -14,6 +14,7 @@ func TestSubscriptionExpirationWorkerWiring(t *testing.T) {
 
 	content := string(mustReadSiblingFile(t, "wire.go"))
 	require.Contains(t, content, "ProvideSubscriptionExpirationWorker", "需要在 service/wire.go 中注入并启动订阅过期修复 worker")
+	require.Contains(t, content, "1*time.Minute", "订阅过期修复 worker 的执行间隔应为 1 分钟")
 }
 
 func TestSubscriptionExpirationWorkerCleanupWiring(t *testing.T) {
@@ -36,6 +37,7 @@ func TestSubscriptionExpirationWorkerImplementationExists(t *testing.T) {
 	content := string(mustReadSiblingFile(t, "subscription_expiration_worker.go"))
 	require.Contains(t, content, "pg_try_advisory_lock", "多机部署需要使用 advisory lock 保证单实例执行")
 	require.Contains(t, content, "user_subscriptions", "需要更新 user_subscriptions 状态")
+	require.Contains(t, content, "time.Minute", "默认 interval 应为 1 分钟")
 }
 
 func mustReadSiblingFile(t *testing.T, name string) []byte {
@@ -48,4 +50,3 @@ func mustReadSiblingFile(t *testing.T, name string) []byte {
 	require.NoError(t, err, "读取 %s 失败", path)
 	return content
 }
-
