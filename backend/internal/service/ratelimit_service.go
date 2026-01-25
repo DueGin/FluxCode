@@ -830,6 +830,7 @@ func parseRateLimitReset(headers http.Header) *time.Time {
 	}
 	keys := []string{
 		"anthropic-ratelimit-unified-reset",
+		"retry-after",
 		"x-ratelimit-reset-requests",
 		"x-ratelimit-reset-tokens",
 		"x-ratelimit-reset",
@@ -873,6 +874,9 @@ func parseResetValue(raw string) *time.Time {
 	if t, err := time.Parse(time.RFC3339, value); err == nil {
 		return &t
 	}
+	if t, err := http.ParseTime(value); err == nil {
+		return &t
+	}
 	return nil
 }
 
@@ -898,6 +902,9 @@ func buildQuotaExceededReason(code, msg string, headers http.Header) string {
 	reason := "Upstream quota exceeded (429)"
 	if code != "" {
 		reason += "; upstream_code=" + code
+	}
+	if resetAt := parseRateLimitReset(headers); resetAt != nil {
+		reason += "; reset_at=" + resetAt.Format(time.RFC3339)
 	}
 	if msg != "" {
 		reason += "; upstream_message=" + msg
