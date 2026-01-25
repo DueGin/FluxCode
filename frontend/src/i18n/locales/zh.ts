@@ -218,6 +218,7 @@ export default {
     apiKeys: 'API 密钥',
     usage: '使用记录',
     redeem: '兑换',
+    docs: '使用文档',
     profile: '个人资料',
     users: '用户管理',
     groups: '分组管理',

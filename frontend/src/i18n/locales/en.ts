@@ -220,6 +220,7 @@ export default {
     apiKeys: 'API Keys',
     usage: 'Usage',
     redeem: 'Redeem',
+    docs: 'Docs',
     profile: 'Profile',
     users: 'Users',
     groups: 'Groups',

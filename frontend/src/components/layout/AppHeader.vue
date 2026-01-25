@@ -88,6 +88,38 @@
               </div>
 
               <div class="py-1">
+                <router-link to="/docs" @click="closeDropdown" class="dropdown-item">
+                  <svg
+                    class="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125V5.25A3.375 3.375 0 0010.125 1.875H8.25A3.375 3.375 0 004.875 5.25v13.5A3.375 3.375 0 008.25 22.125h7.5A3.375 3.375 0 0019.5 18.75v-4.5z"
+                    />
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M8.25 10.5h7.5"
+                    />
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M8.25 14.25h7.5"
+                    />
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M8.25 18h4.5"
+                    />
+                  </svg>
+                  {{ t('nav.docs') }}
+                </router-link>
+
                 <router-link to="/profile" @click="closeDropdown" class="dropdown-item">
                   <svg
                     class="h-4 w-4"
