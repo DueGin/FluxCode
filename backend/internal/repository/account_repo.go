@@ -397,7 +397,7 @@ func (r *accountRepository) ListWithFilters(ctx context.Context, params paginati
 	accounts, err := q.
 		Offset(params.Offset()).
 		Limit(params.Limit()).
-		Order(dbent.Desc(dbaccount.FieldID)).
+		Order(accountListOrders(params)...).
 		All(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -408,6 +408,61 @@ func (r *accountRepository) ListWithFilters(ctx context.Context, params paginati
 		return nil, nil, err
 	}
 	return outAccounts, paginationResultFromTotal(int64(total), params), nil
+}
+
+func accountListOrders(params pagination.PaginationParams) []dbaccount.OrderOption {
+	if params.SortBy == "" {
+		return []dbaccount.OrderOption{dbent.Desc(dbaccount.FieldID)}
+	}
+
+	primary := accountOrderFunc(params.SortBy, params.SortOrder)
+	if params.SortBy == "id" {
+		return []dbaccount.OrderOption{primary}
+	}
+	return []dbaccount.OrderOption{primary, dbent.Desc(dbaccount.FieldID)}
+}
+
+func accountOrderFunc(sortBy, sortOrder string) dbaccount.OrderOption {
+	asc := sortOrder == "asc"
+	switch sortBy {
+	case "id":
+		if asc {
+			return dbent.Asc(dbaccount.FieldID)
+		}
+		return dbent.Desc(dbaccount.FieldID)
+	case "name":
+		if asc {
+			return dbent.Asc(dbaccount.FieldName)
+		}
+		return dbent.Desc(dbaccount.FieldName)
+	case "status":
+		if asc {
+			return dbent.Asc(dbaccount.FieldStatus)
+		}
+		return dbent.Desc(dbaccount.FieldStatus)
+	case "schedulable":
+		if asc {
+			return dbent.Asc(dbaccount.FieldSchedulable)
+		}
+		return dbent.Desc(dbaccount.FieldSchedulable)
+	case "expires_at":
+		if asc {
+			return dbent.Asc(dbaccount.FieldExpiresAt)
+		}
+		return dbent.Desc(dbaccount.FieldExpiresAt)
+	case "priority":
+		if asc {
+			return dbent.Asc(dbaccount.FieldPriority)
+		}
+		return dbent.Desc(dbaccount.FieldPriority)
+	case "last_used_at":
+		if asc {
+			return dbent.Asc(dbaccount.FieldLastUsedAt)
+		}
+		return dbent.Desc(dbaccount.FieldLastUsedAt)
+	default:
+		return dbent.Desc(dbaccount.FieldID)
+	}
 }
 
 func (r *accountRepository) ListByGroup(ctx context.Context, groupID int64) ([]service.Account, error) {

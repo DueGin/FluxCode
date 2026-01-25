@@ -215,6 +215,7 @@ interface Props {
   loading?: boolean
   defaultSortKey?: string
   defaultSortOrder?: 'asc' | 'desc'
+  sortMode?: 'client' | 'server'
   stickyFirstColumn?: boolean
   stickyActionsColumn?: boolean
   expandableActions?: boolean
@@ -225,10 +226,15 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
   defaultSortKey: '',
   defaultSortOrder: 'asc',
+  sortMode: 'client',
   stickyFirstColumn: true,
   stickyActionsColumn: true,
   expandableActions: true
 })
+
+const emit = defineEmits<{
+  (e: 'sort-change', payload: { key: string; order: 'asc' | 'desc' }): void
+}>()
 
 const sortKey = ref<string>(props.defaultSortKey)
 const sortOrder = ref<'asc' | 'desc'>(props.defaultSortOrder)
@@ -259,9 +265,11 @@ const handleSort = (key: string) => {
     sortKey.value = key
     sortOrder.value = 'asc'
   }
+  emit('sort-change', { key: sortKey.value, order: sortOrder.value })
 }
 
 const sortedData = computed(() => {
+  if (props.sortMode === 'server') return props.data
   if (!sortKey.value || !props.data) return props.data
 
   return [...props.data].sort((a, b) => {
