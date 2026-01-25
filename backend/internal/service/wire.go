@@ -97,6 +97,12 @@ func ProvideAccountExpirationWorker(db *sql.DB, timingWheel *TimingWheelService)
 	return svc
 }
 
+func ProvideSubscriptionExpirationWorker(db *sql.DB, timingWheel *TimingWheelService) *SubscriptionExpirationWorker {
+	svc := NewSubscriptionExpirationWorker(db, timingWheel, 30*time.Second)
+	svc.Start()
+	return svc
+}
+
 func ProvideDailyUsageRefreshWorker(
 	db *sql.DB,
 	settingService *SettingService,
@@ -168,6 +174,7 @@ var ProviderSet = wire.NewSet(
 	ProvideTimingWheelService,
 	ProvideDeferredService,
 	ProvideAccountExpirationWorker,
+	ProvideSubscriptionExpirationWorker,
 	ProvideDailyUsageRefreshWorker,
 	NewAntigravityQuotaFetcher,
 	NewUserAttributeService,

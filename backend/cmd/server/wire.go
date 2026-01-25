@@ -69,6 +69,7 @@ func provideCleanup(
 	usageQueue *service.UsageQueueService,
 	billingCache *service.BillingCacheService,
 	accountExpirationWorker *service.AccountExpirationWorker,
+	subscriptionExpirationWorker *service.SubscriptionExpirationWorker,
 	dailyUsageRefreshWorker *service.DailyUsageRefreshWorker,
 	oauth *service.OAuthService,
 	openaiOAuth *service.OpenAIOAuthService,
@@ -84,6 +85,10 @@ func provideCleanup(
 			name string
 			fn   func() error
 		}{
+			{"SubscriptionExpirationWorker", func() error {
+				subscriptionExpirationWorker.Stop()
+				return nil
+			}},
 			{"AccountExpirationWorker", func() error {
 				accountExpirationWorker.Stop()
 				return nil
