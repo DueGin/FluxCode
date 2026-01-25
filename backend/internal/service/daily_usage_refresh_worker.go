@@ -354,6 +354,32 @@ func (w *DailyUsageRefreshWorker) refreshAccountInternal(ctx context.Context, ac
 
 	usage, err := w.usageService.GetUsageFresh(reqCtx, account.ID)
 	if err != nil {
+		if w.rateLimitService != nil {
+			var upstreamErr *UpstreamHTTPError
+			if errors.As(err, &upstreamErr) && upstreamErr != nil {
+				_ = w.rateLimitService.HandleUpstreamError(reqCtx, account, upstreamErr.StatusCode, upstreamErr.Header, upstreamErr.Body)
+
+				resetAt := parseRateLimitReset(upstreamErr.Header)
+				if resetAt == nil {
+					resetAt = parseRateLimitResetFromBody(upstreamErr.Body)
+				}
+				resetAtStr := ""
+				if resetAt != nil {
+					resetAtStr = " reset_at=" + resetAt.Format(time.RFC3339)
+				}
+
+				msg := strings.TrimSpace(extractUpstreamErrorMessage(upstreamErr.Body))
+				msg = sanitizeSensitiveText(msg)
+				if len(msg) > 200 {
+					msg = msg[:200]
+				}
+				if msg != "" {
+					return action, "error", fmt.Sprintf("fetch_failed status=%d%s msg=%s", upstreamErr.StatusCode, resetAtStr, msg)
+				}
+				return action, "error", fmt.Sprintf("fetch_failed status=%d%s", upstreamErr.StatusCode, resetAtStr)
+			}
+		}
+
 		return action, "error", "fetch_failed"
 	}
 	if usage == nil {

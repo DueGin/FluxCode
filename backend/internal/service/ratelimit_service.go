@@ -729,6 +729,9 @@ func (s *RateLimitService) handleQuotaExceeded429(ctx context.Context, account *
 	}
 
 	until := parseRateLimitReset(headers)
+	if until == nil {
+		until = parseRateLimitResetFromBody(responseBody)
+	}
 	now := time.Now()
 	if until == nil || !until.After(now) {
 		fallback := now.Add(30 * time.Minute)
@@ -845,6 +848,39 @@ func parseRateLimitReset(headers http.Header) *time.Time {
 			return resetAt
 		}
 	}
+	return nil
+}
+
+func parseRateLimitResetFromBody(body []byte) *time.Time {
+	if len(body) == 0 {
+		return nil
+	}
+
+	if ts := gjson.GetBytes(body, "error.resets_at"); ts.Exists() {
+		if unix := ts.Int(); unix > 0 {
+			resetAt := time.Unix(unix, 0)
+			return &resetAt
+		}
+	}
+	if ts := gjson.GetBytes(body, "resets_at"); ts.Exists() {
+		if unix := ts.Int(); unix > 0 {
+			resetAt := time.Unix(unix, 0)
+			return &resetAt
+		}
+	}
+	if secs := gjson.GetBytes(body, "error.resets_in_seconds"); secs.Exists() {
+		if v := secs.Int(); v > 0 {
+			resetAt := time.Now().Add(time.Duration(v) * time.Second)
+			return &resetAt
+		}
+	}
+	if secs := gjson.GetBytes(body, "resets_in_seconds"); secs.Exists() {
+		if v := secs.Int(); v > 0 {
+			resetAt := time.Now().Add(time.Duration(v) * time.Second)
+			return &resetAt
+		}
+	}
+
 	return nil
 }
 

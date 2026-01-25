@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -199,6 +200,30 @@ func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesRetryAfte
 	require.False(t, account.Schedulable)
 	require.Equal(t, 1, repo.setUnschedulableCalls)
 	require.Contains(t, repo.setUnschedulableReason, expectedResetAt.Format(time.RFC3339))
+}
+
+func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesResetsAtFromBodyInReason(t *testing.T) {
+	ctx := context.Background()
+	repo := newRateLimitAccountRepoSpy()
+	svc := &RateLimitService{accountRepo: repo}
+
+	account := &Account{
+		ID:          707,
+		Platform:    PlatformAnthropic,
+		Type:        AccountTypeOAuth,
+		Schedulable: true,
+	}
+
+	expectedResetAt := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
+	var headers http.Header
+	body := []byte(fmt.Sprintf(`{"error":{"type":"usage_limit_reached","message":"The usage limit has been reached","plan_type":"plus","resets_at":%d,"resets_in_seconds":95505}}`, expectedResetAt.Unix()))
+
+	shouldDisable := svc.HandleUpstreamError(ctx, account, 429, headers, body)
+
+	require.True(t, shouldDisable)
+	require.False(t, account.Schedulable)
+	require.Equal(t, 1, repo.setUnschedulableCalls)
+	require.Contains(t, repo.setUnschedulableReason, time.Unix(expectedResetAt.Unix(), 0).Format(time.RFC3339))
 }
 
 func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesFallbackResetAtInReason(t *testing.T) {
