@@ -140,7 +140,7 @@
                     {{ copiedIndex === -1 ? t('keys.useKeyModal.copied') : t('keys.useKeyModal.copy') }}
                   </button>
                 </div>
-                <pre class="overflow-x-auto p-4 text-sm font-mono text-gray-100"><code v-text="oneClickCommand"></code></pre>
+                <pre class="p-4 text-sm font-mono text-gray-100 whitespace-pre-wrap break-words"><code v-text="oneClickCommand"></code></pre>
               </div>
 
               <p class="mt-2 text-xs text-emerald-800/80 dark:text-emerald-200/70">
@@ -185,7 +185,7 @@
                 </button>
               </div>
               <!-- Code Content -->
-              <pre class="p-4 text-sm font-mono text-gray-100 overflow-x-auto"><code v-html="file.highlighted"></code></pre>
+              <pre class="p-4 text-sm font-mono text-gray-100 whitespace-pre-wrap break-words"><code v-html="file.highlighted"></code></pre>
             </div>
           </div>
         </div>
