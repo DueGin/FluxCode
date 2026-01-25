@@ -100,6 +100,12 @@
               </p>
 
               <div class="mt-3 space-y-3">
+                <p
+                  v-if="oneClickBlocks.length > 1"
+                  class="text-xs text-emerald-800/80 dark:text-emerald-200/70"
+                >
+                  {{ t('keys.useKeyModal.windowsChoiceHint') }}
+                </p>
                 <div
                   v-for="block in oneClickBlocks"
                   :key="block.copyId"
@@ -164,6 +170,12 @@
 
         <!-- Code Blocks (Stacked for multi-file platforms) -->
         <div class="space-y-4">
+          <p
+            v-if="activeTab === 'windows' && platform !== 'openai'"
+            class="text-xs text-gray-600 dark:text-gray-400"
+          >
+            {{ t('keys.useKeyModal.windowsChoiceHint') }}
+          </p>
           <div
             v-for="(file, index) in currentFiles"
             :key="index"
