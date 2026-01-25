@@ -735,7 +735,7 @@ func (s *RateLimitService) handleQuotaExceeded429(ctx context.Context, account *
 		until = &fallback
 	}
 
-	reason := buildQuotaExceededReason(code, msg, headers)
+	reason := buildQuotaExceededReason(code, msg, headers, until)
 	if err := setUnschedulableWithReason(ctx, s.accountRepo, account, reason); err != nil {
 		applog.Printf("[QuotaExceeded] SetUnschedulableWithReason failed for account %d: %v", account.ID, err)
 		return false
@@ -880,7 +880,7 @@ func parseResetValue(raw string) *time.Time {
 	return nil
 }
 
-func buildQuotaExceededReason(code, msg string, headers http.Header) string {
+func buildQuotaExceededReason(code, msg string, headers http.Header, resetAt *time.Time) string {
 	reqID := ""
 	if headers != nil {
 		reqID = firstNonEmptyHeader(headers, "x-request-id", "request-id", "anthropic-request-id")
@@ -903,7 +903,10 @@ func buildQuotaExceededReason(code, msg string, headers http.Header) string {
 	if code != "" {
 		reason += "; upstream_code=" + code
 	}
-	if resetAt := parseRateLimitReset(headers); resetAt != nil {
+	if resetAt == nil {
+		resetAt = parseRateLimitReset(headers)
+	}
+	if resetAt != nil {
 		reason += "; reset_at=" + resetAt.Format(time.RFC3339)
 	}
 	if msg != "" {

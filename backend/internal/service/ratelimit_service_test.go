@@ -201,6 +201,33 @@ func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesRetryAfte
 	require.Contains(t, repo.setUnschedulableReason, expectedResetAt.Format(time.RFC3339))
 }
 
+func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesFallbackResetAtInReason(t *testing.T) {
+	ctx := context.Background()
+	repo := newRateLimitAccountRepoSpy()
+	svc := &RateLimitService{accountRepo: repo}
+
+	account := &Account{
+		ID:          606,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Schedulable: true,
+	}
+
+	start := time.Now()
+	var headers http.Header
+	body := []byte(`{"error":{"code":"insufficient_quota","message":"The usage limit has been reached"}}`)
+
+	shouldDisable := svc.HandleUpstreamError(ctx, account, 429, headers, body)
+
+	require.True(t, shouldDisable)
+	require.False(t, account.Schedulable)
+	require.Equal(t, 1, repo.setUnschedulableCalls)
+	require.Contains(t, repo.setUnschedulableReason, "reset_at=")
+
+	resetAt := extractResetAtFromReason(t, repo.setUnschedulableReason)
+	require.WithinDuration(t, start.Add(30*time.Minute), resetAt, 3*time.Second)
+}
+
 func extractResetAtFromReason(t *testing.T, reason string) time.Time {
 	t.Helper()
 
