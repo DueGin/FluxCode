@@ -119,6 +119,17 @@ func ProvideDailyUsageRefreshWorker(
 	return svc
 }
 
+func ProvideRateLimitReactivateWorker(
+	db *sql.DB,
+	timingWheel *TimingWheelService,
+	accountRepo AccountRepository,
+	dailyUsageRefreshWorker *DailyUsageRefreshWorker,
+) *RateLimitReactivateWorker {
+	svc := NewRateLimitReactivateWorker(db, timingWheel, accountRepo, dailyUsageRefreshWorker, 30*time.Second)
+	svc.Start()
+	return svc
+}
+
 // ProvideConcurrencyService creates ConcurrencyService and starts slot cleanup worker.
 func ProvideConcurrencyService(cache ConcurrencyCache, accountRepo AccountRepository, cfg *config.Config) *ConcurrencyService {
 	svc := NewConcurrencyService(cache)
@@ -176,6 +187,7 @@ var ProviderSet = wire.NewSet(
 	ProvideAccountExpirationWorker,
 	ProvideSubscriptionExpirationWorker,
 	ProvideDailyUsageRefreshWorker,
+	ProvideRateLimitReactivateWorker,
 	NewAntigravityQuotaFetcher,
 	NewUserAttributeService,
 	NewUsageCache,

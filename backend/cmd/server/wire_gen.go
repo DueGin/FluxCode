@@ -158,7 +158,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, redisClient, configConfig)
 	accountExpirationWorker := service.ProvideAccountExpirationWorker(db, timingWheelService)
 	subscriptionExpirationWorker := service.ProvideSubscriptionExpirationWorker(db, timingWheelService)
-	v := provideCleanup(client, redisClient, tokenRefreshService, pricingService, emailQueueService, usageQueueService, billingCacheService, accountExpirationWorker, subscriptionExpirationWorker, dailyUsageRefreshWorker, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService)
+	rateLimitReactivateWorker := service.ProvideRateLimitReactivateWorker(db, timingWheelService, accountRepository, dailyUsageRefreshWorker)
+	v := provideCleanup(client, redisClient, tokenRefreshService, pricingService, emailQueueService, usageQueueService, billingCacheService, accountExpirationWorker, subscriptionExpirationWorker, dailyUsageRefreshWorker, rateLimitReactivateWorker, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService)
 	application := &Application{
 		Server:  httpServer,
 		Cleanup: v,
@@ -191,6 +192,7 @@ func provideCleanup(
 	accountExpirationWorker *service.AccountExpirationWorker,
 	subscriptionExpirationWorker *service.SubscriptionExpirationWorker,
 	dailyUsageRefreshWorker *service.DailyUsageRefreshWorker,
+	rateLimitReactivateWorker *service.RateLimitReactivateWorker,
 	oauth *service.OAuthService,
 	openaiOAuth *service.OpenAIOAuthService,
 	geminiOAuth *service.GeminiOAuthService,
@@ -214,6 +216,10 @@ func provideCleanup(
 			}},
 			{"DailyUsageRefreshWorker", func() error {
 				dailyUsageRefreshWorker.Stop()
+				return nil
+			}},
+			{"RateLimitReactivateWorker", func() error {
+				rateLimitReactivateWorker.Stop()
 				return nil
 			}},
 			{"TokenRefreshService", func() error {
