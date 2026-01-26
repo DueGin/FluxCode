@@ -23,21 +23,6 @@
             />
           </svg>
         </button>
-        <button @click="showCrsSyncModal = true" class="btn btn-secondary" :title="t('admin.accounts.syncFromCrs')">
-          <svg
-            class="h-5 w-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            stroke-width="1.5"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
-            />
-          </svg>
-        </button>
         <button @click="showCreateModal = true" class="btn btn-primary" data-tour="accounts-create-btn">
           <svg
             class="mr-2 h-5 w-5"
@@ -568,12 +553,6 @@
       @cancel="showBulkClearTempUnschedDialog = false"
     />
 
-    <SyncFromCrsModal
-      :show="showCrsSyncModal"
-      @close="showCrsSyncModal = false"
-      @synced="handleCrsSynced"
-    />
-
     <!-- Bulk Edit Account Modal -->
     <BulkEditAccountModal
       :show="showBulkEditModal"
@@ -728,8 +707,7 @@ import {
   BulkEditAccountModal,
   ReAuthAccountModal,
   AccountStatsModal,
-  TempUnschedStatusModal,
-  SyncFromCrsModal
+  TempUnschedStatusModal
 } from '@/components/account'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
 import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
@@ -825,7 +803,6 @@ const showBulkClearTempUnschedDialog = ref(false)
 const showTestModal = ref(false)
 const showStatsModal = ref(false)
 const showTempUnschedModal = ref(false)
-const showCrsSyncModal = ref(false)
 const showBulkEditModal = ref(false)
 const editingAccount = ref<Account | null>(null)
 const reAuthAccount = ref<Account | null>(null)
@@ -1105,11 +1082,6 @@ const handlePageChange = (page: number) => {
 const handlePageSizeChange = (pageSize: number) => {
   pagination.page_size = pageSize
   pagination.page = 1
-  loadAccounts()
-}
-
-const handleCrsSynced = () => {
-  showCrsSyncModal.value = false
   loadAccounts()
 }
 

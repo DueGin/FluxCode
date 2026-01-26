@@ -162,7 +162,6 @@ var ProviderSet = wire.NewSet(
 	NewSubscriptionService,
 	ProvideConcurrencyService,
 	NewIdentityService,
-	NewCRSSyncService,
 	ProvideUpdateService,
 	ProvideTokenRefreshService,
 	ProvideTimingWheelService,
