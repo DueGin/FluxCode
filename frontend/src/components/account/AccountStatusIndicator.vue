@@ -61,7 +61,7 @@
       <div
         class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden -translate-x-1/2 rounded bg-gray-900 px-2 py-1 text-xs text-white dark:bg-gray-700 group-hover:block"
       >
-        Rate limited until {{ formatTime(account.rate_limit_reset_at) }}
+        Rate limited until {{ formatDateTime(account.rate_limit_reset_at) }}
         <div
           class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"
         ></div>
@@ -86,7 +86,7 @@
       <div
         class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden -translate-x-1/2 rounded bg-gray-900 px-2 py-1 text-xs text-white dark:bg-gray-700 group-hover:block"
       >
-        Overloaded until {{ formatTime(account.overload_until) }}
+        Overloaded until {{ formatDateTime(account.overload_until) }}
         <div
           class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"
         ></div>
@@ -99,7 +99,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Account } from '@/types'
-import { formatTime } from '@/utils/format'
+	import { formatDateTime } from '@/utils/format'
 
 const { t } = useI18n()
 
