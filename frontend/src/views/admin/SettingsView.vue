@@ -356,20 +356,6 @@
               </div>
               <div>
                 <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.scheduling.dailyUsageRefreshTime') }}
-                </label>
-                <input
-                  v-model="form.daily_usage_refresh_time"
-                  type="time"
-                  class="input"
-                  placeholder="03:00"
-                />
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.settings.scheduling.dailyUsageRefreshTimeHint') }}
-                </p>
-              </div>
-              <div>
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   {{ t('admin.settings.scheduling.usageWindowDisablePercent') }}
                 </label>
                 <input
@@ -955,19 +941,18 @@ const adminApiKeyMasked = ref('')
 const adminApiKeyOperating = ref(false)
 const newAdminApiKey = ref('')
 
-const form = reactive<SystemSettings>({
+	const form = reactive<SystemSettings>({
   registration_enabled: true,
   email_verify_enabled: false,
   alert_emails: [],
   alert_cooldown_minutes: 5,
-  default_balance: 0,
-  default_concurrency: 1,
-  gateway_retry_switch_after: 2,
-  daily_usage_refresh_time: '03:00',
-  auth_401_cooldown_seconds: 300,
-  usage_window_disable_percent: 100,
-  usage_window_cooldown_seconds: 300,
-  user_concurrency_wait_timeout_seconds: 30,
+	  default_balance: 0,
+	  default_concurrency: 1,
+	  gateway_retry_switch_after: 2,
+	  auth_401_cooldown_seconds: 300,
+	  usage_window_disable_percent: 100,
+	  usage_window_cooldown_seconds: 300,
+	  user_concurrency_wait_timeout_seconds: 30,
   site_name: 'FluxCode',
   site_logo: '',
   site_subtitle: 'Subscription to API Conversion Platform',

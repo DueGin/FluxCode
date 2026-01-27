@@ -9,14 +9,13 @@ import (
 	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 )
 
-// UsageRefresher is implemented by workers that can refresh usage windows for accounts.
-// DailyUsageRefreshWorker satisfies this interface.
-type UsageRefresher interface {
-	RefreshAccounts(ctx context.Context, accounts []*Account) []UsageRefreshResult
-}
-
-// RateLimitReactivateWorker re-checks accounts disabled by 429 and re-enables scheduling after reset.
-// For multi-host deployments, it uses PostgreSQL advisory lock to ensure only one instance runs.
+// RateLimitReactivateWorker 用于“历史兼容修复”：
+//
+// 早期版本在遇到上游 429 时，可能会把账号的 schedulable 置为 false（等同于人工关闭开关），
+// 导致即使到达 resetAt 也无法自动恢复调度。
+//
+// 本 worker 会定期扫描这类账号，在 resetAt 到期后自动把 schedulable 恢复为 true。
+// 为支持多机部署，使用 PostgreSQL advisory lock 保证同一时刻只有一个实例执行。
 type RateLimitReactivateWorker struct {
 	db         *sql.DB
 	timingWheel *TimingWheelService
@@ -24,7 +23,6 @@ type RateLimitReactivateWorker struct {
 	batchSize  int
 
 	accountRepo AccountRepository
-	refresher   UsageRefresher
 
 	now func() time.Time
 }
@@ -35,7 +33,6 @@ func NewRateLimitReactivateWorker(
 	db *sql.DB,
 	timingWheel *TimingWheelService,
 	accountRepo AccountRepository,
-	refresher UsageRefresher,
 	interval time.Duration,
 ) *RateLimitReactivateWorker {
 	if interval <= 0 {
@@ -47,7 +44,6 @@ func NewRateLimitReactivateWorker(
 		interval:    interval,
 		batchSize:   200,
 		accountRepo: accountRepo,
-		refresher:   refresher,
 		now:         time.Now,
 	}
 }
@@ -69,7 +65,7 @@ func (w *RateLimitReactivateWorker) Stop() {
 }
 
 func (w *RateLimitReactivateWorker) runOnce() {
-	if w == nil || w.db == nil || w.accountRepo == nil || w.refresher == nil {
+	if w == nil || w.db == nil || w.accountRepo == nil {
 		return
 	}
 
@@ -109,7 +105,7 @@ func (w *RateLimitReactivateWorker) runOnce() {
 		applog.Printf("[RateLimitReactivateWorker] load accounts failed: %v", err)
 		return
 	}
-	w.refreshCandidates(ctx, accounts)
+	w.reactivateCandidates(ctx, accounts)
 }
 
 func (w *RateLimitReactivateWorker) listCandidateIDs(ctx context.Context, conn *sql.Conn) ([]int64, error) {
@@ -155,8 +151,8 @@ func (w *RateLimitReactivateWorker) listCandidateIDs(ctx context.Context, conn *
 	return ids, nil
 }
 
-func (w *RateLimitReactivateWorker) refreshCandidates(ctx context.Context, accounts []*Account) {
-	if w == nil || w.refresher == nil || len(accounts) == 0 {
+func (w *RateLimitReactivateWorker) reactivateCandidates(ctx context.Context, accounts []*Account) {
+	if w == nil || w.accountRepo == nil || len(accounts) == 0 {
 		return
 	}
 	now := time.Now()
@@ -174,8 +170,20 @@ func (w *RateLimitReactivateWorker) refreshCandidates(ctx context.Context, accou
 		return
 	}
 
-	results := w.refresher.RefreshAccounts(ctx, candidates)
-	applog.Printf("[RateLimitReactivateWorker] refreshed=%d results=%d", len(candidates), len(results))
+	enabled := 0
+	for _, account := range candidates {
+		if account == nil || account.ID <= 0 {
+			continue
+		}
+		if err := w.accountRepo.SetSchedulable(ctx, account.ID, true); err != nil {
+			applog.Printf("[RateLimitReactivateWorker] SetSchedulable failed for account %d: %v", account.ID, err)
+			continue
+		}
+		enabled++
+	}
+	if enabled > 0 {
+		applog.Printf("[RateLimitReactivateWorker] enabled=%d candidates=%d", enabled, len(candidates))
+	}
 }
 
 func is429ReactivateCandidate(account *Account, now time.Time) bool {

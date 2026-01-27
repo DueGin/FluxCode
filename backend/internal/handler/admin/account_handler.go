@@ -83,7 +83,6 @@ type AccountHandler struct {
 	geminiOAuthService      *service.GeminiOAuthService
 	rateLimitService        *service.RateLimitService
 	accountUsageService     *service.AccountUsageService
-	dailyUsageRefreshWorker *service.DailyUsageRefreshWorker
 	accountTestService      *service.AccountTestService
 	concurrencyService      *service.ConcurrencyService
 }
@@ -96,7 +95,6 @@ func NewAccountHandler(
 	geminiOAuthService *service.GeminiOAuthService,
 	rateLimitService *service.RateLimitService,
 	accountUsageService *service.AccountUsageService,
-	dailyUsageRefreshWorker *service.DailyUsageRefreshWorker,
 	accountTestService *service.AccountTestService,
 	concurrencyService *service.ConcurrencyService,
 ) *AccountHandler {
@@ -107,7 +105,6 @@ func NewAccountHandler(
 		geminiOAuthService:      geminiOAuthService,
 		rateLimitService:        rateLimitService,
 		accountUsageService:     accountUsageService,
-		dailyUsageRefreshWorker: dailyUsageRefreshWorker,
 		accountTestService:      accountTestService,
 		concurrencyService:      concurrencyService,
 	}
@@ -1061,100 +1058,6 @@ func (h *AccountHandler) BulkSetSchedulable(c *gin.Context) {
 	}
 
 	response.Success(c, result)
-}
-
-// BulkRefreshUsageRequest represents the request body for manual usage refresh.
-type BulkRefreshUsageRequest struct {
-	AccountIDs []int64 `json:"account_ids" binding:"required,min=1"`
-}
-
-// BulkRefreshUsage handles manual usage refresh for selected accounts.
-// POST /api/v1/admin/accounts/bulk-refresh-usage
-func (h *AccountHandler) BulkRefreshUsage(c *gin.Context) {
-	var req BulkRefreshUsageRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-	if h.dailyUsageRefreshWorker == nil {
-		response.InternalError(c, "Usage refresh worker not initialized")
-		return
-	}
-
-	uniqueIDs := make([]int64, 0, len(req.AccountIDs))
-	seen := make(map[int64]struct{}, len(req.AccountIDs))
-	for _, id := range req.AccountIDs {
-		if id <= 0 {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		uniqueIDs = append(uniqueIDs, id)
-	}
-	if len(uniqueIDs) == 0 {
-		response.BadRequest(c, "Invalid account IDs")
-		return
-	}
-
-	ctx := c.Request.Context()
-	accounts, err := h.adminService.GetAccountsByIDs(ctx, uniqueIDs)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	accountsByID := make(map[int64]*service.Account, len(accounts))
-	for _, acc := range accounts {
-		if acc == nil {
-			continue
-		}
-		accountsByID[acc.ID] = acc
-	}
-
-	toRefresh := make([]*service.Account, 0, len(accountsByID))
-	for _, id := range uniqueIDs {
-		if acc, ok := accountsByID[id]; ok {
-			toRefresh = append(toRefresh, acc)
-		}
-	}
-
-	refreshResults := h.dailyUsageRefreshWorker.RefreshAccounts(ctx, toRefresh)
-	resultsByID := make(map[int64]service.UsageRefreshResult, len(refreshResults))
-	for _, res := range refreshResults {
-		resultsByID[res.AccountID] = res
-	}
-
-	results := make([]service.UsageRefreshResult, 0, len(uniqueIDs))
-	successCount := 0
-	failedCount := 0
-	for _, id := range uniqueIDs {
-		if res, ok := resultsByID[id]; ok {
-			results = append(results, res)
-			if strings.EqualFold(res.Outcome, "error") {
-				failedCount++
-			} else {
-				successCount++
-			}
-			continue
-		}
-
-		results = append(results, service.UsageRefreshResult{
-			AccountID: id,
-			Action:    "usage_refresh",
-			Outcome:   "error",
-			Detail:    "account_not_found",
-		})
-		failedCount++
-	}
-
-	response.Success(c, gin.H{
-		"total":   len(uniqueIDs),
-		"success": successCount,
-		"failed":  failedCount,
-		"results": results,
-	})
 }
 
 // GetAvailableModels handles getting available models for an account

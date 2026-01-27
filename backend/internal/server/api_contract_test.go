@@ -312,7 +312,6 @@ func TestAPIContracts(t *testing.T) {
 					"default_concurrency": 5,
 					"default_balance": 1.25,
 					"gateway_retry_switch_after": 2,
-					"daily_usage_refresh_time": "03:00",
 					"auth_401_cooldown_seconds": 300,
 					"usage_window_disable_percent": 100,
 					"usage_window_cooldown_seconds": 300,

@@ -103,29 +103,12 @@ func ProvideSubscriptionExpirationWorker(db *sql.DB, timingWheel *TimingWheelSer
 	return svc
 }
 
-func ProvideDailyUsageRefreshWorker(
-	db *sql.DB,
-	settingService *SettingService,
-	accountRepo AccountRepository,
-	usageService *AccountUsageService,
-	rateLimitService *RateLimitService,
-	httpUpstream HTTPUpstream,
-) *DailyUsageRefreshWorker {
-	svc := NewDailyUsageRefreshWorker(db, settingService, accountRepo, usageService, rateLimitService, httpUpstream)
-	if settingService != nil {
-		settingService.RegisterDailyUsageRefreshTimeListener(svc.ResetSchedule)
-	}
-	svc.Start()
-	return svc
-}
-
 func ProvideRateLimitReactivateWorker(
 	db *sql.DB,
 	timingWheel *TimingWheelService,
 	accountRepo AccountRepository,
-	dailyUsageRefreshWorker *DailyUsageRefreshWorker,
 ) *RateLimitReactivateWorker {
-	svc := NewRateLimitReactivateWorker(db, timingWheel, accountRepo, dailyUsageRefreshWorker, 30*time.Second)
+	svc := NewRateLimitReactivateWorker(db, timingWheel, accountRepo, 30*time.Second)
 	svc.Start()
 	return svc
 }
@@ -185,7 +168,6 @@ var ProviderSet = wire.NewSet(
 	ProvideDeferredService,
 	ProvideAccountExpirationWorker,
 	ProvideSubscriptionExpirationWorker,
-	ProvideDailyUsageRefreshWorker,
 	ProvideRateLimitReactivateWorker,
 	NewAntigravityQuotaFetcher,
 	NewUserAttributeService,

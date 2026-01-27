@@ -20,7 +20,6 @@ export interface SystemSettings {
   default_balance: number
   default_concurrency: number
   gateway_retry_switch_after: number
-  daily_usage_refresh_time: string
   auth_401_cooldown_seconds: number
   usage_window_disable_percent: number
   usage_window_cooldown_seconds: number

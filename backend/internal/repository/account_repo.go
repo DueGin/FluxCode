@@ -717,12 +717,23 @@ func (r *accountRepository) ListSchedulableByGroupIDAndPlatforms(ctx context.Con
 }
 
 func (r *accountRepository) SetRateLimited(ctx context.Context, id int64, resetAt time.Time) error {
-	now := time.Now()
-	_, err := r.client.Account.Update().
-		Where(dbaccount.IDEQ(id)).
-		SetRateLimitedAt(now).
-		SetRateLimitResetAt(resetAt).
-		Save(ctx)
+	// 多机部署下可能存在并发写入：
+	// - A 实例解析到更长的 resetAt（例如上游返回了明确的 reset_at）
+	// - B 实例解析失败走兜底（例如 +5m）
+	//
+	// 如果直接覆盖写入，B 可能把 resetAt “写短”，导致账号提前回到可调度集合，形成 429 抖动。
+	// 因此这里采用 “extend-only” 写法：仅当新 resetAt 更晚时才更新 resetAt。
+	_, err := r.sql.ExecContext(ctx, `
+		UPDATE accounts
+		SET rate_limited_at = NOW(),
+			rate_limit_reset_at = CASE
+				WHEN rate_limit_reset_at IS NULL OR rate_limit_reset_at < $1 THEN $1
+				ELSE rate_limit_reset_at
+			END,
+			updated_at = NOW()
+		WHERE id = $2
+			AND deleted_at IS NULL
+	`, resetAt, id)
 	return err
 }
 

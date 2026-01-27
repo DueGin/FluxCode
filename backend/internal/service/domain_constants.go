@@ -91,7 +91,6 @@ const (
 	SettingKeyDefaultConcurrency                = "default_concurrency"                   // 新用户默认并发量
 	SettingKeyDefaultBalance                    = "default_balance"                       // 新用户默认余额
 	SettingKeyGatewayRetrySwitchAfter           = "gateway_retry_switch_after"            // 重试多少次后切换账号调度
-	SettingKeyDailyUsageRefreshTime             = "daily_usage_refresh_time"              // 每日用量刷新时间（HH:MM）
 	SettingKeyAuth401CooldownSeconds            = "auth_401_cooldown_seconds"             // 上游鉴权401临时冷却时间（秒）
 	SettingKeyUsageWindowDisablePercent         = "usage_window_disable_percent"          // 用量窗口达到多少百分比触发临时不可调度
 	SettingKeyUsageWindowCooldownSeconds        = "usage_window_cooldown_seconds"         // 用量窗口超限临时不可调度时间（秒）

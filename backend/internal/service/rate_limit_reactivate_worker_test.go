@@ -10,27 +10,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type usageRefresherStub struct {
-	calls    int
-	accounts []*Account
+type schedulableRepoSpy struct {
+	*accountRepoStub
+
+	calls      int
+	enabledIDs []int64
 }
 
-func (s *usageRefresherStub) RefreshAccounts(ctx context.Context, accounts []*Account) []UsageRefreshResult {
+func (s *schedulableRepoSpy) SetSchedulable(ctx context.Context, id int64, schedulable bool) error {
 	s.calls++
-	s.accounts = accounts
+	if schedulable {
+		s.enabledIDs = append(s.enabledIDs, id)
+	}
 	return nil
 }
 
-func TestRateLimitReactivateWorker_refreshCandidatesOnlyPicks429DueAccounts(t *testing.T) {
+func TestRateLimitReactivateWorker_reactivateCandidatesOnlyPicks429DueAccounts(t *testing.T) {
 	now := time.Date(2026, 1, 25, 12, 0, 0, 0, time.UTC)
 	past := now.Add(-time.Second)
 	future := now.Add(time.Second)
 	expiredAt := now.Add(-time.Hour)
 
-	stub := &usageRefresherStub{}
+	stub := &schedulableRepoSpy{accountRepoStub: &accountRepoStub{}}
 	w := &RateLimitReactivateWorker{
-		refresher: stub,
-		now:       func() time.Time { return now },
+		accountRepo: stub,
+		now:         func() time.Time { return now },
 	}
 
 	accounts := []*Account{
@@ -72,10 +76,8 @@ func TestRateLimitReactivateWorker_refreshCandidatesOnlyPicks429DueAccounts(t *t
 		},
 	}
 
-	w.refreshCandidates(context.Background(), accounts)
+	w.reactivateCandidates(context.Background(), accounts)
 
 	require.Equal(t, 1, stub.calls)
-	require.Len(t, stub.accounts, 1)
-	require.Equal(t, int64(1), stub.accounts[0].ID)
+	require.Equal(t, []int64{1}, stub.enabledIDs)
 }
-
