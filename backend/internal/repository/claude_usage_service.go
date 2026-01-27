@@ -47,7 +47,11 @@ func (s *claudeUsageService) FetchUsage(ctx context.Context, accessToken, proxyU
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+		return nil, &service.UpstreamHTTPError{
+			StatusCode: resp.StatusCode,
+			Header:     resp.Header.Clone(),
+			Body:       body,
+		}
 	}
 
 	var usageResp service.ClaudeUsageResponse

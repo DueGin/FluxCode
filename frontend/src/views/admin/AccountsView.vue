@@ -230,7 +230,7 @@
           </div>
         </div>
 
-      <DataTable :columns="columns" :data="accounts" :loading="loading">
+      <DataTable :columns="columns" :data="accounts" :loading="loading" sort-mode="server" @sort-change="handleSortChange">
           <template #cell-select="{ row }">
             <input
               type="checkbox"
@@ -790,6 +790,10 @@ const pagination = reactive({
   total: 0,
   pages: 0
 })
+const sort = reactive({
+  by: 'id',
+  order: 'desc' as 'asc' | 'desc'
+})
 let abortController: AbortController | null = null
 
 // Modal states
@@ -980,6 +984,63 @@ const formatTempUnschedReason = (raw: string | null): string => {
   }
 }
 
+const extractUpstreamQuotaResetAt = (raw: string | null): Date | null => {
+  const reason = raw?.trim() || ''
+  if (!reason) return null
+
+  const resetAtMatch = reason.match(/(?:^|;\s*)reset_at=([^;]+)/i)
+  if (resetAtMatch?.[1]) {
+    const parsed = new Date(resetAtMatch[1].trim())
+    if (!isNaN(parsed.getTime())) return parsed
+  }
+
+  const unixMatch = reason.match(/(?:^|[;\s"{])resets_at(?:\s*[:=]\s*)(\d{10,13})/i)
+  if (unixMatch?.[1]) {
+    const unix = Number(unixMatch[1])
+    if (Number.isFinite(unix) && unix > 0) {
+      const ms = unix > 1_000_000_000_000 ? unix : unix * 1000
+      const parsed = new Date(ms)
+      if (!isNaN(parsed.getTime())) return parsed
+    }
+  }
+
+  const secondsMatch = reason.match(/(?:^|[;\s"{])resets_in_seconds(?:\s*[:=]\s*)(\d{1,10})/i)
+  if (secondsMatch?.[1]) {
+    const seconds = Number(secondsMatch[1])
+    if (Number.isFinite(seconds) && seconds > 0) {
+      const parsed = new Date(Date.now() + seconds * 1000)
+      if (!isNaN(parsed.getTime())) return parsed
+    }
+  }
+
+  return null
+}
+
+const formatUpstreamQuotaExceededHint = (account: Account): string | null => {
+  const rawReason = account.temp_unschedulable_reason?.trim() || ''
+  if (!rawReason) return null
+
+  const lower = rawReason.toLowerCase()
+  const isQuotaExceeded =
+    lower.includes('upstream quota exceeded (429)') ||
+    lower.includes('usage_limit_reached') ||
+    lower.includes('insufficient_quota') ||
+    lower.includes('quota_exceeded')
+  if (!isQuotaExceeded) return null
+
+  const resetAt = extractUpstreamQuotaResetAt(rawReason) || (account.rate_limit_reset_at ? new Date(account.rate_limit_reset_at) : null)
+  if (!resetAt || isNaN(resetAt.getTime())) return null
+
+  let upstreamMessage = ''
+  const msgMatch = rawReason.match(/(?:^|;\s*)upstream_message=([^;]+)/i)
+  if (msgMatch?.[1]) upstreamMessage = msgMatch[1].trim()
+
+  const time = formatDateTime(resetAt)
+  return upstreamMessage
+    ? t('admin.accounts.schedulableReason.upstreamQuotaExceededUntilWithMessage', { time, message: upstreamMessage })
+    : t('admin.accounts.schedulableReason.upstreamQuotaExceededUntil', { time })
+}
+
 const getSchedulableHint = (account: Account): string => {
   if (isExpired(account.expires_at)) {
     return t('admin.accounts.schedulableReason.expired')
@@ -991,6 +1052,8 @@ const getSchedulableHint = (account: Account): string => {
     return t('admin.accounts.schedulableReason.error')
   }
   if (!account.schedulable) {
+    const quotaHint = formatUpstreamQuotaExceededHint(account)
+    if (quotaHint) return quotaHint
     const reason = formatTempUnschedReason(account.temp_unschedulable_reason)
     return reason ? reason : t('admin.accounts.schedulableReason.manualOff')
   }
@@ -1024,7 +1087,9 @@ const loadAccounts = async () => {
       platform: filters.platform || undefined,
       type: filters.type || undefined,
       status: filters.status || undefined,
-      search: searchQuery.value || undefined
+      search: searchQuery.value || undefined,
+      sort_by: sort.by || undefined,
+      sort_order: sort.order || undefined
     }, {
       signal: currentAbortController.signal
     })
@@ -1085,6 +1150,12 @@ const handlePageSizeChange = (pageSize: number) => {
   loadAccounts()
 }
 
+const handleSortChange = (payload: { key: string; order: 'asc' | 'desc' }) => {
+  sort.by = payload.key
+  sort.order = payload.order
+  pagination.page = 1
+  loadAccounts()
+}
 // Edit modal
 const handleEdit = (account: Account) => {
   editingAccount.value = account

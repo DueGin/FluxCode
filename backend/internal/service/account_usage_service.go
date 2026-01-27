@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-
-	"strings"
 	"sync"
 	"time"
 
@@ -259,7 +257,8 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 		// 4. 添加窗口统计（有独立缓存，1 分钟）
 		s.addWindowStats(ctx, account, usage)
 
-		// 5. 超限检测：5h/7d 达到或超过配置阈值时，取消调度并写入提示信息（非临时不可调度，窗口恢复后可被刷新任务自动启用）
+		// 5. 超限检测：仅当 5h 窗口达到/超过配置阈值时，将账号标记为“临时不可调度”（不关闭调度开关）。
+		//    注意：7d 窗口仅用于展示，不参与调度状态更新（临时/非临时都不基于 7d）。
 		s.enforceUsageWindows(ctx, account, usage)
 
 		return usage, nil
@@ -601,21 +600,9 @@ func (s *AccountUsageService) enforceUsageWindows(ctx context.Context, account *
 	if s.accountRepo == nil {
 		return
 	}
-	// 仅在有 5h/7d 窗口数据时执行（API Key 等无 usage 窗口的账号会被跳过）
-	if usage.FiveHour == nil && usage.SevenDay == nil && usage.SevenDaySonnet == nil {
+	// 仅在有 5h 窗口数据时执行（API Key 等无 usage 窗口的账号会被跳过；7d 不参与调度状态更新）
+	if usage.FiveHour == nil {
 		return
-	}
-
-	type window struct {
-		name   string
-		used   float64
-		reset  *time.Time
-		exceed bool
-	}
-	windows := []window{
-		{name: "5h", used: usageValue(usage.FiveHour), reset: usageResetAt(usage.FiveHour)},
-		{name: "7d", used: usageValue(usage.SevenDay), reset: usageResetAt(usage.SevenDay)},
-		{name: "7d_sonnet", used: usageValue(usage.SevenDaySonnet), reset: usageResetAt(usage.SevenDaySonnet)},
 	}
 
 	threshold := float64(s.settingService.GetUsageWindowDisablePercent(ctx))
@@ -623,51 +610,25 @@ func (s *AccountUsageService) enforceUsageWindows(ctx context.Context, account *
 		threshold = defaultUsageWindowDisablePercent
 	}
 
-	var exceeded []window
-	for _, w := range windows {
-		if w.used >= threshold {
-			w.exceed = true
-			exceeded = append(exceeded, w)
-		}
-	}
+	exceeded := exceededWindows(usageWindowsFromUsageInfo(usage), threshold)
 	if len(exceeded) == 0 {
 		return
 	}
 
-	platformLabel := "账号"
-	switch account.Platform {
-	case PlatformAnthropic:
-		platformLabel = "Anthropic"
-	case PlatformOpenAI:
-		platformLabel = "OpenAI"
-	case PlatformGemini:
-		platformLabel = "Gemini"
-	case PlatformAntigravity:
-		platformLabel = "Antigravity"
+	reason := buildUsageExceededReason(account.Platform, exceeded)
+	cooldown := s.settingService.GetUsageWindowCooldown(ctx)
+	if cooldown <= 0 {
+		cooldown = time.Duration(defaultUsageWindowCooldownSeconds) * time.Second
 	}
-
-	var b strings.Builder
-	b.WriteString(platformLabel)
-	b.WriteString(" 额度已超限：")
-	for i, w := range exceeded {
-		if i > 0 {
-			b.WriteString("；")
-		}
-		b.WriteString(w.name)
-		b.WriteString(" 已用 ")
-		b.WriteString(fmt.Sprintf("%.1f%%", w.used))
-		if w.reset != nil {
-			b.WriteString("，预计 ")
-			b.WriteString(w.reset.Format(time.RFC3339))
-			b.WriteString(" 恢复")
-		} else {
-			b.WriteString("（重置时间未知）")
-		}
+	until := time.Now().Add(cooldown)
+	reason = sanitizeSensitiveText(reason)
+	if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, reason); err != nil {
+		applog.Printf("[UsageLimit] SetTempUnschedulable failed for account %d: %v", account.ID, err)
+		return
 	}
-
-	reason := strings.TrimSpace(b.String())
-	if err := setUnschedulableWithReason(ctx, s.accountRepo, account, reason); err != nil {
-		applog.Printf("[UsageLimit] SetUnschedulableWithReason failed for account %d: %v", account.ID, err)
+	if account.TempUnschedulableUntil == nil || account.TempUnschedulableUntil.Before(until) {
+		account.TempUnschedulableUntil = &until
+		account.TempUnschedulableReason = reason
 	}
 }
 

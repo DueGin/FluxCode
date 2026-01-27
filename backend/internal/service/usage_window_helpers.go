@@ -51,6 +51,10 @@ func exceededWindows(windows []usageWindow, threshold float64) []usageWindow {
 	}
 	var exceeded []usageWindow
 	for _, w := range windows {
+		// 7d 窗口仅用于展示，不参与调度状态更新（临时/非临时都不基于 7d）。
+		if w.name == "7d" || w.name == "7d_sonnet" {
+			continue
+		}
 		if w.used >= threshold {
 			exceeded = append(exceeded, w)
 		}
@@ -124,9 +128,6 @@ func codexUsageWindows(account *Account, now time.Time, threshold float64) ([]us
 			resetAt := baseTime.Add(time.Duration(resetSeconds) * time.Second)
 			w := usageWindow{name: "7d", used: used, reset: &resetAt}
 			windows = append(windows, w)
-			if used >= threshold && resetAt.After(now) {
-				exceeded = append(exceeded, w)
-			}
 		}
 	}
 

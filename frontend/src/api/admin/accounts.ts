@@ -31,6 +31,8 @@ export async function list(
     type?: string
     status?: string
     search?: string
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
   },
   options?: {
     signal?: AbortSignal

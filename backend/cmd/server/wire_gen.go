@@ -156,7 +156,9 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	httpServer := server.ProvideHTTPServer(configConfig, engine)
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, redisClient, configConfig)
 	accountExpirationWorker := service.ProvideAccountExpirationWorker(db, timingWheelService)
-	v := provideCleanup(client, redisClient, tokenRefreshService, pricingService, emailQueueService, usageQueueService, billingCacheService, accountExpirationWorker, dailyUsageRefreshWorker, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService)
+	subscriptionExpirationWorker := service.ProvideSubscriptionExpirationWorker(db, timingWheelService)
+	rateLimitReactivateWorker := service.ProvideRateLimitReactivateWorker(db, timingWheelService, accountRepository, dailyUsageRefreshWorker)
+	v := provideCleanup(client, redisClient, tokenRefreshService, pricingService, emailQueueService, usageQueueService, billingCacheService, accountExpirationWorker, subscriptionExpirationWorker, dailyUsageRefreshWorker, rateLimitReactivateWorker, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService)
 	application := &Application{
 		Server:  httpServer,
 		Cleanup: v,
@@ -187,7 +189,9 @@ func provideCleanup(
 	usageQueue *service.UsageQueueService,
 	billingCache *service.BillingCacheService,
 	accountExpirationWorker *service.AccountExpirationWorker,
+	subscriptionExpirationWorker *service.SubscriptionExpirationWorker,
 	dailyUsageRefreshWorker *service.DailyUsageRefreshWorker,
+	rateLimitReactivateWorker *service.RateLimitReactivateWorker,
 	oauth *service.OAuthService,
 	openaiOAuth *service.OpenAIOAuthService,
 	geminiOAuth *service.GeminiOAuthService,
@@ -201,12 +205,20 @@ func provideCleanup(
 			name string
 			fn   func() error
 		}{
+			{"SubscriptionExpirationWorker", func() error {
+				subscriptionExpirationWorker.Stop()
+				return nil
+			}},
 			{"AccountExpirationWorker", func() error {
 				accountExpirationWorker.Stop()
 				return nil
 			}},
 			{"DailyUsageRefreshWorker", func() error {
 				dailyUsageRefreshWorker.Stop()
+				return nil
+			}},
+			{"RateLimitReactivateWorker", func() error {
+				rateLimitReactivateWorker.Stop()
 				return nil
 			}},
 			{"TokenRefreshService", func() error {

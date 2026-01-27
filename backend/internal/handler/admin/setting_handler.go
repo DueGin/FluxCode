@@ -68,6 +68,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		DailyUsageRefreshTime:             settings.DailyUsageRefreshTime,
 		Auth401CooldownSeconds:            settings.Auth401CooldownSeconds,
 		UsageWindowDisablePercent:         settings.UsageWindowDisablePercent,
+		UsageWindowCooldownSeconds:        settings.UsageWindowCooldownSeconds,
 		UserConcurrencyWaitTimeoutSeconds: settings.UserConcurrencyWaitTimeoutSeconds,
 		EnableModelFallback:               settings.EnableModelFallback,
 		FallbackModelAnthropic:            settings.FallbackModelAnthropic,
@@ -117,6 +118,7 @@ type UpdateSettingsRequest struct {
 	DailyUsageRefreshTime             string  `json:"daily_usage_refresh_time"`
 	Auth401CooldownSeconds            int     `json:"auth_401_cooldown_seconds"`
 	UsageWindowDisablePercent         int     `json:"usage_window_disable_percent"`
+	UsageWindowCooldownSeconds        int     `json:"usage_window_cooldown_seconds"`
 	UserConcurrencyWaitTimeoutSeconds int     `json:"user_concurrency_wait_timeout_seconds"`
 
 	// Model fallback configuration
@@ -156,6 +158,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		req.UsageWindowDisablePercent = 100
 	} else if req.UsageWindowDisablePercent > 100 {
 		req.UsageWindowDisablePercent = 100
+	}
+	if req.UsageWindowCooldownSeconds <= 0 {
+		req.UsageWindowCooldownSeconds = 300
 	}
 	if req.UserConcurrencyWaitTimeoutSeconds <= 0 {
 		req.UserConcurrencyWaitTimeoutSeconds = 30
@@ -231,6 +236,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		DailyUsageRefreshTime:             req.DailyUsageRefreshTime,
 		Auth401CooldownSeconds:            req.Auth401CooldownSeconds,
 		UsageWindowDisablePercent:         req.UsageWindowDisablePercent,
+		UsageWindowCooldownSeconds:        req.UsageWindowCooldownSeconds,
 		UserConcurrencyWaitTimeoutSeconds: req.UserConcurrencyWaitTimeoutSeconds,
 		EnableModelFallback:               req.EnableModelFallback,
 		FallbackModelAnthropic:            req.FallbackModelAnthropic,
@@ -284,6 +290,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		DailyUsageRefreshTime:             updatedSettings.DailyUsageRefreshTime,
 		Auth401CooldownSeconds:            updatedSettings.Auth401CooldownSeconds,
 		UsageWindowDisablePercent:         updatedSettings.UsageWindowDisablePercent,
+		UsageWindowCooldownSeconds:        updatedSettings.UsageWindowCooldownSeconds,
 		UserConcurrencyWaitTimeoutSeconds: updatedSettings.UserConcurrencyWaitTimeoutSeconds,
 		EnableModelFallback:               updatedSettings.EnableModelFallback,
 		FallbackModelAnthropic:            updatedSettings.FallbackModelAnthropic,

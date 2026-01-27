@@ -218,6 +218,7 @@ export default {
     apiKeys: 'API 密钥',
     usage: '使用记录',
     redeem: '兑换',
+    docs: '使用文档',
     profile: '个人资料',
     users: '用户管理',
     groups: '分组管理',
@@ -391,6 +392,7 @@ export default {
       copy: '复制',
       copied: '已复制',
       note: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。',
+      windowsChoiceHint: 'Windows 下请在 CMD / PowerShell 中二选一执行',
       noGroupTitle: '请先分配分组',
       noGroupDescription: '此 API 密钥尚未分配分组，请先在密钥列表中点击分组列进行分配，然后才能查看使用配置。',
       openai: {
@@ -398,6 +400,12 @@ export default {
         configTomlHint: '请确保以下内容位于 config.toml 文件的开头部分',
         note: '请确保配置目录存在。macOS/Linux 用户可运行 mkdir -p ~/.codex 创建目录。',
         noteWindows: '按 Win+R，输入 %userprofile%\\.codex 打开配置目录。如目录不存在，请先手动创建。',
+        manualTitle: '手动配置',
+        oneClick: {
+          title: '推荐：一键配置',
+          description: '复制并运行下面一条命令，将自动写入 Codex CLI 配置文件。',
+          overwriteWarning: '注意：该操作会覆盖本机 ~/.codex/auth.json 与 ~/.codex/config.toml（Windows 为 %userprofile%\\.codex）。',
+        },
       },
       antigravity: {
         description: '为 Antigravity 分组配置 API 访问。请根据您使用的客户端选择对应的配置方式。',
@@ -1112,6 +1120,8 @@ export default {
         tempUnsched: '账号处于临时不可调度状态。',
         tempUnschedWithReason: '账号处于临时不可调度状态：{reason}',
         rateLimitedUntil: '账号触发限流，预计 {time} 后恢复调度。',
+        upstreamQuotaExceededUntil: '上游配额已用尽（429），预计于 {time} 恢复调度。',
+        upstreamQuotaExceededUntilWithMessage: '上游配额已用尽（429），预计于 {time} 恢复调度：{message}',
         overloadedUntil: '账号处于过载，预计 {time} 后恢复调度。'
       },
       tempUnschedulable: {
@@ -1869,8 +1879,11 @@ export default {
         auth401CooldownSecondsHint: '当上游返回 401（token/鉴权异常）时，将账号临时冷却该秒数后再参与调度（默认 300）',
         dailyUsageRefreshTime: '每日用量检查时间',
         dailyUsageRefreshTimeHint: '每日在此时间对启用账号刷新上游用量窗口（HH:MM）',
-        usageWindowDisablePercent: '窗口超限取消调度阈值（%）',
-        usageWindowDisablePercentHint: '当窗口使用率达到该比例时，账号将取消调度（范围 1-100，默认 100），窗口恢复后会自动启用',
+        usageWindowDisablePercent: '窗口超限阈值（%）',
+        usageWindowDisablePercentHint:
+          '当 5h 窗口使用率达到该比例时，账号将进入临时不可调度（不关闭调度开关），冷却时间见下方配置（范围 1-100，默认 100）',
+        usageWindowCooldownSeconds: '窗口超限冷却时间（秒）',
+        usageWindowCooldownSecondsHint: '当 5h 窗口超限时，将账号临时不可调度该秒数（默认 300，即 5 分钟）',
         userConcurrencyWaitTimeoutSeconds: '用户并发等待超时（秒）',
         userConcurrencyWaitTimeoutSecondsHint:
           '当请求达到用户并发上限时，最多等待该秒数获取并发槽位（默认 30）'

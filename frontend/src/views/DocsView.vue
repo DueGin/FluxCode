@@ -37,6 +37,64 @@
             <p class="mt-4 text-gray-700 dark:text-dark-300">以下步骤会根据你的操作系统展示对应文档。</p>
           </div>
 
+          <div
+            v-if="activeOsTab === 'windows'"
+            class="rounded-3xl border border-black/5 bg-white/70 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-dark-900/40"
+          >
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+              （可选）Windows 自动配置环境
+            </h3>
+            <p class="mt-3 text-gray-700 dark:text-dark-300">
+              复制下面这条命令到 PowerShell 执行，会自动下载并运行
+              <a
+                class="underline underline-offset-4 hover:text-gray-900 dark:hover:text-white"
+                :href="windowsOneClickScriptUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                >FluxCode Codex 一键配置.cmd</a>。
+            </p>
+
+            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="w-full rounded-2xl bg-slate-900 p-4 text-[15px] text-slate-100 sm:flex-1">
+                <pre class="overflow-x-auto font-mono leading-relaxed"><code v-text="windowsSetupCmdForPowerShell"></code></pre>
+              </div>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm sm:mt-1"
+                @click="copyWindowsSetupCmdForPowerShell"
+              >
+                {{ t('common.copyToClipboard') }}
+              </button>
+            </div>
+
+            <details class="mt-4 rounded-2xl border border-black/5 bg-white/60 p-4 dark:border-white/10 dark:bg-dark-950/30">
+              <summary class="cursor-pointer select-none font-medium text-gray-900 dark:text-white">
+                如果你使用 CMD（可选）
+              </summary>
+              <p class="mt-3 text-sm text-gray-600 dark:text-dark-400">
+                提示：CMD 版本命令里的
+                <code class="rounded bg-black/5 px-1 py-0.5 font-mono text-[0.9em] dark:bg-white/10">^</code>
+                是转义符，请勿删除；不要在 PowerShell 里运行该版本。
+              </p>
+              <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="w-full rounded-2xl bg-slate-900 p-4 text-[15px] text-slate-100 sm:flex-1">
+                  <pre class="overflow-x-auto font-mono leading-relaxed"><code v-text="windowsSetupCmdForCmd"></code></pre>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm sm:mt-1"
+                  @click="copyWindowsSetupCmdForCmd"
+                >
+                  {{ t('common.copyToClipboard') }}
+                </button>
+              </div>
+            </details>
+
+            <p class="mt-3 text-sm text-gray-600 dark:text-dark-400">
+              如遇权限/安装失败，建议“以管理员身份运行”终端后再执行。
+            </p>
+          </div>
+
           <div class="rounded-3xl border border-black/5 bg-white/70 p-6 shadow-sm backdrop-blur dark:border-white/10 dark:bg-dark-900/40">
             <h3 class="text-base font-semibold text-gray-900 dark:text-white">1. 安装 Node.js</h3>
             <ul class="mt-4 list-disc space-y-2 pl-5 text-gray-700 dark:text-dark-300">
@@ -304,11 +362,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
+import { useClipboard } from '@/composables/useClipboard'
 import PublicHeader from '@/components/layout/PublicHeader.vue'
 
 const { t } = useI18n()
 
 const appStore = useAppStore()
+const { copyToClipboard } = useClipboard()
 
 // Site settings
 const siteName = computed(() => appStore.siteName || 'FluxCode')
@@ -342,6 +402,23 @@ requires_openai_auth = true`)
 const authJsonContent = `{
   "OPENAI_API_KEY": "粘贴你的 API 密钥"
 }`
+
+const windowsOneClickScriptUrl =
+  'https://gitee.com/duegin/handle-env/releases/download/1.0/FluxCode%20Codex%E4%B8%80%E9%94%AE%E9%85%8D%E7%BD%AE.cmd'
+
+const windowsOneClickScriptUrlForCmd = windowsOneClickScriptUrl.replace(/%/g, '^%')
+
+const windowsSetupCmdForCmd = `powershell -NoProfile -ExecutionPolicy Bypass -Command "$u='${windowsOneClickScriptUrlForCmd}'; $p=Join-Path $env:TEMP 'fluxcode-codex-setup.cmd'; Invoke-WebRequest -Uri $u -OutFile $p; cmd /c $p"`
+
+const windowsSetupCmdForPowerShell = `[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u='${windowsOneClickScriptUrl}'; $p=Join-Path $env:TEMP 'fluxcode-codex-setup.cmd'; Invoke-WebRequest -Uri $u -OutFile $p; & $p`
+
+const copyWindowsSetupCmdForCmd = async () => {
+  await copyToClipboard(windowsSetupCmdForCmd, t('common.copiedToClipboard'))
+}
+
+const copyWindowsSetupCmdForPowerShell = async () => {
+  await copyToClipboard(windowsSetupCmdForPowerShell, t('common.copiedToClipboard'))
+}
 
 onMounted(() => {
   appStore.fetchPublicSettings()
