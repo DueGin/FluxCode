@@ -132,7 +132,6 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		accounts.POST("/bulk-clear-temp-unschedulable", h.Admin.Account.BulkClearTempUnschedulable)
 		accounts.POST("/:id/schedulable", h.Admin.Account.SetSchedulable)
 		accounts.POST("/bulk-schedulable", h.Admin.Account.BulkSetSchedulable)
-		accounts.POST("/bulk-refresh-usage", h.Admin.Account.BulkRefreshUsage)
 		accounts.GET("/:id/models", h.Admin.Account.GetAvailableModels)
 		accounts.POST("/batch", h.Admin.Account.BatchCreate)
 		accounts.POST("/batch-update-credentials", h.Admin.Account.BatchUpdateCredentials)

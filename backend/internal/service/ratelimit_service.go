@@ -99,8 +99,8 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		shouldDisable = true
 	case 429:
 		// 429 需要区分：
-		// - Quota exceeded：通常需要人工处理/充值，按“取消调度”处理（schedulable=false）。
-		// - Rate limit：短暂窗口，应该仅标记限流（rate_limit_reset_at），到期自动回到可调度集合。
+		// - Quota exceeded：通常会给出明确的 reset_at（或 Retry-After），按“临时不可调度”处理，到期自动恢复。
+		// - Rate limit：短暂窗口，标记限流（rate_limit_reset_at），到期自动回到可调度集合。
 		if s.handleQuotaExceeded429(ctx, account, headers, responseBody) {
 			shouldDisable = true
 			break
@@ -738,12 +738,19 @@ func (s *RateLimitService) handleQuotaExceeded429(ctx context.Context, account *
 		until = &fallback
 	}
 
-	reason := buildQuotaExceededReason(code, msg, headers, until)
-	if err := setUnschedulableWithReason(ctx, s.accountRepo, account, reason); err != nil {
-		applog.Printf("[QuotaExceeded] SetUnschedulableWithReason failed for account %d: %v", account.ID, err)
+	// Quota exceeded 同样按“临时不可调度”处理：记录 reset_at，让调度器在窗口内自动跳过，到期自动恢复。
+	// 注意：不要把 schedulable=false 作为超限信号，否则需要人工介入才能恢复调度。
+	if err := s.accountRepo.SetRateLimited(ctx, account.ID, *until); err != nil {
+		applog.Printf("[QuotaExceeded] SetRateLimited failed for account %d: %v", account.ID, err)
 		return false
 	}
+	if account != nil {
+		rateLimitedAt := now
+		account.RateLimitedAt = &rateLimitedAt
+		account.RateLimitResetAt = until
+	}
 
+	reason := buildQuotaExceededReason(code, msg, headers, until)
 	applog.Printf(
 		"[QuotaExceeded] account_id=%d platform=%s type=%s until=%v reason=%q",
 		account.ID,

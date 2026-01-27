@@ -1983,10 +1983,14 @@ func (s *GeminiMessagesCompatService) handleGeminiUpstreamError(ctx context.Cont
 	}
 
 	_ = s.accountRepo.SetRateLimited(ctx, account.ID, resetTime)
-	reason := buildGeminiRateLimitReason(body, resetTime)
-	if err := setUnschedulableWithReason(ctx, s.accountRepo, account, reason); err != nil {
-		applog.Printf("[Gemini 429] SetUnschedulableWithReason failed for account %d: %v", account.ID, err)
+	// 429（含用量超限）按“临时不可调度”处理：仅设置 resetAt 窗口，避免把 schedulable=false 作为永久开关。
+	// 这样到达 resetAt 后会自动恢复到可调度集合（无需人工干预）。
+	if account != nil {
+		rateLimitedAt := time.Now()
+		account.RateLimitedAt = &rateLimitedAt
+		account.RateLimitResetAt = &resetTime
 	}
+	_ = buildGeminiRateLimitReason(body, resetTime) // 保留用于调试/扩展（避免删除后影响排障）
 }
 
 func buildGeminiRateLimitReason(body []byte, resetAt time.Time) string {
@@ -1995,7 +1999,7 @@ func buildGeminiRateLimitReason(body []byte, resetAt time.Time) string {
 	if msg != "" && len(msg) > 512 {
 		msg = msg[:512] + "..."
 	}
-	reason := "Gemini 429 限流，已取消调度"
+	reason := "Gemini 429 限流，已进入限流冷却"
 	if !resetAt.IsZero() {
 		reason += "，预计 " + resetAt.Format(time.RFC3339) + " 恢复"
 	}

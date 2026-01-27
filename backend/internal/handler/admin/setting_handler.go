@@ -1,8 +1,6 @@
 package admin
 
 import (
-	"strings"
-
 	"github.com/DueGin/FluxCode/internal/handler/dto"
 	"github.com/DueGin/FluxCode/internal/pkg/response"
 	"github.com/DueGin/FluxCode/internal/service"
@@ -40,7 +38,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		afterSaleContact = append(afterSaleContact, dto.KVItem{K: item.K, V: item.V})
 	}
 
-	response.Success(c, dto.SystemSettings{
+		response.Success(c, dto.SystemSettings{
 		RegistrationEnabled:               settings.RegistrationEnabled,
 		EmailVerifyEnabled:                settings.EmailVerifyEnabled,
 		AlertEmails:                       settings.AlertEmails,
@@ -65,7 +63,6 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		DefaultConcurrency:                settings.DefaultConcurrency,
 		DefaultBalance:                    settings.DefaultBalance,
 		GatewayRetrySwitchAfter:           settings.GatewayRetrySwitchAfter,
-		DailyUsageRefreshTime:             settings.DailyUsageRefreshTime,
 		Auth401CooldownSeconds:            settings.Auth401CooldownSeconds,
 		UsageWindowDisablePercent:         settings.UsageWindowDisablePercent,
 		UsageWindowCooldownSeconds:        settings.UsageWindowCooldownSeconds,
@@ -115,7 +112,6 @@ type UpdateSettingsRequest struct {
 	DefaultConcurrency                int     `json:"default_concurrency"`
 	DefaultBalance                    float64 `json:"default_balance"`
 	GatewayRetrySwitchAfter           int     `json:"gateway_retry_switch_after"`
-	DailyUsageRefreshTime             string  `json:"daily_usage_refresh_time"`
 	Auth401CooldownSeconds            int     `json:"auth_401_cooldown_seconds"`
 	UsageWindowDisablePercent         int     `json:"usage_window_disable_percent"`
 	UsageWindowCooldownSeconds        int     `json:"usage_window_cooldown_seconds"`
@@ -147,9 +143,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.GatewayRetrySwitchAfter <= 0 {
 		req.GatewayRetrySwitchAfter = 2
-	}
-	if strings.TrimSpace(req.DailyUsageRefreshTime) == "" {
-		req.DailyUsageRefreshTime = "03:00"
 	}
 	if req.Auth401CooldownSeconds <= 0 {
 		req.Auth401CooldownSeconds = 300
@@ -233,7 +226,6 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		DefaultConcurrency:                req.DefaultConcurrency,
 		DefaultBalance:                    req.DefaultBalance,
 		GatewayRetrySwitchAfter:           req.GatewayRetrySwitchAfter,
-		DailyUsageRefreshTime:             req.DailyUsageRefreshTime,
 		Auth401CooldownSeconds:            req.Auth401CooldownSeconds,
 		UsageWindowDisablePercent:         req.UsageWindowDisablePercent,
 		UsageWindowCooldownSeconds:        req.UsageWindowCooldownSeconds,
@@ -285,13 +277,12 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AfterSaleContact:                  updatedAfterSaleContact,
 		DocURL:                            updatedSettings.DocURL,
 		DefaultConcurrency:                updatedSettings.DefaultConcurrency,
-		DefaultBalance:                    updatedSettings.DefaultBalance,
-		GatewayRetrySwitchAfter:           updatedSettings.GatewayRetrySwitchAfter,
-		DailyUsageRefreshTime:             updatedSettings.DailyUsageRefreshTime,
-		Auth401CooldownSeconds:            updatedSettings.Auth401CooldownSeconds,
-		UsageWindowDisablePercent:         updatedSettings.UsageWindowDisablePercent,
-		UsageWindowCooldownSeconds:        updatedSettings.UsageWindowCooldownSeconds,
-		UserConcurrencyWaitTimeoutSeconds: updatedSettings.UserConcurrencyWaitTimeoutSeconds,
+			DefaultBalance:                    updatedSettings.DefaultBalance,
+			GatewayRetrySwitchAfter:           updatedSettings.GatewayRetrySwitchAfter,
+			Auth401CooldownSeconds:            updatedSettings.Auth401CooldownSeconds,
+			UsageWindowDisablePercent:         updatedSettings.UsageWindowDisablePercent,
+			UsageWindowCooldownSeconds:        updatedSettings.UsageWindowCooldownSeconds,
+			UserConcurrencyWaitTimeoutSeconds: updatedSettings.UserConcurrencyWaitTimeoutSeconds,
 		EnableModelFallback:               updatedSettings.EnableModelFallback,
 		FallbackModelAnthropic:            updatedSettings.FallbackModelAnthropic,
 		FallbackModelOpenAI:               updatedSettings.FallbackModelOpenAI,
