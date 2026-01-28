@@ -13,7 +13,11 @@ import (
 	"github.com/DueGin/FluxCode/ent/userallowedgroup"
 	"github.com/DueGin/FluxCode/ent/usersubscription"
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
+	"github.com/DueGin/FluxCode/internal/pkg/timezone"
 	"github.com/DueGin/FluxCode/internal/service"
+	"github.com/lib/pq"
+
+	entsql "entgo.io/ent/dialect/sql"
 )
 
 type userRepository struct {
@@ -176,6 +180,11 @@ func (r *userRepository) List(ctx context.Context, params pagination.PaginationP
 }
 
 func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters service.UserListFilters) ([]service.User, *pagination.PaginationResult, error) {
+	sortBy := strings.ToLower(strings.TrimSpace(params.SortBy))
+	if sortBy == "today_actual_cost" || sortBy == "total_actual_cost" {
+		return r.listWithUsageSorting(ctx, params, filters, sortBy)
+	}
+
 	q := r.client.User.Query()
 
 	if filters.Status != "" {
@@ -216,15 +225,71 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 	users, err := q.
 		Offset(params.Offset()).
 		Limit(params.Limit()).
-		Order(dbent.Desc(dbuser.FieldID)).
+		Order(userOrderOptions(params)...).
 		All(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	outUsers, err := r.hydrateUsers(ctx, users)
+	if err != nil {
+		return nil, nil, err
+	}
+	return outUsers, paginationResultFromTotal(int64(total), params), nil
+}
+
+func userOrderOptions(params pagination.PaginationParams) []dbuser.OrderOption {
+	sortBy := strings.ToLower(strings.TrimSpace(params.SortBy))
+	sortOrder := strings.ToLower(strings.TrimSpace(params.SortOrder))
+
+	if sortBy == "" {
+		return []dbuser.OrderOption{
+			dbuser.ByID(entsql.OrderDesc()),
+		}
+	}
+
+	orderTerm := entsql.OrderAsc()
+	if sortOrder == "desc" {
+		orderTerm = entsql.OrderDesc()
+	}
+
+	var primary dbuser.OrderOption
+	switch sortBy {
+	case "id":
+		primary = dbuser.ByID(orderTerm)
+	case "email":
+		primary = dbuser.ByEmail(orderTerm)
+	case "username":
+		primary = dbuser.ByUsername(orderTerm)
+	case "role":
+		primary = dbuser.ByRole(orderTerm)
+	case "balance":
+		primary = dbuser.ByBalance(orderTerm)
+	case "concurrency":
+		primary = dbuser.ByConcurrency(orderTerm)
+	case "status":
+		primary = dbuser.ByStatus(orderTerm)
+	case "created_at":
+		primary = dbuser.ByCreatedAt(orderTerm)
+	default:
+		return []dbuser.OrderOption{
+			dbuser.ByID(entsql.OrderDesc()),
+		}
+	}
+
+	if sortBy == "id" {
+		return []dbuser.OrderOption{primary}
+	}
+	return []dbuser.OrderOption{
+		primary,
+		dbuser.ByID(entsql.OrderDesc()),
+	}
+}
+
+func (r *userRepository) hydrateUsers(ctx context.Context, users []*dbent.User) ([]service.User, error) {
 	outUsers := make([]service.User, 0, len(users))
 	if len(users) == 0 {
-		return outUsers, paginationResultFromTotal(int64(total), params), nil
+		return outUsers, nil
 	}
 
 	userIDs := make([]int64, 0, len(users))
@@ -245,7 +310,7 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		WithGroup().
 		All(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	for i := range subs {
@@ -256,7 +321,7 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 
 	allowedGroupsByUser, err := r.loadAllowedGroups(ctx, userIDs)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	for id, u := range userMap {
 		if groups, ok := allowedGroupsByUser[id]; ok {
@@ -264,7 +329,140 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		}
 	}
 
-	return outUsers, paginationResultFromTotal(int64(total), params), nil
+	return outUsers, nil
+}
+
+func (r *userRepository) listWithUsageSorting(ctx context.Context, params pagination.PaginationParams, filters service.UserListFilters, sortBy string) ([]service.User, *pagination.PaginationResult, error) {
+	if r.sql == nil {
+		return nil, nil, fmt.Errorf("sql executor is not configured")
+	}
+
+	// If attribute filters are specified, we need to filter by user IDs first
+	var allowedUserIDs []int64
+	if len(filters.Attributes) > 0 {
+		var attrErr error
+		allowedUserIDs, attrErr = r.filterUsersByAttributes(ctx, filters.Attributes)
+		if attrErr != nil {
+			return nil, nil, attrErr
+		}
+		if len(allowedUserIDs) == 0 {
+			return []service.User{}, paginationResultFromTotal(0, params), nil
+		}
+	}
+
+	conditions := []string{"u.deleted_at IS NULL"}
+	args := make([]any, 0, 6)
+	if filters.Status != "" {
+		conditions = append(conditions, fmt.Sprintf("u.status = $%d", len(args)+1))
+		args = append(args, filters.Status)
+	}
+	if filters.Role != "" {
+		conditions = append(conditions, fmt.Sprintf("u.role = $%d", len(args)+1))
+		args = append(args, filters.Role)
+	}
+	if filters.Search != "" {
+		conditions = append(conditions, fmt.Sprintf("(u.email ILIKE $%d OR u.username ILIKE $%d)", len(args)+1, len(args)+2))
+		kw := "%" + filters.Search + "%"
+		args = append(args, kw, kw)
+	}
+	if len(allowedUserIDs) > 0 {
+		conditions = append(conditions, fmt.Sprintf("u.id = ANY($%d)", len(args)+1))
+		args = append(args, pq.Array(allowedUserIDs))
+	}
+	whereClause := "WHERE " + strings.Join(conditions, " AND ")
+
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM users u %s", whereClause)
+	countRows, err := r.sql.QueryContext(ctx, countQuery, args...)
+	if err != nil {
+		return nil, nil, err
+	}
+	var total int64
+	if countRows.Next() {
+		if err := countRows.Scan(&total); err != nil {
+			_ = countRows.Close()
+			return nil, nil, err
+		}
+	}
+	if err := countRows.Close(); err != nil {
+		return nil, nil, err
+	}
+	if err := countRows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	if total == 0 {
+		return []service.User{}, paginationResultFromTotal(0, params), nil
+	}
+
+	idArgs := append([]any{}, args...)
+	joinClause := "LEFT JOIN usage_logs ul ON ul.user_id = u.id"
+	if sortBy == "today_actual_cost" {
+		idArgs = append(idArgs, timezone.Today())
+		joinClause = fmt.Sprintf("LEFT JOIN usage_logs ul ON ul.user_id = u.id AND ul.created_at >= $%d", len(idArgs))
+	}
+
+	orderDir := "ASC"
+	if strings.ToLower(strings.TrimSpace(params.SortOrder)) == "desc" {
+		orderDir = "DESC"
+	}
+
+	idArgs = append(idArgs, params.Offset(), params.Limit())
+	offsetIdx := len(idArgs) - 1
+	limitIdx := len(idArgs)
+
+	idQuery := fmt.Sprintf(`
+		SELECT u.id
+		FROM users u
+		%s
+		%s
+		GROUP BY u.id
+		ORDER BY COALESCE(SUM(ul.actual_cost), 0) %s, u.id DESC
+		OFFSET $%d LIMIT $%d
+	`, joinClause, whereClause, orderDir, offsetIdx, limitIdx)
+
+	rows, err := r.sql.QueryContext(ctx, idQuery, idArgs...)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	orderedIDs := make([]int64, 0, params.Limit())
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, nil, err
+		}
+		orderedIDs = append(orderedIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	if len(orderedIDs) == 0 {
+		return []service.User{}, paginationResultFromTotal(total, params), nil
+	}
+
+	userEntities, err := r.client.User.Query().Where(dbuser.IDIn(orderedIDs...)).All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	userByID := make(map[int64]*dbent.User, len(userEntities))
+	for i := range userEntities {
+		userByID[userEntities[i].ID] = userEntities[i]
+	}
+
+	orderedUsers := make([]*dbent.User, 0, len(orderedIDs))
+	for _, id := range orderedIDs {
+		if u, ok := userByID[id]; ok {
+			orderedUsers = append(orderedUsers, u)
+		}
+	}
+
+	outUsers, err := r.hydrateUsers(ctx, orderedUsers)
+	if err != nil {
+		return nil, nil, err
+	}
+	return outUsers, paginationResultFromTotal(total, params), nil
 }
 
 // filterUsersByAttributes returns user IDs that match ALL the given attribute filters

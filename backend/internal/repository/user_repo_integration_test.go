@@ -252,6 +252,57 @@ func (s *UserRepoSuite) TestListWithFilters_CombinedFilters() {
 	s.Require().Equal(target.ID, users[0].ID, "ListWithFilters result mismatch")
 }
 
+func (s *UserRepoSuite) TestListWithFilters_SortByBalanceAsc() {
+	u1 := s.mustCreateUser(&service.User{Email: "bal-10@test.com", Balance: 10})
+	u2 := s.mustCreateUser(&service.User{Email: "bal-01@test.com", Balance: 1})
+	u3 := s.mustCreateUser(&service.User{Email: "bal-05@test.com", Balance: 5})
+
+	users, _, err := s.repo.ListWithFilters(
+		s.ctx,
+		pagination.PaginationParams{Page: 1, PageSize: 10, SortBy: "balance", SortOrder: "asc"},
+		service.UserListFilters{},
+	)
+	s.Require().NoError(err)
+	s.Require().Len(users, 3)
+	s.Require().Equal([]int64{u2.ID, u3.ID, u1.ID}, []int64{users[0].ID, users[1].ID, users[2].ID})
+}
+
+func (s *UserRepoSuite) TestListWithFilters_SortByBalanceDesc() {
+	u1 := s.mustCreateUser(&service.User{Email: "bal-10d@test.com", Balance: 10})
+	u2 := s.mustCreateUser(&service.User{Email: "bal-01d@test.com", Balance: 1})
+	u3 := s.mustCreateUser(&service.User{Email: "bal-05d@test.com", Balance: 5})
+
+	users, _, err := s.repo.ListWithFilters(
+		s.ctx,
+		pagination.PaginationParams{Page: 1, PageSize: 10, SortBy: "balance", SortOrder: "desc"},
+		service.UserListFilters{},
+	)
+	s.Require().NoError(err)
+	s.Require().Len(users, 3)
+	s.Require().Equal([]int64{u1.ID, u3.ID, u2.ID}, []int64{users[0].ID, users[1].ID, users[2].ID})
+}
+
+func (s *UserRepoSuite) TestListWithFilters_SortByCreatedAtAsc() {
+	u1 := s.mustCreateUser(&service.User{Email: "ca1@test.com"})
+	u2 := s.mustCreateUser(&service.User{Email: "ca2@test.com"})
+
+	t1 := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	t2 := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+	_, err := integrationDB.ExecContext(s.ctx, "UPDATE users SET created_at = $1 WHERE id = $2", t2, u2.ID)
+	s.Require().NoError(err)
+	_, err = integrationDB.ExecContext(s.ctx, "UPDATE users SET created_at = $1 WHERE id = $2", t1, u1.ID)
+	s.Require().NoError(err)
+
+	users, _, err := s.repo.ListWithFilters(
+		s.ctx,
+		pagination.PaginationParams{Page: 1, PageSize: 10, SortBy: "created_at", SortOrder: "asc"},
+		service.UserListFilters{},
+	)
+	s.Require().NoError(err)
+	s.Require().Len(users, 2)
+	s.Require().Equal([]int64{u1.ID, u2.ID}, []int64{users[0].ID, users[1].ID})
+}
+
 // --- Balance operations ---
 
 func (s *UserRepoSuite) TestUpdateBalance() {

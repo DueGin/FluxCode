@@ -20,6 +20,8 @@ type UserListFilters struct {
 	Role       string           // User role filter
 	Search     string           // Search in email, username
 	Attributes map[int64]string // Custom attribute filters: attributeID -> value
+	SortBy     string           // Sort field
+	SortOrder  string           // Sort order (asc/desc)
 }
 
 type UserRepository interface {

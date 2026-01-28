@@ -288,7 +288,14 @@
 
       <!-- Users Table -->
       <template #table>
-        <DataTable :columns="columns" :data="users" :loading="loading" :actions-count="7">
+        <DataTable
+          :columns="columns"
+          :data="users"
+          :loading="loading"
+          :actions-count="7"
+          sort-mode="server"
+          @sort-change="handleSortChange"
+        >
           <template #cell-email="{ value }">
             <div class="flex items-center gap-2">
               <div
@@ -382,21 +389,16 @@
             <span class="font-medium text-gray-900 dark:text-white">${{ value.toFixed(2) }}</span>
           </template>
 
-          <template #cell-usage="{ row }">
-            <div class="text-sm">
-              <div class="flex items-center gap-1.5">
-                <span class="text-gray-500 dark:text-gray-400">{{ t('admin.users.today') }}:</span>
-                <span class="font-medium text-gray-900 dark:text-white">
-                  ${{ (usageStats[row.id]?.today_actual_cost ?? 0).toFixed(4) }}
-                </span>
-              </div>
-              <div class="mt-0.5 flex items-center gap-1.5">
-                <span class="text-gray-500 dark:text-gray-400">{{ t('admin.users.total') }}:</span>
-                <span class="font-medium text-gray-900 dark:text-white">
-                  ${{ (usageStats[row.id]?.total_actual_cost ?? 0).toFixed(4) }}
-                </span>
-              </div>
-            </div>
+          <template #cell-today_actual_cost="{ row }">
+            <span class="font-medium text-gray-900 dark:text-white">
+              ${{ (usageStats[row.id]?.today_actual_cost ?? 0).toFixed(4) }}
+            </span>
+          </template>
+
+          <template #cell-total_actual_cost="{ row }">
+            <span class="font-medium text-gray-900 dark:text-white">
+              ${{ (usageStats[row.id]?.total_actual_cost ?? 0).toFixed(4) }}
+            </span>
           </template>
 
           <template #cell-concurrency="{ value }">
@@ -1481,7 +1483,8 @@ const allColumns = computed<Column[]>(() => [
   { key: 'role', label: t('admin.users.columns.role'), sortable: true },
   { key: 'subscriptions', label: t('admin.users.columns.subscriptions'), sortable: false },
   { key: 'balance', label: t('admin.users.columns.balance'), sortable: true },
-  { key: 'usage', label: t('admin.users.columns.usage'), sortable: false },
+  { key: 'today_actual_cost', label: t('admin.users.columns.todayUsage'), sortable: true },
+  { key: 'total_actual_cost', label: t('admin.users.columns.totalUsage'), sortable: true },
   { key: 'concurrency', label: t('admin.users.columns.concurrency'), sortable: true },
   { key: 'status', label: t('admin.users.columns.status'), sortable: true },
   { key: 'created_at', label: t('admin.users.columns.created'), sortable: true },
@@ -1498,7 +1501,7 @@ const toggleableColumns = computed(() =>
 const hiddenColumns = reactive<Set<string>>(new Set())
 
 // Default hidden columns (columns hidden by default on first load)
-const DEFAULT_HIDDEN_COLUMNS = ['notes', 'subscriptions', 'usage', 'concurrency']
+const DEFAULT_HIDDEN_COLUMNS = ['username', 'role', 'notes', 'subscriptions', 'today_actual_cost', 'total_actual_cost', 'concurrency']
 
 // localStorage key for column settings
 const HIDDEN_COLUMNS_KEY = 'user-hidden-columns'
@@ -1510,6 +1513,11 @@ const loadSavedColumns = () => {
     if (saved) {
       const parsed = JSON.parse(saved) as string[]
       parsed.forEach(key => hiddenColumns.add(key))
+      if (hiddenColumns.has('usage')) {
+        hiddenColumns.add('today_actual_cost')
+        hiddenColumns.add('total_actual_cost')
+        hiddenColumns.delete('usage')
+      }
     } else {
       // Use default hidden columns on first load
       DEFAULT_HIDDEN_COLUMNS.forEach(key => hiddenColumns.add(key))
@@ -1552,6 +1560,11 @@ const columns = computed<Column[]>(() =>
 const users = ref<User[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
+
+const sortState = reactive({
+  by: '',
+  order: 'asc' as 'asc' | 'desc'
+})
 
 // Filter values (role, status, and custom attributes)
 const filters = reactive({
@@ -1842,7 +1855,9 @@ const loadUsers = async () => {
         role: filters.role as any,
         status: filters.status as any,
         search: searchQuery.value || undefined,
-        attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined
+        attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
+        sort_by: sortState.by || undefined,
+        sort_order: sortState.by ? sortState.order : undefined
       },
       { signal }
     )
@@ -1906,6 +1921,13 @@ const handleSearch = () => {
     pagination.page = 1
     loadUsers()
   }, 300)
+}
+
+const handleSortChange = (payload: { key: string; order: 'asc' | 'desc' }) => {
+  sortState.by = payload.key
+  sortState.order = payload.order
+  pagination.page = 1
+  loadUsers()
 }
 
 const handlePageChange = (page: number) => {
