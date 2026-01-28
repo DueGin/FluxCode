@@ -38,7 +38,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		afterSaleContact = append(afterSaleContact, dto.KVItem{K: item.K, V: item.V})
 	}
 
-		response.Success(c, dto.SystemSettings{
+	response.Success(c, dto.SystemSettings{
 		RegistrationEnabled:               settings.RegistrationEnabled,
 		EmailVerifyEnabled:                settings.EmailVerifyEnabled,
 		AlertEmails:                       settings.AlertEmails,
@@ -60,6 +60,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		ContactInfo:                       settings.ContactInfo,
 		AfterSaleContact:                  afterSaleContact,
 		DocURL:                            settings.DocURL,
+		QQGroupPopupTitle:                 settings.QQGroupPopupTitle,
+		QQGroupPopupMarkdown:              settings.QQGroupPopupMarkdown,
 		DefaultConcurrency:                settings.DefaultConcurrency,
 		DefaultBalance:                    settings.DefaultBalance,
 		GatewayRetrySwitchAfter:           settings.GatewayRetrySwitchAfter,
@@ -100,13 +102,15 @@ type UpdateSettingsRequest struct {
 	TurnstileSecretKey string `json:"turnstile_secret_key"`
 
 	// OEM设置
-	SiteName         string       `json:"site_name"`
-	SiteLogo         string       `json:"site_logo"`
-	SiteSubtitle     string       `json:"site_subtitle"`
-	APIBaseURL       string       `json:"api_base_url"`
-	ContactInfo      string       `json:"contact_info"`
-	AfterSaleContact []dto.KVItem `json:"after_sale_contact"`
-	DocURL           string       `json:"doc_url"`
+	SiteName             string       `json:"site_name"`
+	SiteLogo             string       `json:"site_logo"`
+	SiteSubtitle         string       `json:"site_subtitle"`
+	APIBaseURL           string       `json:"api_base_url"`
+	ContactInfo          string       `json:"contact_info"`
+	AfterSaleContact     []dto.KVItem `json:"after_sale_contact"`
+	DocURL               string       `json:"doc_url"`
+	QQGroupPopupTitle    string       `json:"qq_group_popup_title"`
+	QQGroupPopupMarkdown string       `json:"qq_group_popup_markdown"`
 
 	// 默认配置
 	DefaultConcurrency                int     `json:"default_concurrency"`
@@ -223,6 +227,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			return out
 		}(),
 		DocURL:                            req.DocURL,
+		QQGroupPopupTitle:                 req.QQGroupPopupTitle,
+		QQGroupPopupMarkdown:              req.QQGroupPopupMarkdown,
 		DefaultConcurrency:                req.DefaultConcurrency,
 		DefaultBalance:                    req.DefaultBalance,
 		GatewayRetrySwitchAfter:           req.GatewayRetrySwitchAfter,
@@ -276,13 +282,15 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ContactInfo:                       updatedSettings.ContactInfo,
 		AfterSaleContact:                  updatedAfterSaleContact,
 		DocURL:                            updatedSettings.DocURL,
+		QQGroupPopupTitle:                 updatedSettings.QQGroupPopupTitle,
+		QQGroupPopupMarkdown:              updatedSettings.QQGroupPopupMarkdown,
 		DefaultConcurrency:                updatedSettings.DefaultConcurrency,
-			DefaultBalance:                    updatedSettings.DefaultBalance,
-			GatewayRetrySwitchAfter:           updatedSettings.GatewayRetrySwitchAfter,
-			Auth401CooldownSeconds:            updatedSettings.Auth401CooldownSeconds,
-			UsageWindowDisablePercent:         updatedSettings.UsageWindowDisablePercent,
-			UsageWindowCooldownSeconds:        updatedSettings.UsageWindowCooldownSeconds,
-			UserConcurrencyWaitTimeoutSeconds: updatedSettings.UserConcurrencyWaitTimeoutSeconds,
+		DefaultBalance:                    updatedSettings.DefaultBalance,
+		GatewayRetrySwitchAfter:           updatedSettings.GatewayRetrySwitchAfter,
+		Auth401CooldownSeconds:            updatedSettings.Auth401CooldownSeconds,
+		UsageWindowDisablePercent:         updatedSettings.UsageWindowDisablePercent,
+		UsageWindowCooldownSeconds:        updatedSettings.UsageWindowCooldownSeconds,
+		UserConcurrencyWaitTimeoutSeconds: updatedSettings.UserConcurrencyWaitTimeoutSeconds,
 		EnableModelFallback:               updatedSettings.EnableModelFallback,
 		FallbackModelAnthropic:            updatedSettings.FallbackModelAnthropic,
 		FallbackModelOpenAI:               updatedSettings.FallbackModelOpenAI,

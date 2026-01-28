@@ -88,6 +88,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyContactInfo,
 		SettingKeyAfterSaleContact,
 		SettingKeyDocURL,
+		SettingKeyQQGroupPopupTitle,
+		SettingKeyQQGroupPopupMarkdown,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
@@ -112,6 +114,10 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		ContactInfo:         settings[SettingKeyContactInfo],
 		AfterSaleContact:    s.parseKVItems(settings[SettingKeyAfterSaleContact]),
 		DocURL:              settings[SettingKeyDocURL],
+		QQGroupPopupTitle:   s.getStringOrDefault(settings, SettingKeyQQGroupPopupTitle, "加入QQ群领取测试卡"),
+		QQGroupPopupMarkdown: s.getStringOrDefault(settings, SettingKeyQQGroupPopupMarkdown, `加入我们的 QQ 群即可领取 **$5 测试卡**。
+
+请在管理后台「系统设置」中配置此弹窗文案。`),
 	}, nil
 }
 
@@ -175,6 +181,8 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyContactInfo] = settings.ContactInfo
 	updates[SettingKeyAfterSaleContact] = s.marshalKVItems(settings.AfterSaleContact)
 	updates[SettingKeyDocURL] = settings.DocURL
+	updates[SettingKeyQQGroupPopupTitle] = settings.QQGroupPopupTitle
+	updates[SettingKeyQQGroupPopupMarkdown] = settings.QQGroupPopupMarkdown
 
 	// 默认配置
 	updates[SettingKeyDefaultConcurrency] = strconv.Itoa(settings.DefaultConcurrency)
@@ -538,6 +546,10 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyUserConcurrencyWaitTimeoutSeconds: strconv.Itoa(defaultUserConcurrencyWaitTimeoutSeconds),
 		SettingKeySMTPPort:                          "587",
 		SettingKeySMTPUseTLS:                        "false",
+		SettingKeyQQGroupPopupTitle:                 "加入QQ群领取测试卡",
+		SettingKeyQQGroupPopupMarkdown: `加入我们的 QQ 群即可领取 **$5 测试卡**。
+
+请在管理后台「系统设置」中配置此弹窗文案。`,
 		// Model fallback defaults
 		SettingKeyEnableModelFallback:      "false",
 		SettingKeyFallbackModelAnthropic:   "claude-3-5-sonnet-20241022",
@@ -586,6 +598,10 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		ContactInfo:         settings[SettingKeyContactInfo],
 		AfterSaleContact:    s.parseKVItems(settings[SettingKeyAfterSaleContact]),
 		DocURL:              settings[SettingKeyDocURL],
+		QQGroupPopupTitle:   s.getStringOrDefault(settings, SettingKeyQQGroupPopupTitle, "加入QQ群领取测试卡"),
+		QQGroupPopupMarkdown: s.getStringOrDefault(settings, SettingKeyQQGroupPopupMarkdown, `加入我们的 QQ 群即可领取 **$5 测试卡**。
+
+请在管理后台「系统设置」中配置此弹窗文案。`),
 	}
 
 	// 告警冷却时间（分钟）：默认 5 分钟；允许 0 表示不限制

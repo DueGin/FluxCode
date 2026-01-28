@@ -11,13 +11,15 @@ import (
 
 // UserHandler handles user-related requests
 type UserHandler struct {
-	userService *service.UserService
+	userService          *service.UserService
+	uiPreferencesService *service.UserUIPreferencesService
 }
 
 // NewUserHandler creates a new UserHandler
-func NewUserHandler(userService *service.UserService) *UserHandler {
+func NewUserHandler(userService *service.UserService, uiPreferencesService *service.UserUIPreferencesService) *UserHandler {
 	return &UserHandler{
-		userService: userService,
+		userService:          userService,
+		uiPreferencesService: uiPreferencesService,
 	}
 }
 
@@ -30,6 +32,14 @@ type ChangePasswordRequest struct {
 // UpdateProfileRequest represents the update profile request payload
 type UpdateProfileRequest struct {
 	Username *string `json:"username"`
+}
+
+type UserUIPreferences struct {
+	DashboardQQGroupPopupDisabled bool `json:"dashboard_qq_group_popup_disabled"`
+}
+
+type UpdateUIPreferencesRequest struct {
+	DashboardQQGroupPopupDisabled *bool `json:"dashboard_qq_group_popup_disabled"`
 }
 
 // GetProfile handles getting user profile
@@ -109,4 +119,60 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	updatedUser.Notes = ""
 
 	response.Success(c, dto.UserFromService(updatedUser))
+}
+
+// GetUIPreferences handles getting current user's UI preferences
+// GET /api/v1/user/ui-preferences
+func (h *UserHandler) GetUIPreferences(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	disabled, err := h.uiPreferencesService.GetDashboardQQGroupPopupDisabled(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, UserUIPreferences{
+		DashboardQQGroupPopupDisabled: disabled,
+	})
+}
+
+// UpdateUIPreferences handles updating current user's UI preferences
+// PUT /api/v1/user/ui-preferences
+func (h *UserHandler) UpdateUIPreferences(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	var req UpdateUIPreferencesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if req.DashboardQQGroupPopupDisabled == nil {
+		response.BadRequest(c, "No preferences to update")
+		return
+	}
+
+	if err := h.uiPreferencesService.SetDashboardQQGroupPopupDisabled(c.Request.Context(), subject.UserID, *req.DashboardQQGroupPopupDisabled); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	disabled, err := h.uiPreferencesService.GetDashboardQQGroupPopupDisabled(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, UserUIPreferences{
+		DashboardQQGroupPopupDisabled: disabled,
+	})
 }

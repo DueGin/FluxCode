@@ -2,6 +2,7 @@
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import { computed, onMounted, watch } from 'vue'
 import Toast from '@/components/common/Toast.vue'
+import QQGroupPopup from '@/components/common/QQGroupPopup.vue'
 import { useAppStore, useAuthStore, useSubscriptionStore } from '@/stores'
 import { getSetupStatus } from '@/api/setup'
 
@@ -84,5 +85,6 @@ onMounted(async () => {
 
 <template>
   <RouterView />
+  <QQGroupPopup />
   <Toast />
 </template>

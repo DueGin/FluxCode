@@ -6,12 +6,26 @@
 import { apiClient } from './client'
 import type { User, ChangePasswordRequest } from '@/types'
 
+export interface UiPreferences {
+  dashboard_qq_group_popup_disabled: boolean
+}
+
 /**
  * Get current user profile
  * @returns User profile data
  */
 export async function getProfile(): Promise<User> {
   const { data } = await apiClient.get<User>('/user/profile')
+  return data
+}
+
+export async function getUiPreferences(): Promise<UiPreferences> {
+  const { data } = await apiClient.get<UiPreferences>('/user/ui-preferences')
+  return data
+}
+
+export async function updateUiPreferences(prefs: Partial<UiPreferences>): Promise<UiPreferences> {
+  const { data } = await apiClient.put<UiPreferences>('/user/ui-preferences', prefs)
   return data
 }
 
@@ -47,6 +61,8 @@ export async function changePassword(
 
 export const userAPI = {
   getProfile,
+  getUiPreferences,
+  updateUiPreferences,
   updateProfile,
   changePassword
 }

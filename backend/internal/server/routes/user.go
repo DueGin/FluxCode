@@ -22,6 +22,8 @@ func RegisterUserRoutes(
 			user.GET("/profile", h.User.GetProfile)
 			user.PUT("/password", h.User.ChangePassword)
 			user.PUT("", h.User.UpdateProfile)
+			user.GET("/ui-preferences", h.User.GetUIPreferences)
+			user.PUT("/ui-preferences", h.User.UpdateUIPreferences)
 		}
 
 		// API Key管理

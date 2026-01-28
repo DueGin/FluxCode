@@ -37,17 +37,19 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 	}
 
 	response.Success(c, dto.PublicSettings{
-		RegistrationEnabled: settings.RegistrationEnabled,
-		EmailVerifyEnabled:  settings.EmailVerifyEnabled,
-		TurnstileEnabled:    settings.TurnstileEnabled,
-		TurnstileSiteKey:    settings.TurnstileSiteKey,
-		SiteName:            settings.SiteName,
-		SiteLogo:            settings.SiteLogo,
-		SiteSubtitle:        settings.SiteSubtitle,
-		APIBaseURL:          settings.APIBaseURL,
-		ContactInfo:         settings.ContactInfo,
-		AfterSaleContact:    afterSaleContact,
-		DocURL:              settings.DocURL,
-		Version:             h.version,
+		RegistrationEnabled:  settings.RegistrationEnabled,
+		EmailVerifyEnabled:   settings.EmailVerifyEnabled,
+		TurnstileEnabled:     settings.TurnstileEnabled,
+		TurnstileSiteKey:     settings.TurnstileSiteKey,
+		SiteName:             settings.SiteName,
+		SiteLogo:             settings.SiteLogo,
+		SiteSubtitle:         settings.SiteSubtitle,
+		APIBaseURL:           settings.APIBaseURL,
+		ContactInfo:          settings.ContactInfo,
+		AfterSaleContact:     afterSaleContact,
+		DocURL:               settings.DocURL,
+		QQGroupPopupTitle:    settings.QQGroupPopupTitle,
+		QQGroupPopupMarkdown: settings.QQGroupPopupMarkdown,
+		Version:              h.version,
 	})
 }
