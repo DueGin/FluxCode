@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1095,6 +1096,18 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		// 发送请求
 		resp, err = s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 		if err != nil {
+			requestID := ensureRequestIDForLog(ctx, c, "")
+			applog.Errorf(
+				"[Gateway] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+				requestID,
+				userEmailFromContext(ctx),
+				0,
+				"transport_error",
+				err.Error(),
+				account.ID,
+				account.Platform,
+				account.Type,
+			)
 			return nil, fmt.Errorf("upstream request failed: %w", err)
 		}
 
@@ -1207,6 +1220,9 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	// 处理正常响应
 	rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
 	requestID := normalizeRequestID(rawRequestID)
+	if c != nil && c.Request != nil {
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.RequestID, requestID))
+	}
 	if rawRequestID != "" {
 		c.Header("x-request-id", rawRequestID)
 	} else {
@@ -1485,6 +1501,56 @@ func extractUpstreamErrorMessage(body []byte) string {
 func (s *GatewayService) handleErrorResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account) (*ForwardResult, error) {
 	body, _ := io.ReadAll(resp.Body)
 
+	rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
+	requestID := normalizeRequestID(rawRequestID)
+	if c != nil && c.Request != nil {
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.RequestID, requestID))
+	}
+
+	userEmail := ""
+	if v, ok := ctx.Value(ctxkey.UserEmail).(string); ok {
+		userEmail = strings.TrimSpace(v)
+	}
+
+	upstreamErrCode := strings.TrimSpace(gjson.GetBytes(body, "error.code").String())
+	if upstreamErrCode == "" {
+		upstreamErrCode = strings.TrimSpace(gjson.GetBytes(body, "error.type").String())
+	}
+	if upstreamErrCode == "" {
+		upstreamErrCode = strconv.Itoa(resp.StatusCode)
+	}
+
+	upstreamErrMsg := strings.TrimSpace(gjson.GetBytes(body, "error.message").String())
+	if upstreamErrMsg == "" {
+		upstreamErrMsg = strings.TrimSpace(gjson.GetBytes(body, "message").String())
+	}
+	if upstreamErrMsg == "" && len(body) > 0 {
+		upstreamErrMsg = truncateForLog(body, 512)
+	}
+
+	if account != nil {
+		applog.Errorf(
+			"[Gateway] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+			requestID,
+			userEmail,
+			resp.StatusCode,
+			upstreamErrCode,
+			upstreamErrMsg,
+			account.ID,
+			account.Platform,
+			account.Type,
+		)
+	} else {
+		applog.Errorf(
+			"[Gateway] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q",
+			requestID,
+			userEmail,
+			resp.StatusCode,
+			upstreamErrCode,
+			upstreamErrMsg,
+		)
+	}
+
 	// 处理上游错误，标记账号状态
 	shouldDisable := false
 	if s.rateLimitService != nil {
@@ -1573,7 +1639,25 @@ func (s *GatewayService) handleFailoverSideEffects(ctx context.Context, resp *ht
 // OAuth 403：标记账号异常
 // API Key 未配置错误码：仅返回错误，不标记账号
 func (s *GatewayService) handleRetryExhaustedError(ctx context.Context, resp *http.Response, c *gin.Context, account *Account) (*ForwardResult, error) {
+	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	resp.Body = io.NopCloser(bytes.NewReader(body))
+
 	s.handleRetryExhaustedSideEffects(ctx, resp, account)
+
+	requestID := ensureRequestIDForLog(ctx, c, strings.TrimSpace(resp.Header.Get("x-request-id")))
+	upstreamErrCode, upstreamErrMsg := extractUpstreamErrorForLog(body, resp.StatusCode)
+	applog.Errorf(
+		"[Gateway] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s retries_exhausted=true",
+		requestID,
+		userEmailFromContext(ctx),
+		resp.StatusCode,
+		upstreamErrCode,
+		upstreamErrMsg,
+		account.ID,
+		account.Platform,
+		account.Type,
+	)
 
 	// 返回统一的重试耗尽错误响应
 	c.JSON(http.StatusBadGateway, gin.H{
@@ -1972,6 +2056,18 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 	// 发送请求
 	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 	if err != nil {
+		requestID := ensureRequestIDForLog(ctx, c, "")
+		applog.Errorf(
+			"[Gateway] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s endpoint=count_tokens",
+			requestID,
+			userEmailFromContext(ctx),
+			0,
+			"transport_error",
+			err.Error(),
+			account.ID,
+			account.Platform,
+			account.Type,
+		)
 		s.countTokensError(c, http.StatusBadGateway, "upstream_error", "Request failed")
 		return fmt.Errorf("upstream request failed: %w", err)
 	}
@@ -2006,6 +2102,19 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 
 	// 处理错误响应
 	if resp.StatusCode >= 400 {
+		requestID := ensureRequestIDForLog(ctx, c, strings.TrimSpace(resp.Header.Get("x-request-id")))
+		upstreamErrCode, upstreamErrMsg := extractUpstreamErrorForLog(respBody, resp.StatusCode)
+		applog.Errorf(
+			"[Gateway] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s endpoint=count_tokens",
+			requestID,
+			userEmailFromContext(ctx),
+			resp.StatusCode,
+			upstreamErrCode,
+			upstreamErrMsg,
+			account.ID,
+			account.Platform,
+			account.Type,
+		)
 		// 标记账号状态（429/529等）
 		s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
 

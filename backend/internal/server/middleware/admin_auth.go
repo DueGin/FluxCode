@@ -2,10 +2,12 @@
 package middleware
 
 import (
+	"context"
 	"crypto/subtle"
 	"errors"
 	"strings"
 
+	"github.com/DueGin/FluxCode/internal/pkg/ctxkey"
 	"github.com/DueGin/FluxCode/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -84,6 +86,9 @@ func validateAdminAPIKey(
 		return false
 	}
 
+	if c.Request != nil {
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.UserEmail, admin.Email))
+	}
 	c.Set(string(ContextKeyUser), AuthSubject{
 		UserID:      admin.ID,
 		Concurrency: admin.Concurrency,
@@ -130,6 +135,9 @@ func validateJWTForAdmin(
 		return false
 	}
 
+	if c.Request != nil {
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.UserEmail, user.Email))
+	}
 	c.Set(string(ContextKeyUser), AuthSubject{
 		UserID:      user.ID,
 		Concurrency: user.Concurrency,

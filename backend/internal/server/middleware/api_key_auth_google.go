@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"strings"
 
 	"github.com/DueGin/FluxCode/internal/config"
+	"github.com/DueGin/FluxCode/internal/pkg/ctxkey"
 	"github.com/DueGin/FluxCode/internal/pkg/googleapi"
 	"github.com/DueGin/FluxCode/internal/service"
 
@@ -53,6 +55,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 
 		// 简易模式：跳过余额和订阅检查
 		if cfg.RunMode == config.RunModeSimple {
+			if c.Request != nil {
+				c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.UserEmail, apiKey.User.Email))
+			}
 			c.Set(string(ContextKeyAPIKey), apiKey)
 			c.Set(string(ContextKeyUser), AuthSubject{
 				UserID:      apiKey.User.ID,
@@ -92,6 +97,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			}
 		}
 
+		if c.Request != nil {
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.UserEmail, apiKey.User.Email))
+		}
 		c.Set(string(ContextKeyAPIKey), apiKey)
 		c.Set(string(ContextKeyUser), AuthSubject{
 			UserID:      apiKey.User.ID,

@@ -1,9 +1,11 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"strings"
 
+	"github.com/DueGin/FluxCode/internal/pkg/ctxkey"
 	"github.com/DueGin/FluxCode/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -68,6 +70,9 @@ func jwtAuth(authService *service.AuthService, userService *service.UserService)
 			return
 		}
 
+		if c.Request != nil {
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.UserEmail, user.Email))
+		}
 		c.Set(string(ContextKeyUser), AuthSubject{
 			UserID:      user.ID,
 			Concurrency: user.Concurrency,

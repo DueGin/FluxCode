@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/pkg/antigravity"
+	"github.com/DueGin/FluxCode/internal/pkg/ctxkey"
 	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -408,6 +409,19 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 				continue
 			}
 			applog.Printf("%s status=request_failed retries_exhausted error=%v", prefix, err)
+			requestID := ensureRequestIDForLog(ctx, c, "")
+			applog.Errorf(
+				"%s upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+				prefix,
+				requestID,
+				userEmailFromContext(ctx),
+				0,
+				"transport_error",
+				err.Error(),
+				account.ID,
+				account.Platform,
+				account.Type,
+			)
 			return nil, s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed after retries")
 		}
 
@@ -485,7 +499,8 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 				return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
 			}
 
-			return nil, s.writeMappedClaudeError(c, resp.StatusCode, respBody)
+			requestID := ensureRequestIDForLog(ctx, c, strings.TrimSpace(resp.Header.Get("x-request-id")))
+			return nil, s.writeMappedClaudeError(ctx, c, account, prefix, requestID, resp.StatusCode, respBody)
 		}
 	}
 
@@ -725,6 +740,19 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 				continue
 			}
 			applog.Printf("%s status=request_failed retries_exhausted error=%v", prefix, err)
+			requestID := ensureRequestIDForLog(ctx, c, "")
+			applog.Errorf(
+				"%s upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+				prefix,
+				requestID,
+				userEmailFromContext(ctx),
+				0,
+				"transport_error",
+				err.Error(),
+				account.ID,
+				account.Platform,
+				account.Type,
+			)
 			return nil, s.writeGoogleError(c, http.StatusBadGateway, "Upstream request failed after retries")
 		}
 
@@ -796,12 +824,28 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		// 解包并返回错误
 		rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
 		requestID := normalizeRequestID(rawRequestID)
+		if c != nil && c.Request != nil {
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.RequestID, requestID))
+		}
 		if rawRequestID != "" {
 			c.Header("x-request-id", rawRequestID)
 		} else {
 			c.Header("x-request-id", requestID)
 		}
 		unwrapped, _ := s.unwrapV1InternalResponse(respBody)
+		upstreamErrCode, upstreamErrMsg := extractUpstreamErrorForLog(unwrapped, resp.StatusCode)
+		applog.Errorf(
+			"%s upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+			prefix,
+			requestID,
+			userEmailFromContext(ctx),
+			resp.StatusCode,
+			upstreamErrCode,
+			upstreamErrMsg,
+			account.ID,
+			account.Platform,
+			account.Type,
+		)
 		contentType := resp.Header.Get("Content-Type")
 		if contentType == "" {
 			contentType = "application/json"
@@ -813,6 +857,9 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 handleSuccess:
 	rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
 	requestID := normalizeRequestID(rawRequestID)
+	if c != nil && c.Request != nil {
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.RequestID, requestID))
+	}
 	if rawRequestID != "" {
 		c.Header("x-request-id", rawRequestID)
 	} else {
@@ -1008,9 +1055,32 @@ func (s *AntigravityGatewayService) writeClaudeError(c *gin.Context, status int,
 	return fmt.Errorf("%s", message)
 }
 
-func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, upstreamStatus int, body []byte) error {
-	// 记录上游错误详情便于调试
-	applog.Printf("[antigravity-Forward] upstream_error status=%d body=%s", upstreamStatus, string(body))
+func (s *AntigravityGatewayService) writeMappedClaudeError(ctx context.Context, c *gin.Context, account *Account, prefix string, requestID string, upstreamStatus int, body []byte) error {
+	upstreamErrCode, upstreamErrMsg := extractUpstreamErrorForLog(body, upstreamStatus)
+	if account != nil {
+		applog.Errorf(
+			"%s upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+			prefix,
+			requestID,
+			userEmailFromContext(ctx),
+			upstreamStatus,
+			upstreamErrCode,
+			upstreamErrMsg,
+			account.ID,
+			account.Platform,
+			account.Type,
+		)
+	} else {
+		applog.Errorf(
+			"%s upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q",
+			prefix,
+			requestID,
+			userEmailFromContext(ctx),
+			upstreamStatus,
+			upstreamErrCode,
+			upstreamErrMsg,
+		)
+	}
 
 	var statusCode int
 	var errType, errMsg string

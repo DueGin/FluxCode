@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/config"
+	"github.com/DueGin/FluxCode/internal/pkg/ctxkey"
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 	"github.com/DueGin/FluxCode/internal/service"
 	"github.com/gin-gonic/gin"
@@ -117,6 +118,55 @@ func newAuthTestRouter(apiKeyService *service.APIKeyService, subscriptionService
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 	return router
+}
+
+func TestAPIKeyAuth_SetsUserEmailInRequestContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	user := &service.User{
+		ID:          7,
+		Email:       "alice@example.com",
+		Role:        service.RoleUser,
+		Status:      service.StatusActive,
+		Balance:     10,
+		Concurrency: 3,
+	}
+	apiKey := &service.APIKey{
+		ID:     100,
+		UserID: user.ID,
+		Key:    "test-key",
+		Status: service.StatusActive,
+		User:   user,
+	}
+
+	apiKeyRepo := &stubApiKeyRepo{
+		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+			if key != apiKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			clone := *apiKey
+			return &clone, nil
+		},
+	}
+
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, cfg)
+	subscriptionService := service.NewSubscriptionService(nil, &stubUserSubscriptionRepo{}, nil)
+
+	r := gin.New()
+	r.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, cfg)))
+	r.GET("/t", func(c *gin.Context) {
+		email, _ := c.Request.Context().Value(ctxkey.UserEmail).(string)
+		c.String(http.StatusOK, email)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	req.Header.Set("x-api-key", apiKey.Key)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "alice@example.com", w.Body.String())
 }
 
 type stubApiKeyRepo struct {

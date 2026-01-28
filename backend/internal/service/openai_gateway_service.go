@@ -19,8 +19,10 @@ import (
 	"time"
 
 	"github.com/DueGin/FluxCode/internal/config"
+	"github.com/DueGin/FluxCode/internal/pkg/ctxkey"
 	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -680,6 +682,18 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	// Send request
 	resp, err := send(token)
 	if err != nil {
+		requestID := ensureRequestIDForLog(ctx, c, "")
+		applog.Errorf(
+			"[OpenAI] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+			requestID,
+			userEmailFromContext(ctx),
+			0,
+			"transport_error",
+			err.Error(),
+			account.ID,
+			account.Platform,
+			account.Type,
+		)
 		return nil, fmt.Errorf("upstream request failed: %w", err)
 	}
 
@@ -720,6 +734,9 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 
 	rawRequestID := strings.TrimSpace(resp.Header.Get("x-request-id"))
 	requestID := normalizeRequestID(rawRequestID)
+	if c != nil && c.Request != nil {
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.RequestID, requestID))
+	}
 	if rawRequestID != "" {
 		c.Header("x-request-id", rawRequestID)
 	} else {
@@ -829,6 +846,56 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 }
 
 func (s *OpenAIGatewayService) handleErrorResponse(ctx context.Context, upstreamStatusCode int, headers http.Header, body []byte, c *gin.Context, account *Account) (*OpenAIForwardResult, error) {
+	rawRequestID := strings.TrimSpace(headers.Get("x-request-id"))
+	requestID := normalizeRequestID(rawRequestID)
+	if c != nil && c.Request != nil {
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.RequestID, requestID))
+	}
+
+	userEmail := ""
+	if v, ok := ctx.Value(ctxkey.UserEmail).(string); ok {
+		userEmail = strings.TrimSpace(v)
+	}
+
+	upstreamErrCode := strings.TrimSpace(gjson.GetBytes(body, "error.code").String())
+	if upstreamErrCode == "" {
+		upstreamErrCode = strings.TrimSpace(gjson.GetBytes(body, "error.type").String())
+	}
+	if upstreamErrCode == "" {
+		upstreamErrCode = strconv.Itoa(upstreamStatusCode)
+	}
+
+	upstreamErrMsg := strings.TrimSpace(gjson.GetBytes(body, "error.message").String())
+	if upstreamErrMsg == "" {
+		upstreamErrMsg = strings.TrimSpace(gjson.GetBytes(body, "message").String())
+	}
+	if upstreamErrMsg == "" && len(body) > 0 {
+		upstreamErrMsg = truncateForLog(body, 512)
+	}
+
+	if account != nil {
+		applog.Errorf(
+			"[OpenAI] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+			requestID,
+			userEmail,
+			upstreamStatusCode,
+			upstreamErrCode,
+			upstreamErrMsg,
+			account.ID,
+			account.Platform,
+			account.Type,
+		)
+	} else {
+		applog.Errorf(
+			"[OpenAI] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q",
+			requestID,
+			userEmail,
+			upstreamStatusCode,
+			upstreamErrCode,
+			upstreamErrMsg,
+		)
+	}
+
 	// Check custom error codes
 	if !account.ShouldHandleErrorCode(upstreamStatusCode) {
 		c.JSON(http.StatusInternalServerError, gin.H{

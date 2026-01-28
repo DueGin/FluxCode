@@ -501,6 +501,18 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 				sleepGeminiBackoff(attempt)
 				continue
 			}
+			requestID := ensureRequestIDForLog(ctx, c, "")
+			applog.Errorf(
+				"[Gemini] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+				requestID,
+				userEmailFromContext(ctx),
+				0,
+				"transport_error",
+				err.Error(),
+				account.ID,
+				account.Platform,
+				account.Type,
+			)
 			return nil, s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed after retries: "+sanitizeUpstreamErrorMessage(err.Error()))
 		}
 
@@ -551,6 +563,24 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 		if s.shouldFailoverGeminiUpstreamError(resp.StatusCode) {
 			return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
 		}
+
+		rawRequestID := resp.Header.Get(requestIDHeader)
+		if rawRequestID == "" {
+			rawRequestID = resp.Header.Get("x-goog-request-id")
+		}
+		requestID := ensureRequestIDForLog(ctx, c, rawRequestID)
+		upstreamErrCode, upstreamErrMsg := extractUpstreamErrorForLog(respBody, resp.StatusCode)
+		applog.Errorf(
+			"[Gemini] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+			requestID,
+			userEmailFromContext(ctx),
+			resp.StatusCode,
+			upstreamErrCode,
+			upstreamErrMsg,
+			account.ID,
+			account.Platform,
+			account.Type,
+		)
 		return nil, s.writeGeminiMappedError(c, resp.StatusCode, respBody)
 	}
 
@@ -559,6 +589,9 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 		rawRequestID = resp.Header.Get("x-goog-request-id")
 	}
 	requestID := normalizeRequestID(rawRequestID)
+	if c != nil && c.Request != nil {
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.RequestID, requestID))
+	}
 	if strings.TrimSpace(rawRequestID) != "" {
 		c.Header("x-request-id", rawRequestID)
 	} else {
@@ -776,6 +809,18 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 					FirstTokenMs: nil,
 				}, nil
 			}
+			requestID := ensureRequestIDForLog(ctx, c, "")
+			applog.Errorf(
+				"[Gemini] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+				requestID,
+				userEmailFromContext(ctx),
+				0,
+				"transport_error",
+				err.Error(),
+				account.ID,
+				account.Platform,
+				account.Type,
+			)
 			return nil, s.writeGoogleError(c, http.StatusBadGateway, "Upstream request failed after retries: "+sanitizeUpstreamErrorMessage(err.Error()))
 		}
 
@@ -829,6 +874,9 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 		rawRequestID = resp.Header.Get("x-goog-request-id")
 	}
 	requestID := normalizeRequestID(rawRequestID)
+	if c != nil && c.Request != nil {
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.RequestID, requestID))
+	}
 	if strings.TrimSpace(rawRequestID) != "" {
 		c.Header("x-request-id", rawRequestID)
 	} else {
@@ -872,6 +920,18 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 		if contentType == "" {
 			contentType = "application/json"
 		}
+		upstreamErrCode, upstreamErrMsg := extractUpstreamErrorForLog(respBody, resp.StatusCode)
+		applog.Errorf(
+			"[Gemini] upstream_error request_id=%s user_email=%s upstream_status=%d upstream_error_code=%s upstream_error_message=%q account_id=%d platform=%s account_type=%s",
+			requestID,
+			userEmailFromContext(ctx),
+			resp.StatusCode,
+			upstreamErrCode,
+			upstreamErrMsg,
+			account.ID,
+			account.Platform,
+			account.Type,
+		)
 		c.Data(resp.StatusCode, contentType, respBody)
 		return nil, fmt.Errorf("gemini upstream error: %d", resp.StatusCode)
 	}

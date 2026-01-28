@@ -1,11 +1,13 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 
 	"strings"
 
 	"github.com/DueGin/FluxCode/internal/config"
+	"github.com/DueGin/FluxCode/internal/pkg/ctxkey"
 	"github.com/DueGin/FluxCode/internal/service"
 
 	applog "github.com/DueGin/FluxCode/internal/pkg/logger"
@@ -89,6 +91,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		if cfg.RunMode == config.RunModeSimple {
 			// 简易模式：跳过余额和订阅检查，但仍需设置必要的上下文
+			if c.Request != nil {
+				c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.UserEmail, apiKey.User.Email))
+			}
 			c.Set(string(ContextKeyAPIKey), apiKey)
 			c.Set(string(ContextKeyUser), AuthSubject{
 				UserID:      apiKey.User.ID,
@@ -147,6 +152,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		}
 
 		// 将API key和用户信息存入上下文
+		if c.Request != nil {
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.UserEmail, apiKey.User.Email))
+		}
 		c.Set(string(ContextKeyAPIKey), apiKey)
 		c.Set(string(ContextKeyUser), AuthSubject{
 			UserID:      apiKey.User.ID,
