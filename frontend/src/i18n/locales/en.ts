@@ -1920,6 +1920,16 @@ export default {
         logoTypeError: 'Please select an image file',
         logoReadError: 'Failed to read the image file'
       },
+      qqGroupPopup: {
+        title: 'QQ Group Popup',
+        description:
+          'Configure the popup content shown on public pages and the user dashboard (Markdown supported)',
+        popupTitle: 'Popup Title',
+        popupTitlePlaceholder: 'Join our QQ group to get $5 test credit',
+        popupMarkdown: 'Popup Content (Markdown)',
+        popupMarkdownPlaceholder: 'e.g. Join the QQ group to get **$5 test credit**...',
+        popupMarkdownHint: 'Supports Markdown. Links will open in a new tab.'
+      },
       smtp: {
         title: 'SMTP Settings',
         description: 'Configure email sending for verification codes',
@@ -2052,6 +2062,12 @@ export default {
     resetIn: 'Resets in {time}',
     windowNotActive: 'Awaiting first use',
     usageOf: '{used} of {limit}'
+  },
+
+  qqGroupPopup: {
+    title: 'Join QQ Group to get $5 test credit',
+    dismissToday: "Don't remind again today",
+    dismissForever: "Don't remind again"
   },
 
   // Onboarding Tour

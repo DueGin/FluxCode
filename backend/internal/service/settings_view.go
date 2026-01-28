@@ -24,13 +24,15 @@ type SystemSettings struct {
 	TurnstileSiteKey   string
 	TurnstileSecretKey string
 
-	SiteName         string
-	SiteLogo         string
-	SiteSubtitle     string
-	APIBaseURL       string
-	ContactInfo      string
-	AfterSaleContact []KVItem
-	DocURL           string
+	SiteName             string
+	SiteLogo             string
+	SiteSubtitle         string
+	APIBaseURL           string
+	ContactInfo          string
+	AfterSaleContact     []KVItem
+	DocURL               string
+	QQGroupPopupTitle    string
+	QQGroupPopupMarkdown string
 
 	DefaultConcurrency                int
 	DefaultBalance                    float64
@@ -49,16 +51,18 @@ type SystemSettings struct {
 }
 
 type PublicSettings struct {
-	RegistrationEnabled bool
-	EmailVerifyEnabled  bool
-	TurnstileEnabled    bool
-	TurnstileSiteKey    string
-	SiteName            string
-	SiteLogo            string
-	SiteSubtitle        string
-	APIBaseURL          string
-	ContactInfo         string
-	AfterSaleContact    []KVItem
-	DocURL              string
-	Version             string
+	RegistrationEnabled  bool
+	EmailVerifyEnabled   bool
+	TurnstileEnabled     bool
+	TurnstileSiteKey     string
+	SiteName             string
+	SiteLogo             string
+	SiteSubtitle         string
+	APIBaseURL           string
+	ContactInfo          string
+	AfterSaleContact     []KVItem
+	DocURL               string
+	QQGroupPopupTitle    string
+	QQGroupPopupMarkdown string
+	Version              string
 }

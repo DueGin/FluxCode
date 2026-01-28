@@ -25,13 +25,15 @@ type SystemSettings struct {
 	TurnstileSiteKey   string `json:"turnstile_site_key"`
 	TurnstileSecretKey string `json:"turnstile_secret_key,omitempty"`
 
-	SiteName         string   `json:"site_name"`
-	SiteLogo         string   `json:"site_logo"`
-	SiteSubtitle     string   `json:"site_subtitle"`
-	APIBaseURL       string   `json:"api_base_url"`
-	ContactInfo      string   `json:"contact_info"`
-	AfterSaleContact []KVItem `json:"after_sale_contact"`
-	DocURL           string   `json:"doc_url"`
+	SiteName             string   `json:"site_name"`
+	SiteLogo             string   `json:"site_logo"`
+	SiteSubtitle         string   `json:"site_subtitle"`
+	APIBaseURL           string   `json:"api_base_url"`
+	ContactInfo          string   `json:"contact_info"`
+	AfterSaleContact     []KVItem `json:"after_sale_contact"`
+	DocURL               string   `json:"doc_url"`
+	QQGroupPopupTitle    string   `json:"qq_group_popup_title"`
+	QQGroupPopupMarkdown string   `json:"qq_group_popup_markdown"`
 
 	DefaultConcurrency                int     `json:"default_concurrency"`
 	DefaultBalance                    float64 `json:"default_balance"`
@@ -50,16 +52,18 @@ type SystemSettings struct {
 }
 
 type PublicSettings struct {
-	RegistrationEnabled bool     `json:"registration_enabled"`
-	EmailVerifyEnabled  bool     `json:"email_verify_enabled"`
-	TurnstileEnabled    bool     `json:"turnstile_enabled"`
-	TurnstileSiteKey    string   `json:"turnstile_site_key"`
-	SiteName            string   `json:"site_name"`
-	SiteLogo            string   `json:"site_logo"`
-	SiteSubtitle        string   `json:"site_subtitle"`
-	APIBaseURL          string   `json:"api_base_url"`
-	ContactInfo         string   `json:"contact_info"`
-	AfterSaleContact    []KVItem `json:"after_sale_contact"`
-	DocURL              string   `json:"doc_url"`
-	Version             string   `json:"version"`
+	RegistrationEnabled  bool     `json:"registration_enabled"`
+	EmailVerifyEnabled   bool     `json:"email_verify_enabled"`
+	TurnstileEnabled     bool     `json:"turnstile_enabled"`
+	TurnstileSiteKey     string   `json:"turnstile_site_key"`
+	SiteName             string   `json:"site_name"`
+	SiteLogo             string   `json:"site_logo"`
+	SiteSubtitle         string   `json:"site_subtitle"`
+	APIBaseURL           string   `json:"api_base_url"`
+	ContactInfo          string   `json:"contact_info"`
+	AfterSaleContact     []KVItem `json:"after_sale_contact"`
+	DocURL               string   `json:"doc_url"`
+	QQGroupPopupTitle    string   `json:"qq_group_popup_title"`
+	QQGroupPopupMarkdown string   `json:"qq_group_popup_markdown"`
+	Version              string   `json:"version"`
 }
