@@ -361,56 +361,12 @@ export async function bulkSetSchedulable(
 }
 
 /**
- * Bulk refresh usage windows for multiple accounts.
- * @param accountIds - Array of account IDs
- * @returns Results of bulk refresh operation
- */
-export async function bulkRefreshUsage(accountIds: number[]): Promise<{
-  total: number
-  success: number
-  failed: number
-  results: Array<{ account_id: number; action: string; outcome: string; detail: string }>
-}> {
-  const { data } = await apiClient.post<{
-    total: number
-    success: number
-    failed: number
-    results: Array<{ account_id: number; action: string; outcome: string; detail: string }>
-  }>('/admin/accounts/bulk-refresh-usage', {
-    account_ids: accountIds
-  })
-  return data
-}
-
-/**
  * Get available models for an account
  * @param id - Account ID
  * @returns List of available models for this account
  */
 export async function getAvailableModels(id: number): Promise<ClaudeModel[]> {
   const { data } = await apiClient.get<ClaudeModel[]>(`/admin/accounts/${id}/models`)
-  return data
-}
-
-export async function syncFromCrs(params: {
-  base_url: string
-  username: string
-  password: string
-  sync_proxies?: boolean
-}): Promise<{
-  created: number
-  updated: number
-  skipped: number
-  failed: number
-  items: Array<{
-    crs_account_id: string
-    kind: string
-    name: string
-    action: string
-    error?: string
-  }>
-}> {
-  const { data } = await apiClient.post('/admin/accounts/sync/crs', params)
   return data
 }
 
@@ -433,14 +389,12 @@ export const accountsAPI = {
   bulkClearTempUnschedulable,
   setSchedulable,
   bulkSetSchedulable,
-  bulkRefreshUsage,
   getAvailableModels,
   generateAuthUrl,
   exchangeCode,
   batchCreate,
   batchUpdateCredentials,
-  bulkUpdate,
-  syncFromCrs
+  bulkUpdate
 }
 
 export default accountsAPI

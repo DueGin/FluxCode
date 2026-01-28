@@ -70,7 +70,6 @@ func provideCleanup(
 	billingCache *service.BillingCacheService,
 	accountExpirationWorker *service.AccountExpirationWorker,
 	subscriptionExpirationWorker *service.SubscriptionExpirationWorker,
-	dailyUsageRefreshWorker *service.DailyUsageRefreshWorker,
 	rateLimitReactivateWorker *service.RateLimitReactivateWorker,
 	oauth *service.OAuthService,
 	openaiOAuth *service.OpenAIOAuthService,
@@ -94,18 +93,14 @@ func provideCleanup(
 				accountExpirationWorker.Stop()
 				return nil
 			}},
-				{"DailyUsageRefreshWorker", func() error {
-					dailyUsageRefreshWorker.Stop()
-					return nil
-				}},
-				{"RateLimitReactivateWorker", func() error {
-					rateLimitReactivateWorker.Stop()
-					return nil
-				}},
-				{"TokenRefreshService", func() error {
-					tokenRefresh.Stop()
-					return nil
-				}},
+			{"RateLimitReactivateWorker", func() error {
+				rateLimitReactivateWorker.Stop()
+				return nil
+			}},
+			{"TokenRefreshService", func() error {
+				tokenRefresh.Stop()
+				return nil
+			}},
 			{"PricingService", func() error {
 				pricing.Stop()
 				return nil

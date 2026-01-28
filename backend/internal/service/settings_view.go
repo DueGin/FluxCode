@@ -35,7 +35,6 @@ type SystemSettings struct {
 	DefaultConcurrency                int
 	DefaultBalance                    float64
 	GatewayRetrySwitchAfter           int
-	DailyUsageRefreshTime             string
 	Auth401CooldownSeconds            int
 	UsageWindowDisablePercent         int
 	UsageWindowCooldownSeconds        int

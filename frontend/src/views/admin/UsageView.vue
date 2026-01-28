@@ -254,6 +254,7 @@
                 v-model="filters.account_id"
                 :options="accountOptions"
                 :placeholder="t('admin.usage.allAccounts')"
+                searchable
                 @change="applyFilters"
               />
             </div>

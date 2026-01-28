@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -96,7 +95,7 @@ func TestRateLimitService_HandleUpstreamError_429RateLimitDoesNotDisableScheduli
 	require.WithinDuration(t, resetAt, *account.RateLimitResetAt, time.Second)
 }
 
-func TestRateLimitService_HandleUpstreamError_429QuotaExceededDisablesScheduling(t *testing.T) {
+func TestRateLimitService_HandleUpstreamError_429QuotaExceededDoesNotDisableScheduling(t *testing.T) {
 	ctx := context.Background()
 	repo := newRateLimitAccountRepoSpy()
 	svc := &RateLimitService{accountRepo: repo}
@@ -116,12 +115,14 @@ func TestRateLimitService_HandleUpstreamError_429QuotaExceededDisablesScheduling
 	shouldDisable := svc.HandleUpstreamError(ctx, account, 429, headers, body)
 
 	require.True(t, shouldDisable)
-	require.False(t, account.Schedulable)
-	require.Equal(t, 0, repo.setRateLimitedCalls)
-	require.Equal(t, 1, repo.setUnschedulableCalls)
-	require.Equal(t, account.ID, repo.setUnschedulableAccountID)
-	require.Contains(t, repo.setUnschedulableReason, "Upstream quota exceeded")
-	require.Contains(t, repo.setUnschedulableReason, time.Unix(resetAt.Unix(), 0).Format(time.RFC3339))
+	require.True(t, account.Schedulable)
+	require.Equal(t, 1, repo.setRateLimitedCalls)
+	require.Equal(t, account.ID, repo.setRateLimitedAccountID)
+	require.WithinDuration(t, resetAt, repo.setRateLimitedResetAt, time.Second)
+	require.Equal(t, 0, repo.setUnschedulableCalls)
+
+	require.NotNil(t, account.RateLimitResetAt)
+	require.WithinDuration(t, resetAt, *account.RateLimitResetAt, time.Second)
 }
 
 func TestRateLimitService_HandleUpstreamError_429UsesGenericResetHeader(t *testing.T) {
@@ -149,7 +150,7 @@ func TestRateLimitService_HandleUpstreamError_429UsesGenericResetHeader(t *testi
 	require.WithinDuration(t, start.Add(17*time.Second), repo.setRateLimitedResetAt, 2*time.Second)
 }
 
-func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesRetryAfterSecondsInReason(t *testing.T) {
+func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_UsesRetryAfterSecondsAsResetAt(t *testing.T) {
 	ctx := context.Background()
 	repo := newRateLimitAccountRepoSpy()
 	svc := &RateLimitService{accountRepo: repo}
@@ -169,15 +170,13 @@ func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesRetryAfte
 	shouldDisable := svc.HandleUpstreamError(ctx, account, 429, headers, body)
 
 	require.True(t, shouldDisable)
-	require.False(t, account.Schedulable)
-	require.Equal(t, 1, repo.setUnschedulableCalls)
-	require.Contains(t, repo.setUnschedulableReason, "reset_at=")
-
-	resetAt := extractResetAtFromReason(t, repo.setUnschedulableReason)
-	require.WithinDuration(t, start.Add(17*time.Second), resetAt, 2*time.Second)
+	require.True(t, account.Schedulable)
+	require.Equal(t, 1, repo.setRateLimitedCalls)
+	require.Equal(t, 0, repo.setUnschedulableCalls)
+	require.WithinDuration(t, start.Add(17*time.Second), repo.setRateLimitedResetAt, 2*time.Second)
 }
 
-func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesRetryAfterHTTPDateInReason(t *testing.T) {
+func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_UsesRetryAfterHTTPDateAsResetAt(t *testing.T) {
 	ctx := context.Background()
 	repo := newRateLimitAccountRepoSpy()
 	svc := &RateLimitService{accountRepo: repo}
@@ -197,12 +196,13 @@ func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesRetryAfte
 	shouldDisable := svc.HandleUpstreamError(ctx, account, 429, headers, body)
 
 	require.True(t, shouldDisable)
-	require.False(t, account.Schedulable)
-	require.Equal(t, 1, repo.setUnschedulableCalls)
-	require.Contains(t, repo.setUnschedulableReason, expectedResetAt.Format(time.RFC3339))
+	require.True(t, account.Schedulable)
+	require.Equal(t, 1, repo.setRateLimitedCalls)
+	require.Equal(t, 0, repo.setUnschedulableCalls)
+	require.WithinDuration(t, expectedResetAt, repo.setRateLimitedResetAt, time.Second)
 }
 
-func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesResetsAtFromBodyInReason(t *testing.T) {
+func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_UsesResetsAtFromBodyAsResetAt(t *testing.T) {
 	ctx := context.Background()
 	repo := newRateLimitAccountRepoSpy()
 	svc := &RateLimitService{accountRepo: repo}
@@ -221,12 +221,13 @@ func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesResetsAtF
 	shouldDisable := svc.HandleUpstreamError(ctx, account, 429, headers, body)
 
 	require.True(t, shouldDisable)
-	require.False(t, account.Schedulable)
-	require.Equal(t, 1, repo.setUnschedulableCalls)
-	require.Contains(t, repo.setUnschedulableReason, time.Unix(expectedResetAt.Unix(), 0).Format(time.RFC3339))
+	require.True(t, account.Schedulable)
+	require.Equal(t, 1, repo.setRateLimitedCalls)
+	require.Equal(t, 0, repo.setUnschedulableCalls)
+	require.WithinDuration(t, expectedResetAt, repo.setRateLimitedResetAt, time.Second)
 }
 
-func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesFallbackResetAtInReason(t *testing.T) {
+func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_UsesFallbackResetAt(t *testing.T) {
 	ctx := context.Background()
 	repo := newRateLimitAccountRepoSpy()
 	svc := &RateLimitService{accountRepo: repo}
@@ -245,28 +246,11 @@ func TestRateLimitService_HandleUpstreamError_429QuotaExceeded_IncludesFallbackR
 	shouldDisable := svc.HandleUpstreamError(ctx, account, 429, headers, body)
 
 	require.True(t, shouldDisable)
-	require.False(t, account.Schedulable)
-	require.Equal(t, 1, repo.setUnschedulableCalls)
-	require.Contains(t, repo.setUnschedulableReason, "reset_at=")
-
-	resetAt := extractResetAtFromReason(t, repo.setUnschedulableReason)
-	require.WithinDuration(t, start.Add(30*time.Minute), resetAt, 3*time.Second)
+	require.True(t, account.Schedulable)
+	require.Equal(t, 1, repo.setRateLimitedCalls)
+	require.Equal(t, 0, repo.setUnschedulableCalls)
+	require.WithinDuration(t, start.Add(30*time.Minute), repo.setRateLimitedResetAt, 3*time.Second)
 }
 
-func extractResetAtFromReason(t *testing.T, reason string) time.Time {
-	t.Helper()
-
-	needle := "reset_at="
-	idx := strings.Index(reason, needle)
-	require.NotEqual(t, -1, idx)
-
-	raw := reason[idx+len(needle):]
-	if cut := strings.Index(raw, ";"); cut != -1 {
-		raw = raw[:cut]
-	}
-	raw = strings.TrimSpace(raw)
-
-	parsed, err := time.Parse(time.RFC3339, raw)
-	require.NoError(t, err)
-	return parsed
-}
+// NOTE: quota exceeded 的 resetAt 解析逻辑由 parseRateLimitReset/parseRateLimitResetFromBody 覆盖，
+// 单测通过 repo.SetRateLimited 的参数断言验证解析结果。

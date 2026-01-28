@@ -24,7 +24,6 @@ var (
 
 const (
 	defaultGatewayRetrySwitchAfter           = 2
-	defaultDailyUsageRefreshTime             = "03:00"
 	defaultAuth401CooldownSeconds            = 300
 	defaultUsageWindowDisablePercent         = 100
 	defaultUsageWindowCooldownSeconds        = 300
@@ -47,8 +46,6 @@ type SettingService struct {
 	settingCache SettingCache
 	cfg          *config.Config
 	listenersMu  sync.Mutex
-
-	dailyUsageRefreshListeners []func()
 }
 
 func (s *SettingService) webTitleDefault() string {
@@ -64,27 +61,6 @@ func NewSettingService(settingRepo SettingRepository, settingCache SettingCache,
 		settingRepo:  settingRepo,
 		settingCache: settingCache,
 		cfg:          cfg,
-	}
-}
-
-func (s *SettingService) RegisterDailyUsageRefreshTimeListener(listener func()) {
-	if s == nil || listener == nil {
-		return
-	}
-	s.listenersMu.Lock()
-	s.dailyUsageRefreshListeners = append(s.dailyUsageRefreshListeners, listener)
-	s.listenersMu.Unlock()
-}
-
-func (s *SettingService) notifyDailyUsageRefreshTimeChanged() {
-	if s == nil {
-		return
-	}
-	s.listenersMu.Lock()
-	listeners := append([]func(){}, s.dailyUsageRefreshListeners...)
-	s.listenersMu.Unlock()
-	for _, listener := range listeners {
-		listener()
 	}
 }
 
@@ -207,10 +183,6 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 		settings.GatewayRetrySwitchAfter = defaultGatewayRetrySwitchAfter
 	}
 	updates[SettingKeyGatewayRetrySwitchAfter] = strconv.Itoa(settings.GatewayRetrySwitchAfter)
-	if strings.TrimSpace(settings.DailyUsageRefreshTime) == "" {
-		settings.DailyUsageRefreshTime = defaultDailyUsageRefreshTime
-	}
-	updates[SettingKeyDailyUsageRefreshTime] = strings.TrimSpace(settings.DailyUsageRefreshTime)
 	if settings.Auth401CooldownSeconds <= 0 {
 		settings.Auth401CooldownSeconds = defaultAuth401CooldownSeconds
 	}
@@ -248,11 +220,6 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 		}
 	}
 
-	previousDaily := strings.TrimSpace(previousValues[SettingKeyDailyUsageRefreshTime])
-	if previousDaily == "" {
-		previousDaily = defaultDailyUsageRefreshTime
-	}
-
 	if err := s.settingRepo.SetMultiple(ctx, updates); err != nil {
 		return err
 	}
@@ -260,7 +227,6 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	if s.settingCache != nil {
 		cacheUpdates := map[string]string{
 			SettingKeyGatewayRetrySwitchAfter:           updates[SettingKeyGatewayRetrySwitchAfter],
-			SettingKeyDailyUsageRefreshTime:             updates[SettingKeyDailyUsageRefreshTime],
 			SettingKeyAuth401CooldownSeconds:            updates[SettingKeyAuth401CooldownSeconds],
 			SettingKeyUsageWindowDisablePercent:         updates[SettingKeyUsageWindowDisablePercent],
 			SettingKeyUsageWindowCooldownSeconds:        updates[SettingKeyUsageWindowCooldownSeconds],
@@ -274,14 +240,6 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 			_ = s.bestEffortRestoreSettingsCache(ctx, previousValues)
 			return infraerrors.ServiceUnavailable("SETTING_CACHE_UPDATE_FAILED", "failed to update settings cache").WithCause(err)
 		}
-	}
-
-	newDaily := strings.TrimSpace(settings.DailyUsageRefreshTime)
-	if newDaily == "" {
-		newDaily = defaultDailyUsageRefreshTime
-	}
-	if previousDaily != newDaily {
-		s.notifyDailyUsageRefreshTimeChanged()
 	}
 
 	return nil
@@ -316,9 +274,6 @@ func (s *SettingService) bestEffortRestoreSettingsCache(ctx context.Context, pre
 	restore := map[string]string{}
 	if v, ok := previousValues[SettingKeyGatewayRetrySwitchAfter]; ok {
 		restore[SettingKeyGatewayRetrySwitchAfter] = v
-	}
-	if v, ok := previousValues[SettingKeyDailyUsageRefreshTime]; ok {
-		restore[SettingKeyDailyUsageRefreshTime] = v
 	}
 	if v, ok := previousValues[SettingKeyAuth401CooldownSeconds]; ok {
 		restore[SettingKeyAuth401CooldownSeconds] = v
@@ -422,38 +377,6 @@ func (s *SettingService) GetGatewayRetrySwitchAfter(ctx context.Context) int {
 		_ = s.settingCache.Set(ctx, SettingKeyGatewayRetrySwitchAfter, strconv.Itoa(v))
 	}
 	return v
-}
-
-// GetDailyUsageRefreshTime returns the daily refresh time in HH:MM format.
-func (s *SettingService) GetDailyUsageRefreshTime(ctx context.Context) string {
-	if s == nil {
-		return defaultDailyUsageRefreshTime
-	}
-	if s.settingCache != nil {
-		if value, err := s.settingCache.GetValue(ctx, SettingKeyDailyUsageRefreshTime); err == nil {
-			value = strings.TrimSpace(value)
-			if value != "" {
-				return value
-			}
-		}
-	}
-
-	if s.settingRepo == nil {
-		return defaultDailyUsageRefreshTime
-	}
-
-	value, err := s.settingRepo.GetValue(ctx, SettingKeyDailyUsageRefreshTime)
-	if err != nil {
-		return defaultDailyUsageRefreshTime
-	}
-	value = strings.TrimSpace(value)
-	if value == "" {
-		value = defaultDailyUsageRefreshTime
-	}
-	if s.settingCache != nil {
-		_ = s.settingCache.Set(ctx, SettingKeyDailyUsageRefreshTime, value)
-	}
-	return value
 }
 
 func (s *SettingService) GetAuth401CooldownSeconds(ctx context.Context) int {
@@ -609,7 +532,6 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyDefaultConcurrency:                strconv.Itoa(s.cfg.Default.UserConcurrency),
 		SettingKeyDefaultBalance:                    strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
 		SettingKeyGatewayRetrySwitchAfter:           strconv.Itoa(defaultGatewayRetrySwitchAfter),
-		SettingKeyDailyUsageRefreshTime:             defaultDailyUsageRefreshTime,
 		SettingKeyAuth401CooldownSeconds:            strconv.Itoa(defaultAuth401CooldownSeconds),
 		SettingKeyUsageWindowDisablePercent:         strconv.Itoa(defaultUsageWindowDisablePercent),
 		SettingKeyUsageWindowCooldownSeconds:        strconv.Itoa(defaultUsageWindowCooldownSeconds),
@@ -630,7 +552,6 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	if s.settingCache != nil {
 		_ = s.settingCache.SetMultiple(ctx, map[string]string{
 			SettingKeyGatewayRetrySwitchAfter:           defaults[SettingKeyGatewayRetrySwitchAfter],
-			SettingKeyDailyUsageRefreshTime:             defaults[SettingKeyDailyUsageRefreshTime],
 			SettingKeyAuth401CooldownSeconds:            defaults[SettingKeyAuth401CooldownSeconds],
 			SettingKeyUsageWindowDisablePercent:         defaults[SettingKeyUsageWindowDisablePercent],
 			SettingKeyUsageWindowCooldownSeconds:        defaults[SettingKeyUsageWindowCooldownSeconds],
@@ -696,7 +617,6 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	} else {
 		result.GatewayRetrySwitchAfter = defaultGatewayRetrySwitchAfter
 	}
-	result.DailyUsageRefreshTime = s.getStringOrDefault(settings, SettingKeyDailyUsageRefreshTime, defaultDailyUsageRefreshTime)
 	if v, err := strconv.Atoi(settings[SettingKeyAuth401CooldownSeconds]); err == nil && v > 0 {
 		result.Auth401CooldownSeconds = v
 	} else {
