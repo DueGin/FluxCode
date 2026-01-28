@@ -22,6 +22,8 @@ export async function list(
     role?: 'admin' | 'user'
     search?: string
     attributes?: Record<number, string>  // attributeId -> value
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
   },
   options?: {
     signal?: AbortSignal
@@ -33,7 +35,9 @@ export async function list(
     page_size: pageSize,
     status: filters?.status,
     role: filters?.role,
-    search: filters?.search
+    search: filters?.search,
+    sort_by: filters?.sort_by,
+    sort_order: filters?.sort_order
   }
 
   // Add attribute filters as attr[id]=value

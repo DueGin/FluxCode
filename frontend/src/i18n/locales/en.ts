@@ -691,6 +691,8 @@ export default {
         subscriptions: 'Subscriptions',
         balance: 'Balance',
         usage: 'Usage',
+        todayUsage: 'Today Usage',
+        totalUsage: 'Total Usage',
         concurrency: 'Concurrency',
         status: 'Status',
         created: 'Created',

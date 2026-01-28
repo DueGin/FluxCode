@@ -682,6 +682,8 @@ export default {
         subscriptions: '订阅分组',
         balance: '余额',
         usage: '用量',
+        todayUsage: '今日用量',
+        totalUsage: '累计用量',
         concurrency: '并发数',
         status: '状态',
         created: '创建时间',

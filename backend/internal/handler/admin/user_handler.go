@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"context"
 	"strconv"
+	"strings"
 
 	"github.com/DueGin/FluxCode/internal/handler/dto"
 	"github.com/DueGin/FluxCode/internal/pkg/response"
@@ -10,13 +12,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type userAdminService interface {
+	ListUsers(ctx context.Context, page, pageSize int, filters service.UserListFilters) ([]service.User, int64, error)
+	GetUser(ctx context.Context, id int64) (*service.User, error)
+	CreateUser(ctx context.Context, input *service.CreateUserInput) (*service.User, error)
+	UpdateUser(ctx context.Context, id int64, input *service.UpdateUserInput) (*service.User, error)
+	DeleteUser(ctx context.Context, id int64) error
+	UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*service.User, error)
+	GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int) ([]service.APIKey, int64, error)
+	GetUserUsageStats(ctx context.Context, userID int64, period string) (any, error)
+}
+
 // UserHandler handles admin user management
 type UserHandler struct {
-	adminService service.AdminService
+	adminService userAdminService
 }
 
 // NewUserHandler creates a new admin user handler
-func NewUserHandler(adminService service.AdminService) *UserHandler {
+func NewUserHandler(adminService userAdminService) *UserHandler {
 	return &UserHandler{
 		adminService: adminService,
 	}
@@ -68,6 +81,38 @@ func (h *UserHandler) List(c *gin.Context) {
 		Role:       c.Query("role"),
 		Search:     c.Query("search"),
 		Attributes: parseAttributeFilters(c),
+	}
+
+	sortBy := strings.ToLower(strings.TrimSpace(c.Query("sort_by")))
+	sortOrder := strings.ToLower(strings.TrimSpace(c.Query("sort_order")))
+	if sortBy != "" {
+		allowedSortBy := map[string]struct{}{
+			"id":                {},
+			"email":             {},
+			"username":          {},
+			"role":              {},
+			"balance":           {},
+			"concurrency":       {},
+			"status":            {},
+			"created_at":        {},
+			"today_actual_cost": {},
+			"total_actual_cost": {},
+		}
+		if _, ok := allowedSortBy[sortBy]; !ok {
+			response.BadRequest(c, "Invalid sort_by")
+			return
+		}
+
+		if sortOrder == "" {
+			sortOrder = "asc"
+		}
+		if sortOrder != "asc" && sortOrder != "desc" {
+			response.BadRequest(c, "Invalid sort_order")
+			return
+		}
+
+		filters.SortBy = sortBy
+		filters.SortOrder = sortOrder
 	}
 
 	users, total, err := h.adminService.ListUsers(c.Request.Context(), page, pageSize, filters)
