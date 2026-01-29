@@ -3,14 +3,14 @@
     <Transition name="modal">
       <div
         v-if="show"
-        class="modal-overlay"
+        :class="['modal-overlay', overlayClass]"
         :aria-labelledby="dialogId"
         role="dialog"
         aria-modal="true"
         @click.self="handleClose"
       >
         <!-- Modal panel -->
-        <div ref="dialogRef" :class="['modal-content', widthClasses]" @click.stop>
+        <div ref="dialogRef" :class="['modal-content', widthClasses, contentClass]" @click.stop>
           <!-- Header -->
           <div class="modal-header">
             <h3 :id="dialogId" class="modal-title">
@@ -67,6 +67,8 @@ interface Props {
   width?: DialogWidth
   closeOnEscape?: boolean
   closeOnClickOutside?: boolean
+  overlayClass?: string
+  contentClass?: string
 }
 
 interface Emits {
@@ -76,7 +78,9 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   width: 'normal',
   closeOnEscape: true,
-  closeOnClickOutside: false
+  closeOnClickOutside: false,
+  overlayClass: '',
+  contentClass: ''
 })
 
 const emit = defineEmits<Emits>()
