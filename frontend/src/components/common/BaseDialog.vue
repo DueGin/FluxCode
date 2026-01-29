@@ -17,6 +17,7 @@
               {{ title }}
             </h3>
             <button
+              v-if="showCloseButton"
               @click="emit('close')"
               class="-mr-2 rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-dark-500 dark:hover:bg-dark-700 dark:hover:text-dark-300"
               aria-label="Close modal"
@@ -67,6 +68,8 @@ interface Props {
   width?: DialogWidth
   closeOnEscape?: boolean
   closeOnClickOutside?: boolean
+  // 是否展示右上角关闭按钮（“×”）。部分弹窗会自定义底部按钮，不希望额外的关闭入口。
+  showCloseButton?: boolean
   overlayClass?: string
   contentClass?: string
 }
@@ -79,9 +82,12 @@ const props = withDefaults(defineProps<Props>(), {
   width: 'normal',
   closeOnEscape: true,
   closeOnClickOutside: false,
+  showCloseButton: true,
   overlayClass: '',
   contentClass: ''
 })
+
+const showCloseButton = computed(() => props.showCloseButton)
 
 const emit = defineEmits<Emits>()
 

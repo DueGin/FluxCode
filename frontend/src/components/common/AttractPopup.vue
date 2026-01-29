@@ -4,6 +4,7 @@
     :title="dialogTitle"
     width="narrow"
     overlay-class="items-start pt-[16vh] sm:pt-[18vh] md:pt-[20vh]"
+    :show-close-button="false"
     :close-on-click-outside="true"
     @close="handleClose"
   >
