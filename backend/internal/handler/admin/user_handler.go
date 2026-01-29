@@ -23,6 +23,11 @@ type userAdminService interface {
 	GetUserUsageStats(ctx context.Context, userID int64, period string) (any, error)
 }
 
+// ProvideUserAdminService adapts service.AdminService to the narrower userAdminService interface for Wire injection.
+func ProvideUserAdminService(adminService service.AdminService) userAdminService {
+	return adminService
+}
+
 // UserHandler handles admin user management
 type UserHandler struct {
 	adminService userAdminService
