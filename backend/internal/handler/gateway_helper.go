@@ -47,6 +47,9 @@ type SSEPingFormat string
 const (
 	// SSEPingFormatClaude is the Claude/Anthropic SSE ping format
 	SSEPingFormatClaude SSEPingFormat = "data: {\"type\": \"ping\"}\n\n"
+	// SSEPingFormatComment is a spec-compliant SSE comment ping (safe for most SSE clients).
+	// It helps keep the stream alive without introducing a JSON payload that might confuse strict parsers.
+	SSEPingFormatComment SSEPingFormat = ": ping\n\n"
 	// SSEPingFormatNone indicates no ping should be sent (e.g., OpenAI has no ping spec)
 	SSEPingFormatNone SSEPingFormat = ""
 )
@@ -196,6 +199,20 @@ func (h *ConcurrencyHelper) waitForSlotWithPingTimeout(c *gin.Context, slotType 
 		if !ok {
 			return nil, fmt.Errorf("streaming not supported")
 		}
+
+		// Send an initial ping immediately to flush headers/body early.
+		// This reduces first-byte timeouts (common with some SSE clients and proxies).
+		if !*streamStarted {
+			c.Header("Content-Type", "text/event-stream")
+			c.Header("Cache-Control", "no-cache")
+			c.Header("Connection", "keep-alive")
+			c.Header("X-Accel-Buffering", "no")
+			*streamStarted = true
+		}
+		if _, err := fmt.Fprint(c.Writer, string(h.pingFormat)); err != nil {
+			return nil, err
+		}
+		flusher.Flush()
 	}
 
 	// Only create ping ticker if ping is needed

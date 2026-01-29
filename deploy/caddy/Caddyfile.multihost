@@ -71,13 +71,14 @@
 	@root path /
 	redir @root /home 302
 
-	# SSE/流式响应：禁用缓冲并放宽读写超时，避免被动中断
-	@stream path /responses
-	handle @stream {
-		reverse_proxy {
-			import fluxcode_upstreams
-			lb_policy least_conn
-			flush_interval -1
+		# SSE/流式响应：禁用缓冲并放宽读写超时，避免被动中断
+		# 注意：OpenAI 官方 Responses API 路径是 /v1/responses（SDK 默认会带 /v1 前缀）
+		@stream path /responses /v1/responses /v1/messages
+		handle @stream {
+			reverse_proxy {
+				import fluxcode_upstreams
+				lb_policy least_conn
+				flush_interval -1
 			transport http {
 				read_timeout 10m
 				write_timeout 10m

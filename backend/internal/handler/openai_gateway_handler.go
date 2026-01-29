@@ -41,7 +41,9 @@ func NewOpenAIGatewayHandler(
 		gatewayService:      gatewayService,
 		billingCacheService: billingCacheService,
 		usageQueueService:   usageQueueService,
-		concurrencyHelper:   NewConcurrencyHelper(concurrencyService, SSEPingFormatNone),
+		// OpenAI Responses streaming has no official ping event, but SSE comments are spec-compliant
+		// and help prevent first-byte timeouts in some clients/proxies.
+		concurrencyHelper:   NewConcurrencyHelper(concurrencyService, SSEPingFormatComment),
 		settingService:      settingService,
 		alertService:        alertService,
 	}
@@ -220,16 +222,36 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				h.handleConcurrencyError(c, err, "account", streamStarted)
 				return
 			}
-			if err := h.gatewayService.BindStickySession(c.Request.Context(), sessionHash, account.ID); err != nil {
-				applog.Printf("Bind sticky session failed: %v", err)
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), sessionHash, account.ID); err != nil {
+					applog.Printf("Bind sticky session failed: %v", err)
+				}
 			}
-		}
 
-		// Forward request
-		result, err := h.gatewayService.Forward(c.Request.Context(), c, account, body)
-		if accountReleaseFunc != nil {
-			accountReleaseFunc()
-		}
+			// For streaming requests, proactively flush an SSE comment to avoid client/proxy first-byte timeouts
+			// while establishing the upstream connection.
+			if reqStream && !streamStarted {
+				flusher, ok := c.Writer.(http.Flusher)
+				if !ok {
+					h.errorResponse(c, http.StatusInternalServerError, "api_error", "streaming not supported")
+					return
+				}
+				c.Header("Content-Type", "text/event-stream")
+				c.Header("Cache-Control", "no-cache")
+				c.Header("Connection", "keep-alive")
+				c.Header("X-Accel-Buffering", "no")
+				streamStarted = true
+				if _, err := fmt.Fprint(c.Writer, string(SSEPingFormatComment)); err != nil {
+					_ = c.Error(err)
+					return
+				}
+				flusher.Flush()
+			}
+
+			// Forward request
+			result, err := h.gatewayService.Forward(c.Request.Context(), c, account, body)
+			if accountReleaseFunc != nil {
+				accountReleaseFunc()
+			}
 		if accountWaitRelease != nil {
 			accountWaitRelease()
 		}
