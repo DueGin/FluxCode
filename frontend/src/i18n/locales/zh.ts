@@ -1920,13 +1920,13 @@ export default {
         logoTypeError: '请选择图片文件',
         logoReadError: '读取图片文件失败'
       },
-      qqGroupPopup: {
-        title: 'QQ群引流弹窗',
-        description: '配置官网/控制台提示用户进群的弹窗文案（支持 Markdown）',
+      attractPopup: {
+        title: '引流弹窗',
+        description: '配置官网/控制台引导用户进入社群/渠道的弹窗文案（支持 Markdown）',
         popupTitle: '弹窗标题',
-        popupTitlePlaceholder: '加入QQ群领取 $5 测试卡',
+        popupTitlePlaceholder: '加入社群领取 $5 测试卡',
         popupMarkdown: '弹窗文案（Markdown）',
-        popupMarkdownPlaceholder: '例如：加入我们的 QQ 群即可领取 **$5 测试卡**……',
+        popupMarkdownPlaceholder: '例如：加入我们的社群即可领取 **$5 测试卡**……',
         popupMarkdownHint: '支持 Markdown；链接会在新窗口打开。'
       },
       smtp: {
@@ -2061,8 +2061,8 @@ export default {
     usageOf: '已用 {used} / {limit}'
   },
 
-  qqGroupPopup: {
-    title: '加入QQ群领取 $5 测试卡',
+  attractPopup: {
+    title: '加入社群领取 $5 测试卡',
     dismissToday: '今日不再提醒',
     dismissForever: '不再提醒'
   },

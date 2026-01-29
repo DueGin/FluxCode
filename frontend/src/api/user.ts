@@ -7,7 +7,7 @@ import { apiClient } from './client'
 import type { User, ChangePasswordRequest } from '@/types'
 
 export interface UiPreferences {
-  dashboard_qq_group_popup_disabled: boolean
+  dashboard_attract_popup_disabled: boolean
 }
 
 /**

@@ -31,8 +31,8 @@ type SystemSettings struct {
 	ContactInfo          string
 	AfterSaleContact     []KVItem
 	DocURL               string
-	QQGroupPopupTitle    string
-	QQGroupPopupMarkdown string
+	AttractPopupTitle    string
+	AttractPopupMarkdown string
 
 	DefaultConcurrency                int
 	DefaultBalance                    float64
@@ -62,7 +62,7 @@ type PublicSettings struct {
 	ContactInfo          string
 	AfterSaleContact     []KVItem
 	DocURL               string
-	QQGroupPopupTitle    string
-	QQGroupPopupMarkdown string
+	AttractPopupTitle    string
+	AttractPopupMarkdown string
 	Version              string
 }

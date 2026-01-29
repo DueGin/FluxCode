@@ -606,42 +606,42 @@
               </p>
             </div>
 
-            <!-- QQ Group Popup -->
+            <!-- Attract Popup -->
             <div class="border-t border-gray-100 pt-6 dark:border-dark-700">
               <div class="mb-4">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
-                  {{ t('admin.settings.qqGroupPopup.title') }}
+                  {{ t('admin.settings.attractPopup.title') }}
                 </h3>
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.settings.qqGroupPopup.description') }}
+                  {{ t('admin.settings.attractPopup.description') }}
                 </p>
               </div>
 
               <div class="space-y-4">
                 <div>
                   <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {{ t('admin.settings.qqGroupPopup.popupTitle') }}
+                    {{ t('admin.settings.attractPopup.popupTitle') }}
                   </label>
                   <input
-                    v-model="form.qq_group_popup_title"
+                    v-model="form.attract_popup_title"
                     type="text"
                     class="input"
-                    :placeholder="t('admin.settings.qqGroupPopup.popupTitlePlaceholder')"
+                    :placeholder="t('admin.settings.attractPopup.popupTitlePlaceholder')"
                   />
                 </div>
 
                 <div>
                   <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {{ t('admin.settings.qqGroupPopup.popupMarkdown') }}
+                    {{ t('admin.settings.attractPopup.popupMarkdown') }}
                   </label>
                   <textarea
-                    v-model="form.qq_group_popup_markdown"
+                    v-model="form.attract_popup_markdown"
                     rows="6"
                     class="textarea font-mono text-sm"
-                    :placeholder="t('admin.settings.qqGroupPopup.popupMarkdownPlaceholder')"
+                    :placeholder="t('admin.settings.attractPopup.popupMarkdownPlaceholder')"
                   ></textarea>
                   <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    {{ t('admin.settings.qqGroupPopup.popupMarkdownHint') }}
+                    {{ t('admin.settings.attractPopup.popupMarkdownHint') }}
                   </p>
                 </div>
               </div>
@@ -1001,8 +1001,8 @@ const newAdminApiKey = ref('')
   contact_info: '',
   after_sale_contact: [],
   doc_url: '',
-  qq_group_popup_title: '',
-  qq_group_popup_markdown: '',
+  attract_popup_title: '',
+  attract_popup_markdown: '',
   smtp_host: '',
   smtp_port: 587,
   smtp_username: '',

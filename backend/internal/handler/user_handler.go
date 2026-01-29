@@ -35,11 +35,11 @@ type UpdateProfileRequest struct {
 }
 
 type UserUIPreferences struct {
-	DashboardQQGroupPopupDisabled bool `json:"dashboard_qq_group_popup_disabled"`
+	DashboardAttractPopupDisabled bool `json:"dashboard_attract_popup_disabled"`
 }
 
 type UpdateUIPreferencesRequest struct {
-	DashboardQQGroupPopupDisabled *bool `json:"dashboard_qq_group_popup_disabled"`
+	DashboardAttractPopupDisabled *bool `json:"dashboard_attract_popup_disabled"`
 }
 
 // GetProfile handles getting user profile
@@ -130,14 +130,14 @@ func (h *UserHandler) GetUIPreferences(c *gin.Context) {
 		return
 	}
 
-	disabled, err := h.uiPreferencesService.GetDashboardQQGroupPopupDisabled(c.Request.Context(), subject.UserID)
+	disabled, err := h.uiPreferencesService.GetDashboardAttractPopupDisabled(c.Request.Context(), subject.UserID)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 
 	response.Success(c, UserUIPreferences{
-		DashboardQQGroupPopupDisabled: disabled,
+		DashboardAttractPopupDisabled: disabled,
 	})
 }
 
@@ -156,23 +156,23 @@ func (h *UserHandler) UpdateUIPreferences(c *gin.Context) {
 		return
 	}
 
-	if req.DashboardQQGroupPopupDisabled == nil {
+	if req.DashboardAttractPopupDisabled == nil {
 		response.BadRequest(c, "No preferences to update")
 		return
 	}
 
-	if err := h.uiPreferencesService.SetDashboardQQGroupPopupDisabled(c.Request.Context(), subject.UserID, *req.DashboardQQGroupPopupDisabled); err != nil {
+	if err := h.uiPreferencesService.SetDashboardAttractPopupDisabled(c.Request.Context(), subject.UserID, *req.DashboardAttractPopupDisabled); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 
-	disabled, err := h.uiPreferencesService.GetDashboardQQGroupPopupDisabled(c.Request.Context(), subject.UserID)
+	disabled, err := h.uiPreferencesService.GetDashboardAttractPopupDisabled(c.Request.Context(), subject.UserID)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 
 	response.Success(c, UserUIPreferences{
-		DashboardQQGroupPopupDisabled: disabled,
+		DashboardAttractPopupDisabled: disabled,
 	})
 }

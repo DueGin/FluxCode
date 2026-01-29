@@ -60,8 +60,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		ContactInfo:                       settings.ContactInfo,
 		AfterSaleContact:                  afterSaleContact,
 		DocURL:                            settings.DocURL,
-		QQGroupPopupTitle:                 settings.QQGroupPopupTitle,
-		QQGroupPopupMarkdown:              settings.QQGroupPopupMarkdown,
+		AttractPopupTitle:                 settings.AttractPopupTitle,
+		AttractPopupMarkdown:              settings.AttractPopupMarkdown,
 		DefaultConcurrency:                settings.DefaultConcurrency,
 		DefaultBalance:                    settings.DefaultBalance,
 		GatewayRetrySwitchAfter:           settings.GatewayRetrySwitchAfter,
@@ -109,8 +109,8 @@ type UpdateSettingsRequest struct {
 	ContactInfo          string       `json:"contact_info"`
 	AfterSaleContact     []dto.KVItem `json:"after_sale_contact"`
 	DocURL               string       `json:"doc_url"`
-	QQGroupPopupTitle    string       `json:"qq_group_popup_title"`
-	QQGroupPopupMarkdown string       `json:"qq_group_popup_markdown"`
+	AttractPopupTitle    string       `json:"attract_popup_title"`
+	AttractPopupMarkdown string       `json:"attract_popup_markdown"`
 
 	// 默认配置
 	DefaultConcurrency                int     `json:"default_concurrency"`
@@ -227,8 +227,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			return out
 		}(),
 		DocURL:                            req.DocURL,
-		QQGroupPopupTitle:                 req.QQGroupPopupTitle,
-		QQGroupPopupMarkdown:              req.QQGroupPopupMarkdown,
+		AttractPopupTitle:                 req.AttractPopupTitle,
+		AttractPopupMarkdown:              req.AttractPopupMarkdown,
 		DefaultConcurrency:                req.DefaultConcurrency,
 		DefaultBalance:                    req.DefaultBalance,
 		GatewayRetrySwitchAfter:           req.GatewayRetrySwitchAfter,
@@ -282,8 +282,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ContactInfo:                       updatedSettings.ContactInfo,
 		AfterSaleContact:                  updatedAfterSaleContact,
 		DocURL:                            updatedSettings.DocURL,
-		QQGroupPopupTitle:                 updatedSettings.QQGroupPopupTitle,
-		QQGroupPopupMarkdown:              updatedSettings.QQGroupPopupMarkdown,
+		AttractPopupTitle:                 updatedSettings.AttractPopupTitle,
+		AttractPopupMarkdown:              updatedSettings.AttractPopupMarkdown,
 		DefaultConcurrency:                updatedSettings.DefaultConcurrency,
 		DefaultBalance:                    updatedSettings.DefaultBalance,
 		GatewayRetrySwitchAfter:           updatedSettings.GatewayRetrySwitchAfter,

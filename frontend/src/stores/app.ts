@@ -31,8 +31,9 @@ export const useAppStore = defineStore('app', () => {
   const afterSaleContact = ref<KeyValueItem[]>([])
   const apiBaseUrl = ref<string>('')
   const docUrl = ref<string>('')
-  const qqGroupPopupTitle = ref<string>('')
-  const qqGroupPopupMarkdown = ref<string>('')
+  // 引流弹窗文案（来自 public settings，可在后台配置；内容支持 Markdown）
+  const attractPopupTitle = ref<string>('')
+  const attractPopupMarkdown = ref<string>('')
 
   // Version cache state
   const versionLoaded = ref<boolean>(false)
@@ -300,8 +301,8 @@ export const useAppStore = defineStore('app', () => {
         contact_info: contactInfo.value,
         after_sale_contact: afterSaleContact.value,
         doc_url: docUrl.value,
-        qq_group_popup_title: qqGroupPopupTitle.value,
-        qq_group_popup_markdown: qqGroupPopupMarkdown.value,
+        attract_popup_title: attractPopupTitle.value,
+        attract_popup_markdown: attractPopupMarkdown.value,
         version: siteVersion.value
       }
     }
@@ -321,8 +322,8 @@ export const useAppStore = defineStore('app', () => {
       afterSaleContact.value = Array.isArray(data.after_sale_contact) ? data.after_sale_contact : []
       apiBaseUrl.value = data.api_base_url || ''
       docUrl.value = data.doc_url || ''
-      qqGroupPopupTitle.value = data.qq_group_popup_title || ''
-      qqGroupPopupMarkdown.value = data.qq_group_popup_markdown || ''
+      attractPopupTitle.value = data.attract_popup_title || ''
+      attractPopupMarkdown.value = data.attract_popup_markdown || ''
       publicSettingsLoaded.value = true
       return data
     } catch (error) {
@@ -358,8 +359,8 @@ export const useAppStore = defineStore('app', () => {
     afterSaleContact,
     apiBaseUrl,
     docUrl,
-    qqGroupPopupTitle,
-    qqGroupPopupMarkdown,
+    attractPopupTitle,
+    attractPopupMarkdown,
 
     // Version state
     versionLoaded,

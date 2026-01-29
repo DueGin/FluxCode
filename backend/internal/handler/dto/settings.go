@@ -32,8 +32,8 @@ type SystemSettings struct {
 	ContactInfo          string   `json:"contact_info"`
 	AfterSaleContact     []KVItem `json:"after_sale_contact"`
 	DocURL               string   `json:"doc_url"`
-	QQGroupPopupTitle    string   `json:"qq_group_popup_title"`
-	QQGroupPopupMarkdown string   `json:"qq_group_popup_markdown"`
+	AttractPopupTitle    string   `json:"attract_popup_title"`
+	AttractPopupMarkdown string   `json:"attract_popup_markdown"`
 
 	DefaultConcurrency                int     `json:"default_concurrency"`
 	DefaultBalance                    float64 `json:"default_balance"`
@@ -63,7 +63,7 @@ type PublicSettings struct {
 	ContactInfo          string   `json:"contact_info"`
 	AfterSaleContact     []KVItem `json:"after_sale_contact"`
 	DocURL               string   `json:"doc_url"`
-	QQGroupPopupTitle    string   `json:"qq_group_popup_title"`
-	QQGroupPopupMarkdown string   `json:"qq_group_popup_markdown"`
+	AttractPopupTitle    string   `json:"attract_popup_title"`
+	AttractPopupMarkdown string   `json:"attract_popup_markdown"`
 	Version              string   `json:"version"`
 }
