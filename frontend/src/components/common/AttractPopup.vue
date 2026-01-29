@@ -50,13 +50,15 @@ import { userAPI } from '@/api'
  * 引流弹窗（可配置 Markdown 文案）
  *
  * 展示规则：
- * - 官网/文档/定价（PUBLIC_PATHS）：用户点击「今日不再提醒」后，当天不再弹（localStorage 按日期）。
- * - 控制台（DASHBOARD_PATHS）：用户点击「不再提醒」后，按用户维度永久不弹（后端存储）；仅影响控制台，不影响官网/文档/定价页。
+ * - 官网首页（PUBLIC_PATHS）：用户点击「今日不再提醒」后，当天不再弹（localStorage 按日期）。
+ * - 控制台（DASHBOARD_PATHS）：用户点击「不再提醒」后，按用户维度永久不弹（后端存储）。
+ * - 当用户已登录且已设置「不再提醒」时：官网首页与控制台都不再展示弹窗。
  * - 管理员：控制台不弹。
  */
 type PopupContext = 'public' | 'dashboard'
 
-const PUBLIC_PATHS = new Set(['/home', '/docs', '/pricing'])
+// 只在官网首页展示；使用文档页/定价页不展示。
+const PUBLIC_PATHS = new Set(['/home'])
 const DASHBOARD_PATHS = new Set(['/dashboard', '/keys', '/usage', '/redeem', '/profile', '/subscriptions'])
 
 // 仅用于 public 页「今日不再提醒」：避免引入登录态依赖。
@@ -127,6 +129,10 @@ async function maybeShow(): Promise<void> {
 
   if (PUBLIC_PATHS.has(path)) {
     if (isPublicDismissedToday()) return
+    if (authStore.isAuthenticated && !authStore.isAdmin) {
+      await loadDashboardPreferenceIfNeeded()
+      if (dashboardPopupDisabled.value) return
+    }
     context.value = 'public'
     show.value = true
     return
