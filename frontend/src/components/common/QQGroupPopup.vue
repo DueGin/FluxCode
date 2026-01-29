@@ -9,18 +9,23 @@
   >
     <div class="space-y-5">
       <div class="qq-popup-markdown" v-html="renderedHtml"></div>
-
-      <label v-if="checkboxLabel" class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-        <input v-model="suppressChecked" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-        <span>{{ checkboxLabel }}</span>
-      </label>
     </div>
 
     <template #footer>
-      <div class="flex justify-end gap-3">
+      <div class="flex flex-col gap-3 sm:flex-row sm:justify-end">
+        <button
+          v-if="dismissButtonText"
+          type="button"
+          class="btn btn-secondary w-full sm:w-auto"
+          :disabled="savingPreference"
+          @click="handleDismiss"
+        >
+          {{ dismissButtonText }}
+        </button>
+
         <button
           type="button"
-          class="btn btn-secondary"
+          class="btn btn-primary w-full sm:w-auto"
           :disabled="savingPreference"
           @click="handleClose"
         >
@@ -54,7 +59,6 @@ const authStore = useAuthStore()
 
 const show = ref(false)
 const context = ref<PopupContext | null>(null)
-const suppressChecked = ref(false)
 
 const savingPreference = ref(false)
 const dashboardPopupDisabled = ref<boolean | null>(null)
@@ -99,7 +103,7 @@ const dialogTitle = computed(() => appStore.qqGroupPopupTitle || t('qqGroupPopup
 const markdown = computed(() => (appStore.qqGroupPopupMarkdown || '').trim())
 const renderedHtml = computed(() => renderMarkdownToHtml(markdown.value))
 
-const checkboxLabel = computed(() => {
+const dismissButtonText = computed(() => {
   if (context.value === 'public') return t('qqGroupPopup.dismissToday')
   if (context.value === 'dashboard') return t('qqGroupPopup.dismissForever')
   return ''
@@ -114,7 +118,6 @@ async function maybeShow(): Promise<void> {
   if (PUBLIC_PATHS.has(path)) {
     if (isPublicDismissedToday()) return
     context.value = 'public'
-    suppressChecked.value = false
     show.value = true
     return
   }
@@ -124,40 +127,48 @@ async function maybeShow(): Promise<void> {
     await loadDashboardPreferenceIfNeeded()
     if (dashboardPopupDisabled.value) return
     context.value = 'dashboard'
-    suppressChecked.value = false
     show.value = true
   }
 }
 
+function resetPopupState(): void {
+  show.value = false
+  context.value = null
+}
+
 async function handleClose(): Promise<void> {
+  resetPopupState()
+}
+
+async function handleDismiss(): Promise<void> {
   if (!context.value) {
-    show.value = false
+    resetPopupState()
     return
   }
 
   if (context.value === 'public') {
-    if (suppressChecked.value) {
-      setPublicDismissedToday()
-    }
+    setPublicDismissedToday()
+    resetPopupState()
+    return
   }
 
   if (context.value === 'dashboard') {
-    if (suppressChecked.value && authStore.isAuthenticated && !authStore.isAdmin) {
-      savingPreference.value = true
-      try {
-        const updated = await userAPI.updateUiPreferences({ dashboard_qq_group_popup_disabled: true })
-        dashboardPopupDisabled.value = !!updated.dashboard_qq_group_popup_disabled
-      } catch (error) {
-        appStore.showError((error as { message?: string }).message || t('common.error'))
-      } finally {
-        savingPreference.value = false
-      }
+    if (!authStore.isAuthenticated || authStore.isAdmin) {
+      resetPopupState()
+      return
+    }
+
+    savingPreference.value = true
+    try {
+      const updated = await userAPI.updateUiPreferences({ dashboard_qq_group_popup_disabled: true })
+      dashboardPopupDisabled.value = !!updated.dashboard_qq_group_popup_disabled
+      resetPopupState()
+    } catch (error) {
+      appStore.showError((error as { message?: string }).message || t('common.error'))
+    } finally {
+      savingPreference.value = false
     }
   }
-
-  show.value = false
-  context.value = null
-  suppressChecked.value = false
 }
 
 watch(
