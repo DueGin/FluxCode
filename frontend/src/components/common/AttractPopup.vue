@@ -8,7 +8,7 @@
     @close="handleClose"
   >
     <div class="space-y-5">
-      <div class="qq-popup-markdown" v-html="renderedHtml"></div>
+      <div class="attract-popup-markdown" v-html="renderedHtml"></div>
     </div>
 
     <template #footer>
@@ -45,12 +45,21 @@ import { renderMarkdownToHtml } from '@/utils/markdown'
 import { useAppStore, useAuthStore } from '@/stores'
 import { userAPI } from '@/api'
 
+/**
+ * 引流弹窗（可配置 Markdown 文案）
+ *
+ * 展示规则：
+ * - 官网/文档/定价（PUBLIC_PATHS）：用户点击「今日不再提醒」后，当天不再弹（localStorage 按日期）。
+ * - 控制台（DASHBOARD_PATHS）：用户点击「不再提醒」后，按用户维度永久不弹（后端存储）；仅影响控制台，不影响官网/文档/定价页。
+ * - 管理员：控制台不弹。
+ */
 type PopupContext = 'public' | 'dashboard'
 
 const PUBLIC_PATHS = new Set(['/home', '/docs', '/pricing'])
 const DASHBOARD_PATHS = new Set(['/dashboard', '/keys', '/usage', '/redeem', '/profile', '/subscriptions'])
 
-const LOCAL_KEY_PUBLIC_DISMISSED_DATE = 'qq-group-popup:public:dismissed-date'
+// 仅用于 public 页「今日不再提醒」：避免引入登录态依赖。
+const LOCAL_KEY_PUBLIC_DISMISSED_DATE = 'attract-popup:public:dismissed-date'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -91,7 +100,7 @@ async function loadDashboardPreferenceIfNeeded(): Promise<void> {
   dashboardPrefLoading.value = true
   try {
     const prefs = await userAPI.getUiPreferences()
-    dashboardPopupDisabled.value = !!prefs.dashboard_qq_group_popup_disabled
+    dashboardPopupDisabled.value = !!prefs.dashboard_attract_popup_disabled
   } catch {
     dashboardPopupDisabled.value = false
   } finally {
@@ -99,13 +108,13 @@ async function loadDashboardPreferenceIfNeeded(): Promise<void> {
   }
 }
 
-const dialogTitle = computed(() => appStore.qqGroupPopupTitle || t('qqGroupPopup.title'))
-const markdown = computed(() => (appStore.qqGroupPopupMarkdown || '').trim())
+const dialogTitle = computed(() => appStore.attractPopupTitle || t('attractPopup.title'))
+const markdown = computed(() => (appStore.attractPopupMarkdown || '').trim())
 const renderedHtml = computed(() => renderMarkdownToHtml(markdown.value))
 
 const dismissButtonText = computed(() => {
-  if (context.value === 'public') return t('qqGroupPopup.dismissToday')
-  if (context.value === 'dashboard') return t('qqGroupPopup.dismissForever')
+  if (context.value === 'public') return t('attractPopup.dismissToday')
+  if (context.value === 'dashboard') return t('attractPopup.dismissForever')
   return ''
 })
 
@@ -160,8 +169,8 @@ async function handleDismiss(): Promise<void> {
 
     savingPreference.value = true
     try {
-      const updated = await userAPI.updateUiPreferences({ dashboard_qq_group_popup_disabled: true })
-      dashboardPopupDisabled.value = !!updated.dashboard_qq_group_popup_disabled
+      const updated = await userAPI.updateUiPreferences({ dashboard_attract_popup_disabled: true })
+      dashboardPopupDisabled.value = !!updated.dashboard_attract_popup_disabled
       resetPopupState()
     } catch (error) {
       appStore.showError((error as { message?: string }).message || t('common.error'))
@@ -189,30 +198,30 @@ watch(
 </script>
 
 <style scoped>
-.qq-popup-markdown :deep(p) {
+.attract-popup-markdown :deep(p) {
   margin: 0 0 0.75rem;
 }
 
-.qq-popup-markdown :deep(p:last-child) {
+.attract-popup-markdown :deep(p:last-child) {
   margin-bottom: 0;
 }
 
-.qq-popup-markdown :deep(ul),
-.qq-popup-markdown :deep(ol) {
+.attract-popup-markdown :deep(ul),
+.attract-popup-markdown :deep(ol) {
   margin: 0.5rem 0 0.75rem;
   padding-left: 1.25rem;
 }
 
-.qq-popup-markdown :deep(li) {
+.attract-popup-markdown :deep(li) {
   margin: 0.25rem 0;
 }
 
-.qq-popup-markdown :deep(a) {
+.attract-popup-markdown :deep(a) {
   color: rgb(79 70 229);
   text-decoration: underline;
 }
 
-.qq-popup-markdown :deep(code) {
+.attract-popup-markdown :deep(code) {
   padding: 0.1rem 0.35rem;
   border-radius: 0.375rem;
   background: rgba(15, 23, 42, 0.06);
@@ -220,7 +229,7 @@ watch(
   font-size: 0.875em;
 }
 
-.dark .qq-popup-markdown :deep(code) {
+.dark .attract-popup-markdown :deep(code) {
   background: rgba(148, 163, 184, 0.12);
 }
 </style>

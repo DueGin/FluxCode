@@ -48,8 +48,8 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		ContactInfo:          settings.ContactInfo,
 		AfterSaleContact:     afterSaleContact,
 		DocURL:               settings.DocURL,
-		QQGroupPopupTitle:    settings.QQGroupPopupTitle,
-		QQGroupPopupMarkdown: settings.QQGroupPopupMarkdown,
+		AttractPopupTitle:    settings.AttractPopupTitle,
+		AttractPopupMarkdown: settings.AttractPopupMarkdown,
 		Version:              h.version,
 	})
 }

@@ -32,8 +32,8 @@ export interface SystemSettings {
   contact_info: string
   after_sale_contact: KeyValueItem[]
   doc_url: string
-  qq_group_popup_title: string
-  qq_group_popup_markdown: string
+  attract_popup_title: string
+  attract_popup_markdown: string
   // SMTP settings
   smtp_host: string
   smtp_port: number

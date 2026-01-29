@@ -88,8 +88,10 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyContactInfo,
 		SettingKeyAfterSaleContact,
 		SettingKeyDocURL,
-		SettingKeyQQGroupPopupTitle,
-		SettingKeyQQGroupPopupMarkdown,
+		SettingKeyAttractPopupTitle,
+		SettingKeyAttractPopupMarkdown,
+		SettingKeyLegacyAttractPopupTitle,
+		SettingKeyLegacyAttractPopupMarkdown,
 	}
 
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
@@ -114,8 +116,17 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		ContactInfo:         settings[SettingKeyContactInfo],
 		AfterSaleContact:    s.parseKVItems(settings[SettingKeyAfterSaleContact]),
 		DocURL:              settings[SettingKeyDocURL],
-		QQGroupPopupTitle:   s.getStringOrDefault(settings, SettingKeyQQGroupPopupTitle, "加入QQ群领取测试卡"),
-		QQGroupPopupMarkdown: s.getStringOrDefault(settings, SettingKeyQQGroupPopupMarkdown, `加入我们的 QQ 群即可领取 **$5 测试卡**。
+		AttractPopupTitle: s.getStringWithFallback(
+			settings,
+			SettingKeyAttractPopupTitle,
+			SettingKeyLegacyAttractPopupTitle,
+			"加入社群领取测试卡",
+		),
+		AttractPopupMarkdown: s.getStringWithFallback(
+			settings,
+			SettingKeyAttractPopupMarkdown,
+			SettingKeyLegacyAttractPopupMarkdown,
+			`加入我们的社群即可领取 **$5 测试卡**。
 
 请在管理后台「系统设置」中配置此弹窗文案。`),
 	}, nil
@@ -181,8 +192,11 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyContactInfo] = settings.ContactInfo
 	updates[SettingKeyAfterSaleContact] = s.marshalKVItems(settings.AfterSaleContact)
 	updates[SettingKeyDocURL] = settings.DocURL
-	updates[SettingKeyQQGroupPopupTitle] = settings.QQGroupPopupTitle
-	updates[SettingKeyQQGroupPopupMarkdown] = settings.QQGroupPopupMarkdown
+	updates[SettingKeyAttractPopupTitle] = settings.AttractPopupTitle
+	updates[SettingKeyAttractPopupMarkdown] = settings.AttractPopupMarkdown
+	// 历史兼容：保持旧 key 与新 key 同步，避免灰度/回滚期间出现配置丢失。
+	updates[SettingKeyLegacyAttractPopupTitle] = settings.AttractPopupTitle
+	updates[SettingKeyLegacyAttractPopupMarkdown] = settings.AttractPopupMarkdown
 
 	// 默认配置
 	updates[SettingKeyDefaultConcurrency] = strconv.Itoa(settings.DefaultConcurrency)
@@ -546,8 +560,12 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyUserConcurrencyWaitTimeoutSeconds: strconv.Itoa(defaultUserConcurrencyWaitTimeoutSeconds),
 		SettingKeySMTPPort:                          "587",
 		SettingKeySMTPUseTLS:                        "false",
-		SettingKeyQQGroupPopupTitle:                 "加入QQ群领取测试卡",
-		SettingKeyQQGroupPopupMarkdown: `加入我们的 QQ 群即可领取 **$5 测试卡**。
+		SettingKeyAttractPopupTitle:                 "加入社群领取测试卡",
+		SettingKeyAttractPopupMarkdown: `加入我们的社群即可领取 **$5 测试卡**。
+
+请在管理后台「系统设置」中配置此弹窗文案。`,
+		SettingKeyLegacyAttractPopupTitle: "加入社群领取测试卡",
+		SettingKeyLegacyAttractPopupMarkdown: `加入我们的社群即可领取 **$5 测试卡**。
 
 请在管理后台「系统设置」中配置此弹窗文案。`,
 		// Model fallback defaults
@@ -598,8 +616,17 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		ContactInfo:         settings[SettingKeyContactInfo],
 		AfterSaleContact:    s.parseKVItems(settings[SettingKeyAfterSaleContact]),
 		DocURL:              settings[SettingKeyDocURL],
-		QQGroupPopupTitle:   s.getStringOrDefault(settings, SettingKeyQQGroupPopupTitle, "加入QQ群领取测试卡"),
-		QQGroupPopupMarkdown: s.getStringOrDefault(settings, SettingKeyQQGroupPopupMarkdown, `加入我们的 QQ 群即可领取 **$5 测试卡**。
+		AttractPopupTitle: s.getStringWithFallback(
+			settings,
+			SettingKeyAttractPopupTitle,
+			SettingKeyLegacyAttractPopupTitle,
+			"加入社群领取测试卡",
+		),
+		AttractPopupMarkdown: s.getStringWithFallback(
+			settings,
+			SettingKeyAttractPopupMarkdown,
+			SettingKeyLegacyAttractPopupMarkdown,
+			`加入我们的社群即可领取 **$5 测试卡**。
 
 请在管理后台「系统设置」中配置此弹窗文案。`),
 	}
@@ -760,6 +787,17 @@ func (s *SettingService) marshalStringList(items []string) string {
 // getStringOrDefault 获取字符串值或默认值
 func (s *SettingService) getStringOrDefault(settings map[string]string, key, defaultValue string) string {
 	if value, ok := settings[key]; ok && value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// getStringWithFallback 按「新 key → 旧 key → default」顺序取值（主要用于平滑升级/历史兼容）。
+func (s *SettingService) getStringWithFallback(settings map[string]string, key, fallbackKey, defaultValue string) string {
+	if value, ok := settings[key]; ok && value != "" {
+		return value
+	}
+	if value, ok := settings[fallbackKey]; ok && value != "" {
 		return value
 	}
 	return defaultValue

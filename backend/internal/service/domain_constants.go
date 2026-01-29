@@ -79,15 +79,19 @@ const (
 	SettingKeyTurnstileSecretKey = "turnstile_secret_key" // Turnstile Secret Key
 
 	// OEM设置
-	SettingKeySiteName             = "site_name"               // 网站名称
-	SettingKeySiteLogo             = "site_logo"               // 网站Logo (base64)
-	SettingKeySiteSubtitle         = "site_subtitle"           // 网站副标题
-	SettingKeyAPIBaseURL           = "api_base_url"            // API端点地址（用于客户端配置和导入）
-	SettingKeyContactInfo          = "contact_info"            // 客服联系方式
-	SettingKeyAfterSaleContact     = "after_sale_contact"      // 售后联系方式（KV JSON 数组）
-	SettingKeyDocURL               = "doc_url"                 // 文档链接
-	SettingKeyQQGroupPopupTitle    = "qq_group_popup_title"    // QQ群弹窗标题
-	SettingKeyQQGroupPopupMarkdown = "qq_group_popup_markdown" // QQ群弹窗 Markdown 文案
+	SettingKeySiteName             = "site_name"              // 网站名称
+	SettingKeySiteLogo             = "site_logo"              // 网站Logo (base64)
+	SettingKeySiteSubtitle         = "site_subtitle"          // 网站副标题
+	SettingKeyAPIBaseURL           = "api_base_url"           // API端点地址（用于客户端配置和导入）
+	SettingKeyContactInfo          = "contact_info"           // 客服联系方式
+	SettingKeyAfterSaleContact     = "after_sale_contact"     // 售后联系方式（KV JSON 数组）
+	SettingKeyDocURL               = "doc_url"                // 文档链接
+	SettingKeyAttractPopupTitle    = "attract_popup_title"    // 引流弹窗标题
+	SettingKeyAttractPopupMarkdown = "attract_popup_markdown" // 引流弹窗 Markdown 文案
+
+	// 历史兼容：早期版本使用 qq_group_popup_*，保留读取/写入以平滑升级（后续可迁移后移除）。
+	SettingKeyLegacyAttractPopupTitle    = "qq_group_popup_title"
+	SettingKeyLegacyAttractPopupMarkdown = "qq_group_popup_markdown"
 
 	// 默认配置
 	SettingKeyDefaultConcurrency                = "default_concurrency"                   // 新用户默认并发量
