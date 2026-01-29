@@ -1,5 +1,12 @@
 <template>
-  <BaseDialog :show="show" :title="dialogTitle" width="wide" :close-on-click-outside="true" @close="handleClose">
+  <BaseDialog
+    :show="show"
+    :title="dialogTitle"
+    width="narrow"
+    overlay-class="items-start pt-[16vh] sm:pt-[18vh] md:pt-[20vh]"
+    :close-on-click-outside="true"
+    @close="handleClose"
+  >
     <div class="space-y-5">
       <div class="qq-popup-markdown" v-html="renderedHtml"></div>
 
