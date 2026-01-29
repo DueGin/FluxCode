@@ -46,8 +46,6 @@ const PUBLIC_PATHS = new Set(['/home', '/docs', '/pricing'])
 const DASHBOARD_PATHS = new Set(['/dashboard', '/keys', '/usage', '/redeem', '/profile', '/subscriptions'])
 
 const LOCAL_KEY_PUBLIC_DISMISSED_DATE = 'qq-group-popup:public:dismissed-date'
-const SESSION_KEY_PUBLIC_DISMISSED = 'qq-group-popup:public:session-dismissed'
-const SESSION_KEY_DASHBOARD_DISMISSED = 'qq-group-popup:dashboard:session-dismissed'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -76,14 +74,6 @@ function isPublicDismissedToday(): boolean {
 
 function setPublicDismissedToday(): void {
   localStorage.setItem(LOCAL_KEY_PUBLIC_DISMISSED_DATE, getTodayLocalISODate())
-}
-
-function isSessionDismissed(key: string): boolean {
-  return sessionStorage.getItem(key) === '1'
-}
-
-function setSessionDismissed(key: string): void {
-  sessionStorage.setItem(key, '1')
 }
 
 async function loadDashboardPreferenceIfNeeded(): Promise<void> {
@@ -123,7 +113,6 @@ async function maybeShow(): Promise<void> {
 
   if (PUBLIC_PATHS.has(path)) {
     if (isPublicDismissedToday()) return
-    if (isSessionDismissed(SESSION_KEY_PUBLIC_DISMISSED)) return
     context.value = 'public'
     suppressChecked.value = false
     show.value = true
@@ -132,7 +121,6 @@ async function maybeShow(): Promise<void> {
 
   if (DASHBOARD_PATHS.has(path)) {
     if (!authStore.isAuthenticated || authStore.isAdmin) return
-    if (isSessionDismissed(SESSION_KEY_DASHBOARD_DISMISSED)) return
     await loadDashboardPreferenceIfNeeded()
     if (dashboardPopupDisabled.value) return
     context.value = 'dashboard'
@@ -150,13 +138,10 @@ async function handleClose(): Promise<void> {
   if (context.value === 'public') {
     if (suppressChecked.value) {
       setPublicDismissedToday()
-    } else {
-      setSessionDismissed(SESSION_KEY_PUBLIC_DISMISSED)
     }
   }
 
   if (context.value === 'dashboard') {
-    setSessionDismissed(SESSION_KEY_DASHBOARD_DISMISSED)
     if (suppressChecked.value && authStore.isAuthenticated && !authStore.isAdmin) {
       savingPreference.value = true
       try {
