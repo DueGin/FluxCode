@@ -978,6 +978,7 @@ export default {
       assignSubscription: 'Assign Subscription',
       extendSubscription: 'Extend Subscription',
       revokeSubscription: 'Revoke Subscription',
+      searchUserEmailPlaceholder: 'Search user email...',
       allStatus: 'All Status',
       allGroups: 'All Groups',
       daily: 'Daily',

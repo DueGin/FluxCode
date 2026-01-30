@@ -42,19 +42,27 @@
       <!-- Filters -->
       <template #filters>
       <div class="flex flex-wrap gap-3">
+        <input
+          v-model="filters.user_email"
+          type="text"
+          class="input w-64"
+          :placeholder="t('admin.subscriptions.searchUserEmailPlaceholder')"
+          @input="debounceApplyFilters"
+          @keyup.enter="applyFilters"
+        />
         <Select
           v-model="filters.status"
           :options="statusOptions"
           :placeholder="t('admin.subscriptions.allStatus')"
           class="w-40"
-          @change="loadSubscriptions"
+          @change="applyFilters"
         />
         <Select
           v-model="filters.group_id"
           :options="groupOptions"
           :placeholder="t('admin.subscriptions.allGroups')"
           class="w-48"
-          @change="loadSubscriptions"
+          @change="applyFilters"
         />
       </div>
       </template>
@@ -565,7 +573,8 @@ let userSearchTimeout: ReturnType<typeof setTimeout> | null = null
 
 const filters = reactive({
   status: '',
-  group_id: ''
+  group_id: '',
+  user_email: ''
 })
 const pagination = reactive({
   page: 1,
@@ -580,6 +589,8 @@ const showRevokeDialog = ref(false)
 const submitting = ref(false)
 const extendingSubscription = ref<UserSubscription | null>(null)
 const revokingSubscription = ref<UserSubscription | null>(null)
+
+let filterTimeout: ReturnType<typeof setTimeout> | null = null
 
 const assignForm = reactive({
   user_id: null as number | null,
@@ -616,7 +627,8 @@ const loadSubscriptions = async () => {
   try {
     const response = await adminAPI.subscriptions.list(pagination.page, pagination.page_size, {
       status: (filters.status as any) || undefined,
-      group_id: filters.group_id ? parseInt(filters.group_id) : undefined
+      group_id: filters.group_id ? parseInt(filters.group_id) : undefined,
+      user_email: filters.user_email.trim() || undefined
     }, {
       signal
     })
@@ -636,6 +648,18 @@ const loadSubscriptions = async () => {
       abortController = null
     }
   }
+}
+
+const applyFilters = () => {
+  pagination.page = 1
+  loadSubscriptions()
+}
+
+const debounceApplyFilters = () => {
+  if (filterTimeout) {
+    clearTimeout(filterTimeout)
+  }
+  filterTimeout = setTimeout(applyFilters, 300)
 }
 
 const loadGroups = async () => {
@@ -871,6 +895,9 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
   if (userSearchTimeout) {
     clearTimeout(userSearchTimeout)
+  }
+  if (filterTimeout) {
+    clearTimeout(filterTimeout)
   }
 })
 </script>

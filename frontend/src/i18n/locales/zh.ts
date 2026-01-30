@@ -962,6 +962,7 @@ export default {
       assignSubscription: '分配订阅',
       extendSubscription: '延长订阅',
       revokeSubscription: '撤销订阅',
+      searchUserEmailPlaceholder: '搜索用户邮箱...',
       allStatus: '全部状态',
       allGroups: '全部分组',
       daily: '每日',

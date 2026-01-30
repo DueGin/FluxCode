@@ -2,6 +2,7 @@ package admin
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/DueGin/FluxCode/internal/handler/dto"
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
@@ -81,8 +82,9 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 		}
 	}
 	status := c.Query("status")
+	userEmail := strings.TrimSpace(c.Query("user_email"))
 
-	subscriptions, pagination, err := h.subscriptionService.List(c.Request.Context(), page, pageSize, userID, groupID, status)
+	subscriptions, pagination, err := h.subscriptionService.List(c.Request.Context(), page, pageSize, userID, groupID, status, userEmail)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

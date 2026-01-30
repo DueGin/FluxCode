@@ -271,7 +271,7 @@ func (s *UserSubscriptionRepoSuite) TestList_NoFilters() {
 	group := s.mustCreateGroup("g-list")
 	s.mustCreateSubscription(user.ID, group.ID, nil)
 
-	subs, page, err := s.repo.List(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, nil, nil, "")
+	subs, page, err := s.repo.List(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, nil, nil, "", "")
 	s.Require().NoError(err, "List")
 	s.Require().Len(subs, 1)
 	s.Require().Equal(int64(1), page.Total)
@@ -285,7 +285,7 @@ func (s *UserSubscriptionRepoSuite) TestList_FilterByUserID() {
 	s.mustCreateSubscription(user1.ID, group.ID, nil)
 	s.mustCreateSubscription(user2.ID, group.ID, nil)
 
-	subs, _, err := s.repo.List(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, &user1.ID, nil, "")
+	subs, _, err := s.repo.List(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, &user1.ID, nil, "", "")
 	s.Require().NoError(err)
 	s.Require().Len(subs, 1)
 	s.Require().Equal(user1.ID, subs[0].UserID)
@@ -299,7 +299,7 @@ func (s *UserSubscriptionRepoSuite) TestList_FilterByGroupID() {
 	s.mustCreateSubscription(user.ID, g1.ID, nil)
 	s.mustCreateSubscription(user.ID, g2.ID, nil)
 
-	subs, _, err := s.repo.List(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, nil, &g1.ID, "")
+	subs, _, err := s.repo.List(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, nil, &g1.ID, "", "")
 	s.Require().NoError(err)
 	s.Require().Len(subs, 1)
 	s.Require().Equal(g1.ID, subs[0].GroupID)
@@ -320,10 +320,26 @@ func (s *UserSubscriptionRepoSuite) TestList_FilterByStatus() {
 		c.SetExpiresAt(time.Now().Add(-24 * time.Hour))
 	})
 
-	subs, _, err := s.repo.List(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, nil, nil, service.SubscriptionStatusExpired)
+	subs, _, err := s.repo.List(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, nil, nil, service.SubscriptionStatusExpired, "")
 	s.Require().NoError(err)
 	s.Require().Len(subs, 1)
 	s.Require().Equal(service.SubscriptionStatusExpired, subs[0].Status)
+}
+
+func (s *UserSubscriptionRepoSuite) TestList_FilterByUserEmail() {
+	user1 := s.mustCreateUser("alice.subscription@test.com", service.RoleUser)
+	user2 := s.mustCreateUser("bob.subscription@test.com", service.RoleUser)
+	group := s.mustCreateGroup("g-email-filter")
+
+	s.mustCreateSubscription(user1.ID, group.ID, nil)
+	s.mustCreateSubscription(user2.ID, group.ID, nil)
+
+	subs, _, err := s.repo.List(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, nil, nil, "", "ALICE")
+	s.Require().NoError(err)
+	s.Require().Len(subs, 1)
+	s.Require().Equal(user1.ID, subs[0].UserID)
+	s.Require().NotNil(subs[0].User)
+	s.Require().Equal("alice.subscription@test.com", subs[0].User.Email)
 }
 
 // --- Usage tracking ---

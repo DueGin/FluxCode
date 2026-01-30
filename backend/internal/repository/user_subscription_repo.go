@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	dbent "github.com/DueGin/FluxCode/ent"
+	dbuser "github.com/DueGin/FluxCode/ent/user"
 	"github.com/DueGin/FluxCode/ent/usersubscription"
 	"github.com/DueGin/FluxCode/internal/pkg/pagination"
 	"github.com/DueGin/FluxCode/internal/service"
@@ -190,7 +192,7 @@ func (r *userSubscriptionRepository) ListByGroupID(ctx context.Context, groupID 
 	return userSubscriptionEntitiesToService(subs), paginationResultFromTotal(int64(total), params), nil
 }
 
-func (r *userSubscriptionRepository) List(ctx context.Context, params pagination.PaginationParams, userID, groupID *int64, status string) ([]service.UserSubscription, *pagination.PaginationResult, error) {
+func (r *userSubscriptionRepository) List(ctx context.Context, params pagination.PaginationParams, userID, groupID *int64, status string, userEmail string) ([]service.UserSubscription, *pagination.PaginationResult, error) {
 	client := clientFromContext(ctx, r.client)
 	q := client.UserSubscription.Query()
 	if userID != nil {
@@ -201,6 +203,9 @@ func (r *userSubscriptionRepository) List(ctx context.Context, params pagination
 	}
 	if status != "" {
 		q = q.Where(usersubscription.StatusEQ(status))
+	}
+	if userEmail = strings.TrimSpace(userEmail); userEmail != "" {
+		q = q.Where(usersubscription.HasUserWith(dbuser.EmailContainsFold(userEmail)))
 	}
 
 	total, err := q.Clone().Count(ctx)
