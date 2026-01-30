@@ -60,6 +60,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		ContactInfo:                       settings.ContactInfo,
 		AfterSaleContact:                  afterSaleContact,
 		DocURL:                            settings.DocURL,
+		RedeemDeliveryText:                settings.RedeemDeliveryText,
 		AttractPopupTitle:                 settings.AttractPopupTitle,
 		AttractPopupMarkdown:              settings.AttractPopupMarkdown,
 		DefaultConcurrency:                settings.DefaultConcurrency,
@@ -109,6 +110,7 @@ type UpdateSettingsRequest struct {
 	ContactInfo          string       `json:"contact_info"`
 	AfterSaleContact     []dto.KVItem `json:"after_sale_contact"`
 	DocURL               string       `json:"doc_url"`
+	RedeemDeliveryText   string       `json:"redeem_delivery_text"`
 	AttractPopupTitle    string       `json:"attract_popup_title"`
 	AttractPopupMarkdown string       `json:"attract_popup_markdown"`
 
@@ -227,6 +229,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			return out
 		}(),
 		DocURL:                            req.DocURL,
+		RedeemDeliveryText:                req.RedeemDeliveryText,
 		AttractPopupTitle:                 req.AttractPopupTitle,
 		AttractPopupMarkdown:              req.AttractPopupMarkdown,
 		DefaultConcurrency:                req.DefaultConcurrency,
@@ -282,6 +285,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ContactInfo:                       updatedSettings.ContactInfo,
 		AfterSaleContact:                  updatedAfterSaleContact,
 		DocURL:                            updatedSettings.DocURL,
+		RedeemDeliveryText:                updatedSettings.RedeemDeliveryText,
 		AttractPopupTitle:                 updatedSettings.AttractPopupTitle,
 		AttractPopupMarkdown:              updatedSettings.AttractPopupMarkdown,
 		DefaultConcurrency:                updatedSettings.DefaultConcurrency,

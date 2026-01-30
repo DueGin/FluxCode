@@ -1777,6 +1777,7 @@ export default {
       count: 'Count',
       generating: 'Generating...',
       generate: 'Generate',
+      copyDeliveryText: 'Copy Delivery Text',
       copyAll: 'Copy All',
       copied: 'Copied!',
       download: 'Download',
@@ -1920,6 +1921,11 @@ export default {
         logoSizeError: 'Image size exceeds 300KB limit ({size}KB)',
         logoTypeError: 'Please select an image file',
         logoReadError: 'Failed to read the image file'
+      },
+      redeemDeliveryText: {
+        label: 'Redeem Delivery Text',
+        placeholder: 'e.g. Your redeem codes:\n${redeemCodes}',
+        hint: 'Supports placeholder ${redeemCodes}, which will be replaced with the redeem codes generated this time.'
       },
       attractPopup: {
         title: 'Attract Popup',

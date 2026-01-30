@@ -606,6 +606,22 @@
               </p>
             </div>
 
+            <!-- Redeem Delivery Text -->
+            <div>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('admin.settings.redeemDeliveryText.label') }}
+              </label>
+              <textarea
+                v-model="form.redeem_delivery_text"
+                rows="4"
+                class="textarea font-mono text-sm"
+                :placeholder="t('admin.settings.redeemDeliveryText.placeholder')"
+              ></textarea>
+              <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.settings.redeemDeliveryText.hint') }}
+              </p>
+            </div>
+
             <!-- Attract Popup -->
             <div class="border-t border-gray-100 pt-6 dark:border-dark-700">
               <div class="mb-4">
@@ -1001,6 +1017,7 @@ const newAdminApiKey = ref('')
   contact_info: '',
   after_sale_contact: [],
   doc_url: '',
+  redeem_delivery_text: '${redeemCodes}',
   attract_popup_title: '',
   attract_popup_markdown: '',
   smtp_host: '',

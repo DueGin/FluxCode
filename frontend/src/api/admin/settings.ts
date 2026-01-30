@@ -32,6 +32,7 @@ export interface SystemSettings {
   contact_info: string
   after_sale_contact: KeyValueItem[]
   doc_url: string
+  redeem_delivery_text: string
   attract_popup_title: string
   attract_popup_markdown: string
   // SMTP settings

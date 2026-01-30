@@ -31,6 +31,7 @@ type SystemSettings struct {
 	ContactInfo          string
 	AfterSaleContact     []KVItem
 	DocURL               string
+	RedeemDeliveryText   string
 	AttractPopupTitle    string
 	AttractPopupMarkdown string
 

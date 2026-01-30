@@ -86,6 +86,7 @@ const (
 	SettingKeyContactInfo          = "contact_info"           // 客服联系方式
 	SettingKeyAfterSaleContact     = "after_sale_contact"     // 售后联系方式（KV JSON 数组）
 	SettingKeyDocURL               = "doc_url"                // 文档链接
+	SettingKeyRedeemDeliveryText   = "redeem_delivery_text"   // 兑换码发货文案（支持 ${redeemCodes} 占位符）
 	SettingKeyAttractPopupTitle    = "attract_popup_title"    // 引流弹窗标题
 	SettingKeyAttractPopupMarkdown = "attract_popup_markdown" // 引流弹窗 Markdown 文案
 

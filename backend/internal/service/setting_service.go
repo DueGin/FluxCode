@@ -192,6 +192,7 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyContactInfo] = settings.ContactInfo
 	updates[SettingKeyAfterSaleContact] = s.marshalKVItems(settings.AfterSaleContact)
 	updates[SettingKeyDocURL] = settings.DocURL
+	updates[SettingKeyRedeemDeliveryText] = settings.RedeemDeliveryText
 	updates[SettingKeyAttractPopupTitle] = settings.AttractPopupTitle
 	updates[SettingKeyAttractPopupMarkdown] = settings.AttractPopupMarkdown
 	// 历史兼容：保持旧 key 与新 key 同步，避免灰度/回滚期间出现配置丢失。
@@ -551,6 +552,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeySiteName:                          s.webTitleDefault(),
 		SettingKeySiteLogo:                          "",
 		SettingKeyAfterSaleContact:                  "[]",
+		SettingKeyRedeemDeliveryText:                "${redeemCodes}",
 		SettingKeyDefaultConcurrency:                strconv.Itoa(s.cfg.Default.UserConcurrency),
 		SettingKeyDefaultBalance:                    strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
 		SettingKeyGatewayRetrySwitchAfter:           strconv.Itoa(defaultGatewayRetrySwitchAfter),
@@ -616,6 +618,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		ContactInfo:         settings[SettingKeyContactInfo],
 		AfterSaleContact:    s.parseKVItems(settings[SettingKeyAfterSaleContact]),
 		DocURL:              settings[SettingKeyDocURL],
+		RedeemDeliveryText:  s.getStringOrDefault(settings, SettingKeyRedeemDeliveryText, "${redeemCodes}"),
 		AttractPopupTitle: s.getStringWithFallback(
 			settings,
 			SettingKeyAttractPopupTitle,

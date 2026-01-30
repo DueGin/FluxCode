@@ -1779,6 +1779,7 @@ export default {
       value: '面值',
       count: '数量',
       generate: '生成',
+      copyDeliveryText: '复制发货文案',
       copyAll: '全部复制',
       download: '下载',
       codesExported: '兑换码导出成功',
@@ -1920,6 +1921,11 @@ export default {
         logoSizeError: '图片大小超过 300KB 限制（{size}KB）',
         logoTypeError: '请选择图片文件',
         logoReadError: '读取图片文件失败'
+      },
+      redeemDeliveryText: {
+        label: '兑换码发货文案',
+        placeholder: '例如：您的兑换码如下：\n${redeemCodes}',
+        hint: '支持占位符 ${redeemCodes}，将替换为本次生成的兑换码列表。'
       },
       attractPopup: {
         title: '引流弹窗',

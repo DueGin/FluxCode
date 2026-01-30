@@ -461,6 +461,38 @@
             class="flex justify-end gap-2 rounded-b-xl border-t border-gray-200 bg-gray-50 px-5 py-4 dark:border-dark-600 dark:bg-dark-700/50"
           >
             <button
+              @click="copyDeliveryText"
+              :class="[
+                'btn flex items-center gap-2 transition-all',
+                copiedDelivery ? 'btn-success' : 'btn-secondary'
+              ]"
+            >
+              <svg
+                v-if="!copiedDelivery"
+                class="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
+              </svg>
+              <svg
+                v-else
+                class="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              {{ copiedDelivery ? t('admin.redeem.copied') : t('admin.redeem.copyDeliveryText') }}
+            </button>
+            <button
               @click="copyGeneratedCodes"
               :class="[
                 'btn flex items-center gap-2 transition-all',
@@ -566,6 +598,7 @@
 	const showResultDialog = ref(false)
 	const generatedCodes = ref<RedeemCode[]>([])
 	const subscriptionGroups = ref<Group[]>([])
+	const redeemDeliveryText = ref('${redeemCodes}')
 
 // 订阅类型分组选项
 const subscriptionGroupOptions = computed(() => {
@@ -581,6 +614,23 @@ const generatedCodesText = computed(() => {
   return generatedCodes.value.map((code) => code.code).join('\n')
 })
 
+const redeemCodesPlaceholderText = computed(() => {
+  const codes = generatedCodes.value.map((code) => code.code)
+  if (codes.length === 1) {
+    return codes[0]
+  }
+  if (codes.length > 1) {
+    return codes.join('\n') + '\n'
+  }
+  return ''
+})
+
+const deliveryText = computed(() => {
+  const template = redeemDeliveryText.value
+  const effectiveTemplate = template && template.trim() !== '' ? template : '${redeemCodes}'
+  return effectiveTemplate.split('${redeemCodes}').join(redeemCodesPlaceholderText.value)
+})
+
 const textareaHeight = computed(() => {
   const lineCount = generatedCodes.value.length
   const lineHeight = 24 // approximate line height in px
@@ -591,11 +641,23 @@ const textareaHeight = computed(() => {
 })
 
 const copiedAll = ref(false)
+const copiedDelivery = ref(false)
 
 const closeResultDialog = () => {
   showResultDialog.value = false
   generatedCodes.value = []
   copiedAll.value = false
+  copiedDelivery.value = false
+}
+
+const copyDeliveryText = async () => {
+  const success = await clipboardCopy(deliveryText.value, t('admin.redeem.copied'))
+  if (success) {
+    copiedDelivery.value = true
+    setTimeout(() => {
+      copiedDelivery.value = false
+    }, 2000)
+  }
 }
 
 const copyGeneratedCodes = async () => {
@@ -692,7 +754,7 @@ const deletingCode = ref<RedeemCode | null>(null)
 	)
 
 	const generateForm = reactive({
-	  type: 'balance' as RedeemCodeType,
+	  type: 'subscription' as RedeemCodeType,
 	  value: 10,
   count: 1,
   group_id: null as number | null,
@@ -903,10 +965,20 @@ const loadSubscriptionGroups = async () => {
   }
 }
 
+const loadRedeemDeliveryText = async () => {
+  try {
+    const settings = await adminAPI.settings.getSettings()
+    redeemDeliveryText.value = settings.redeem_delivery_text || '${redeemCodes}'
+  } catch (error) {
+    console.error('Error loading redeem delivery text:', error)
+  }
+}
+
 	onMounted(() => {
 	  document.addEventListener('click', handleClickOutside)
 	  loadCodes()
 	  loadSubscriptionGroups()
+	  loadRedeemDeliveryText()
 	  loadWelfareNos()
 	})
 

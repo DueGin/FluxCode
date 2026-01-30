@@ -32,6 +32,7 @@ type SystemSettings struct {
 	ContactInfo          string   `json:"contact_info"`
 	AfterSaleContact     []KVItem `json:"after_sale_contact"`
 	DocURL               string   `json:"doc_url"`
+	RedeemDeliveryText   string   `json:"redeem_delivery_text"`
 	AttractPopupTitle    string   `json:"attract_popup_title"`
 	AttractPopupMarkdown string   `json:"attract_popup_markdown"`
 
