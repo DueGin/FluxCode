@@ -133,7 +133,9 @@ async function maybeShow(): Promise<void> {
   if (PUBLIC_PATHS.has(path)) {
     if (isPublicDismissedToday()) return
     // 官网首页识别“已登录且已永久不再提醒”的用户：若 token 存在，则读取用户维度偏好并全站生效（官网首页与控制台均不展示）。
-    if (localStorage.getItem('auth_token') && !authStore.isAdmin) {
+    // 管理员在官网首页默认不展示该引流弹窗
+    if (authStore.isAdmin) return
+    if (localStorage.getItem('auth_token')) {
       await loadDashboardPreferenceIfNeeded()
       if (dashboardPopupDisabled.value) return
     }
