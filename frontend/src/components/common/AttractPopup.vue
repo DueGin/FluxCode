@@ -93,7 +93,10 @@ function setPublicDismissedToday(): void {
 }
 
 async function loadDashboardPreferenceIfNeeded(): Promise<void> {
-  if (!authStore.isAuthenticated || authStore.isAdmin) {
+  // 对于官网首页：我们以 localStorage 的 auth_token 作为“已登录”的判断依据，
+  // 因为 public 页可能没有预先加载 user 信息，但依然可以用 token 调用偏好接口。
+  const hasToken = !!localStorage.getItem('auth_token')
+  if (!hasToken || authStore.isAdmin) {
     dashboardPopupDisabled.value = null
     return
   }
@@ -129,7 +132,8 @@ async function maybeShow(): Promise<void> {
 
   if (PUBLIC_PATHS.has(path)) {
     if (isPublicDismissedToday()) return
-    if (authStore.isAuthenticated && !authStore.isAdmin) {
+    // 官网首页识别“已登录且已永久不再提醒”的用户：若 token 存在，则读取用户维度偏好并全站生效（官网首页与控制台均不展示）。
+    if (localStorage.getItem('auth_token') && !authStore.isAdmin) {
       await loadDashboardPreferenceIfNeeded()
       if (dashboardPopupDisabled.value) return
     }
